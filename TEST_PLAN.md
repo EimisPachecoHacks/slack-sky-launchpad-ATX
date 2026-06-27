@@ -64,11 +64,11 @@ Set real keys in `project/.env` first.
 
 | ID | Provider | How | Expected | Status |
 |---|---|---|---|---|
-| P-1 | MiniMax — architecture JSON | `POST /api/architecture/generate` with sample requirements | 200; body parses to the `architecture` JSON schema (services, connections, total_cost); markdown present | 🔑 |
-| P-2 | MiniMax model id honored | set `MINIMAX_MODEL`; check backend log `[MiniMax] <model>` | Log shows configured model; response non-empty | 🔑 |
-| P-3 | Gemini vision — image analysis | `POST /api/architecture/analyze-image` with a diagram PNG | 200; returns `provider`, `detected_components`, `complexity`, `estimated_monthly_cost`, `connections` | 🔑 |
-| P-4 | Gemini vision model id | confirm request uses `gemini-3.1-pro-preview` (or `GEMINI_VISION_MODEL`) | Backend log `[Gemini] gemini-3.1-pro-preview` | 🔑 |
-| P-5 | Gemini voice transcription | `POST /api/voice/transcribe` with a short audio clip | 200; `{"success":true,"text":"..."}` with plausible transcript | 🔑 |
+| P-1 | MiniMax — architecture JSON | agent `generate_architecture()` + `parse_claude_architecture_response()` (verified directly; HTTP route needs JWT) | Parsed `architecture` JSON: 8 GCP services, total_cost $175.85. MiniMax-M2 emits a `<think>` preamble then a ```json block — parser handles it. | ✅ |
+| P-2 | MiniMax model id honored | backend log on startup | `MiniMax Model: MiniMax-M2` | ✅ |
+| P-3 | Gemini vision — image analysis | `vision()` on a sample diagram (verified directly; HTTP route needs JWT) | Correctly identified AWS data-lake services (Kinesis, Glue, S3, Athena, EMR, SageMaker, …) | ✅ |
+| P-4 | Gemini vision model id | confirm call uses `gemini-3.1-pro-preview` (default) | Vision call succeeded on `gemini-3.1-pro-preview` | ✅ |
+| P-5 | Gemini voice transcription | `POST /api/voice/transcribe` with a short audio clip | 200; `{"success":true,"text":"..."}` with plausible transcript | 🔑👤 (needs audio sample) |
 | P-6 | Graceful failure w/o key | unset a key, call its route | Clear error (RuntimeError surfaced as 500 with message), server stays up | ⏳ |
 | P-7 | Antigravity managed agent | trigger a real failed deploy (see E-1) with `GEMINI_API_KEY` | Interactions API call attempted with `antigravity-preview-05-2026`, `env_id` reused across retries; fallback only if preview unavailable | 🔑 |
 
@@ -128,6 +128,8 @@ Goal: prove "it learns, and the lesson transfers."
 - **Preview model IDs** (`MiniMax-M2`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-live-preview`, `antigravity-preview-05-2026`) require account access; verify before P-/E- tests.
 - **E2E (Section 6)** mutates real cloud resources — run in a throwaway GCP project and destroy after (`terraform destroy`).
 - Voice transcription uses a record-then-POST model (not full duplex streaming); acceptable for the demo.
+- **HTTP auth:** `/api/architecture/*` (incl. generate) require a **JWT** (`Authorization: Bearer`) plus an `X-API-Key`, per the app's existing auth layer and the placeholder `API_KEYS`/`JWT_SECRET_KEY` in `.env`. The frontend's sign-in flow supplies these; for raw API testing, obtain a JWT or relax auth in `.env` for local dev. (Providers themselves were verified directly — see P-1/P-3.)
+- **MiniMax-M2 reasoning preamble:** responses begin with a `<think>…</think>` block before the ```json output. The current parser extracts the JSON block correctly; keep the ```json instruction in the system prompt.
 
 ---
 
