@@ -36,3 +36,4 @@ pytest-mock>=3.12.0  # Enhanced mocking capabilities
 # Optional for production
 # gunicorn==21.2.0  # For production deployment
 # mangum==0.17.0    # For AWS Lambda deployment
+boto3>=1.34.0  # AWS S3 storage backend (optional)

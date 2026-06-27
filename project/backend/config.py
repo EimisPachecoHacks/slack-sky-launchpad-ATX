@@ -9,15 +9,37 @@ from pydantic import Field, validator
 class Settings(BaseSettings):
     """Application settings with validation"""
 
-    # Anthropic API Configuration
-    ANTHROPIC_API_KEY: str = Field(..., description="Anthropic API key")
+    # Anthropic API Configuration (legacy/optional — replaced by MiniMax + Gemini)
+    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key (legacy/optional)")
     ANTHROPIC_MODEL: str = Field(
         default="claude-opus-4-6",
-        description="Anthropic model ID"
+        description="Anthropic model ID (legacy)"
     )
 
-    # ElevenLabs API Configuration (Optional - for voice input)
-    ELEVENLABS_API_KEY: str = Field(default="", description="ElevenLabs API key for voice transcription (optional)")
+    # MiniMax API Configuration — powers cloud-architecture JSON generation (replaces Anthropic)
+    MINIMAX_API_KEY: str = Field(default="", description="MiniMax API key")
+    MINIMAX_MODEL: str = Field(default="MiniMax-M2", description="MiniMax model id (best general model)")
+    MINIMAX_BASE_URL: str = Field(
+        default="https://api.minimax.io/v1",
+        description="MiniMax OpenAI-compatible base URL",
+    )
+
+    # Google Gemini API Configuration — image analysis + real-time voice (replaces Claude Vision + ElevenLabs)
+    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
+    GEMINI_VISION_MODEL: str = Field(
+        default="gemini-3.1-pro-preview", description="Gemini model for image analysis"
+    )
+    GEMINI_LIVE_MODEL: str = Field(
+        default="gemini-3.1-flash-live-preview",
+        description="Gemini Live model for real-time voice (narration + transcription)",
+    )
+    ANTIGRAVITY_MODEL: str = Field(
+        default="antigravity-preview-05-2026",
+        description="Gemini Interactions API managed-agent model (self-improvement loop)",
+    )
+
+    # ElevenLabs API Configuration (deprecated — voice now powered by Gemini Live)
+    ELEVENLABS_API_KEY: str = Field(default="", description="Deprecated; voice uses Gemini Live")
 
     # API Configuration
     API_ENVIRONMENT: str = Field(default="development", description="Environment (development/production)")
@@ -65,6 +87,7 @@ class Settings(BaseSettings):
         env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
         env_file_encoding = 'utf-8'
         case_sensitive = True
+        extra = "ignore"  # tolerate extra .env keys (e.g. deployer/CLI-only vars)
 
     @validator("CORS_ORIGINS")
     def validate_cors_origins(cls, v: str) -> str:
@@ -144,10 +167,13 @@ try:
 except Exception as e:
     print(f"❌ Configuration Error: {e}")
     print("\n🔧 Please check your .env file and ensure all required variables are set.")
-    print("\nRequired environment variables:")
-    print("  - ANTHROPIC_API_KEY")
+    print("\nKey environment variables (set the providers you use):")
+    print("  - MINIMAX_API_KEY     (cloud architecture JSON generation)")
+    print("  - GEMINI_API_KEY      (image analysis + real-time voice)")
     print("\nOptional environment variables:")
-    print("  - ANTHROPIC_MODEL (default: claude-opus-4-6)")
+    print("  - MINIMAX_MODEL (default: MiniMax-M2)")
+    print("  - GEMINI_VISION_MODEL (default: gemini-3.1-pro-preview)")
+    print("  - GEMINI_LIVE_MODEL (default: gemini-3.1-flash-live-preview)")
     print("  - API_ENVIRONMENT (default: development)")
     print("  - CORS_ORIGINS (default: http://localhost:5173,http://localhost:3000)")
     print("  - RATE_LIMIT_PER_MINUTE (default: 10)")
@@ -188,8 +214,15 @@ def validate_configuration():
     # Print configuration summary
     print("\n✅ Configuration validated successfully")
     print(f"   Environment: {settings.API_ENVIRONMENT}")
-    print(f"   Anthropic Model: {settings.ANTHROPIC_MODEL}")
+    print(f"   MiniMax Model: {settings.MINIMAX_MODEL}")
+    print(f"   Gemini Vision Model: {settings.GEMINI_VISION_MODEL}")
+    print(f"   Gemini Live Model: {settings.GEMINI_LIVE_MODEL}")
     print(f"   CORS Origins: {len(settings.get_cors_origins())} origin(s)")
+    # Warn if no provider keys are configured (servers still start; calls fail until set)
+    if not settings.MINIMAX_API_KEY:
+        print("   ⚠️  MINIMAX_API_KEY not set — architecture generation will fail until configured")
+    if not settings.GEMINI_API_KEY:
+        print("   ⚠️  GEMINI_API_KEY not set — image analysis & voice will fail until configured")
     print(f"   Rate Limiting: {'Enabled' if settings.RATE_LIMIT_ENABLED else 'Disabled'}")
     if settings.RATE_LIMIT_ENABLED:
         print(f"   Rate Limit: {settings.RATE_LIMIT_PER_MINUTE} req/min")

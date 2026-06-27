@@ -1472,51 +1472,38 @@ async def gitlab_duo_status():
     }
 
 
-@app.get(
-    "/api/scribe-token",
+@app.post(
+    "/api/voice/transcribe",
     dependencies=[Depends(check_rate_limit)]
 )
-async def get_scribe_token(
+async def transcribe_voice(
+    file: UploadFile = File(...),
     auth_context: dict = Security(optional_authentication)
 ):
     """
-    Generate a single-use token for ElevenLabs Scribe v2 Realtime
+    Transcribe uploaded audio to text using the Gemini Live model
+    (gemini-3.1-flash-live-preview), replacing ElevenLabs Scribe.
 
     **Authentication**: Optional
     **Rate Limit**: Yes
     """
     try:
-        from elevenlabs import ElevenLabs
+        from backend.gemini_client import transcribe_audio
 
-        # Get ElevenLabs API key from environment
-        elevenlabs_api_key = os.getenv('ELEVENLABS_API_KEY')
-        if not elevenlabs_api_key:
-            raise HTTPException(
-                status_code=500,
-                detail="ElevenLabs API key not configured"
-            )
+        audio_bytes = await file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio upload")
 
-        logger.info("Generating single-use token for Scribe v2 Realtime")
+        logger.info(f"🎙️  Transcribing {len(audio_bytes)} bytes via Gemini Live...")
+        text = transcribe_audio(audio_bytes, file.content_type or "audio/webm")
+        logger.info("✅ Transcription complete")
 
-        # Create ElevenLabs client
-        client = ElevenLabs(api_key=elevenlabs_api_key)
-
-        # Generate single-use token for realtime scribe
-        token_response = client.tokens.single_use.create(
-            token_type="realtime_scribe"
-        )
-
-        logger.info(f"✅ Token generated successfully")
-
-        return {
-            "success": True,
-            "token": token_response.token
-        }
+        return {"success": True, "text": text}
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating Scribe token: {e}")
+        logger.error(f"Error transcribing voice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

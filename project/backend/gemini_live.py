@@ -74,7 +74,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-GEMINI_LIVE_MODEL: str = "gemini-3.5-live-preview"
+GEMINI_LIVE_MODEL: str = os.getenv("GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview")
 
 # Per-subscriber queue depth. The bus drops the oldest events for a subscriber
 # that falls behind so a slow / disconnected client can never block the deploy

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, MicOff, Loader2, Volume2 } from 'lucide-react';
-import { Scribe, RealtimeEvents } from '@elevenlabs/client';
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
@@ -8,6 +7,13 @@ interface VoiceInputProps {
   buttonClassName?: string;
 }
 
+/**
+ * Voice input powered by Google Gemini (gemini-3.1-flash-live-preview).
+ *
+ * Records mic audio in the browser, then POSTs it to the backend
+ * `/api/voice/transcribe` endpoint, which transcribes it with Gemini.
+ * (Replaces the previous ElevenLabs Scribe integration.)
+ */
 const VoiceInput: React.FC<VoiceInputProps> = ({
   onTranscript,
   className = '',
@@ -16,118 +22,81 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const connectionRef = useRef<any | null>(null);
-  const transcriptRef = useRef<string>('');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (connectionRef.current) {
-        try {
-          connectionRef.current.close();
-        } catch (e) {
-          console.error('Error closing connection:', e);
-        }
+      try {
+        mediaRecorderRef.current?.stop();
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        // ignore
       }
     };
   }, []);
 
-  const startRecording = async () => {
+  const transcribe = async (blob: Blob) => {
+    setIsProcessing(true);
     try {
-      setError(null);
-      setIsProcessing(true);
-      transcriptRef.current = '';
-
-      // Get single-use token from backend
-      const response = await fetch('/api/scribe-token');
-      if (!response.ok) {
-        throw new Error('Failed to get authentication token');
+      const form = new FormData();
+      form.append('file', blob, 'recording.webm');
+      const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form });
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail?.detail || 'Transcription failed');
       }
-
-      const { token } = await response.json();
-
-      // Connect to ElevenLabs Scribe v2 Realtime
-      const connection = Scribe.connect({
-        token,
-        modelId: 'scribe_v2_realtime',
-        includeTimestamps: false,
-        microphone: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      connectionRef.current = connection;
-
-      // Handle session started
-      connection.on(RealtimeEvents.SESSION_STARTED, () => {
-        console.log('Scribe session started');
-        setIsRecording(true);
-        setIsProcessing(false);
-      });
-
-      // Handle partial transcripts (real-time updates)
-      connection.on(RealtimeEvents.PARTIAL_TRANSCRIPT, (data: { text: string }) => {
-        console.log('Partial:', data.text);
-        // Show real-time partial results
-        const fullText = transcriptRef.current + (transcriptRef.current ? ' ' : '') + data.text;
-        onTranscript(fullText);
-      });
-
-      // Handle committed transcripts (finalized segments)
-      connection.on(RealtimeEvents.COMMITTED_TRANSCRIPT, (data: { text: string }) => {
-        console.log('Committed:', data.text);
-        // Add to committed transcript
-        transcriptRef.current += (transcriptRef.current ? ' ' : '') + data.text;
-        // Update with committed text
-        onTranscript(transcriptRef.current);
-      });
-
-      // Handle errors
-      connection.on(RealtimeEvents.ERROR, (errorData: any) => {
-        console.error('Scribe error:', errorData);
-        setError('Transcription error occurred');
-        setIsRecording(false);
-        setIsProcessing(false);
-      });
-
-      // Handle session ended
-      connection.on(RealtimeEvents.SESSION_ENDED, () => {
-        console.log('Scribe session ended');
-        setIsRecording(false);
-        setIsProcessing(false);
-
-        // Send final transcript to parent
-        if (transcriptRef.current) {
-          onTranscript(transcriptRef.current);
-        }
-      });
-
+      const data = await res.json();
+      if (data?.text) onTranscript(data.text);
     } catch (err) {
-      console.error('Error starting recording:', err);
-      setError(err instanceof Error ? err.message : 'Failed to start recording');
-      setIsRecording(false);
+      console.error('Transcription error:', err);
+      setError(err instanceof Error ? err.message : 'Transcription failed');
+    } finally {
       setIsProcessing(false);
     }
   };
 
-  const stopRecording = () => {
-    if (connectionRef.current) {
-      try {
-        // Close the connection gracefully
-        connectionRef.current.close();
-        connectionRef.current = null;
+  const startRecording = async () => {
+    try {
+      setError(null);
+      chunksRef.current = [];
 
-        // Clear states immediately
-        setIsRecording(false);
-        setIsProcessing(false);
-      } catch (err) {
-        console.error('Error stopping recording:', err);
-        setError('Failed to stop recording');
-        setIsRecording(false);
-        setIsProcessing(false);
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        streamRef.current?.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (blob.size > 0) transcribe(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Error starting recording:', err);
+      setError(err instanceof Error ? err.message : 'Microphone access denied');
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      mediaRecorderRef.current?.stop();
+    } catch (err) {
+      console.error('Error stopping recording:', err);
+      setError('Failed to stop recording');
+    } finally {
+      setIsRecording(false);
     }
   };
 
@@ -173,7 +142,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
 
         {/* Tooltip */}
         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-          {isRecording ? 'Stop recording' : isProcessing ? 'Connecting...' : 'Voice input'}
+          {isRecording ? 'Stop recording' : isProcessing ? 'Transcribing...' : 'Voice input'}
         </div>
       </button>
 

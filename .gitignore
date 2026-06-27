@@ -43,3 +43,9 @@ dist/
 coverage/
 
 # skyrchitect: monorepo sync marker (no ignore-behavior change)
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc

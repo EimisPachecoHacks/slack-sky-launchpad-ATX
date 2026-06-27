@@ -1,19 +1,18 @@
 """
 AI Agent for Cloud Architecture Recommendations
 
-Routes all text-based AI requests through the GitLab Duo Agent Platform
-(glab duo cli run --goal) so that AGENTS.md, chat-rules.md, and SKILL.md
-files are automatically loaded as context.
+Routes all text-based AI requests (architecture JSON + markdown) through the
+MiniMax model (see backend/minimax_client.py), replacing the previous
+Anthropic-backed path.
 
-Image/vision analysis remains in image_analysis_agent.py because
-glab duo cli does not support multimodal input.
+Image/vision analysis lives in image_analysis_agent.py (Google Gemini).
 """
 
 import logging
 import os
 from typing import Optional
 
-from backend.duo_client import get_duo_client
+from backend.minimax_client import minimax_chat
 
 logger = logging.getLogger(__name__)
 
@@ -72,19 +71,16 @@ class ArchitectureAgent:
     """AI Agent for cloud architecture design routed via GitLab Duo CLI."""
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
-        # Anthropic model is the configured default for the app (vision / direct API paths);
-        # this agent's text architecture calls are routed through GitLab Duo.
-        self.model = model or os.getenv("ANTHROPIC_MODEL", "claude-opus-4-6")
-        self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
-        self.duo = get_duo_client()
-        logger.info("ArchitectureAgent initialized (GitLab Duo CLI backend)")
+        # Architecture text/JSON generation is powered by MiniMax.
+        self.model = model or os.getenv("MINIMAX_MODEL", "MiniMax-M2")
+        self.api_key = api_key or os.getenv("MINIMAX_API_KEY", "")
+        logger.info("ArchitectureAgent initialized (MiniMax backend)")
 
     def _call_duo(self, prompt: str) -> str:
-        """Send prompt to GitLab Duo and return the response."""
-        full_prompt = f"{_SYSTEM_PROMPT}\n\nHere are the user requirements:\n\n{prompt}"
-        logger.info(f"[ArchitectureAgent] Sending to GitLab Duo ({len(full_prompt)} chars)")
-        response = self.duo.ask(full_prompt)
-        logger.info(f"[ArchitectureAgent] Received {len(response)} chars from Duo")
+        """Generate an architecture response via MiniMax (name kept for call-site stability)."""
+        logger.info(f"[ArchitectureAgent] Sending to MiniMax ({len(prompt)} chars)")
+        response = minimax_chat(prompt, system=_SYSTEM_PROMPT)
+        logger.info(f"[ArchitectureAgent] Received {len(response)} chars from MiniMax")
         return response
 
     def generate_architecture(self, requirements: str) -> str:
