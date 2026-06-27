@@ -68,7 +68,7 @@ Set real keys in `project/.env` first.
 | P-2 | MiniMax model id honored | backend log on startup | `MiniMax Model: MiniMax-M2` | ✅ |
 | P-3 | Gemini vision — image analysis | `vision()` on a sample diagram (verified directly; HTTP route needs JWT) | Correctly identified AWS data-lake services (Kinesis, Glue, S3, Athena, EMR, SageMaker, …) | ✅ |
 | P-4 | Gemini vision model id | confirm call uses `gemini-3.1-pro-preview` (default) | Vision call succeeded on `gemini-3.1-pro-preview` | ✅ |
-| P-5 | Gemini voice transcription | `POST /api/voice/transcribe` with a short audio clip | 200; `{"success":true,"text":"..."}` with plausible transcript | 🔑👤 (needs audio sample) |
+| P-5 | Gemini voice transcription | `POST /api/voice/transcribe` with a short audio clip | 200; `{"success":true,"text":"Design a photo sharing application on Google Cloud…"}` in ~1.9s (model `gemini-3.1-flash-lite`) | ✅ |
 | P-6 | Graceful failure w/o key | unset a key, call its route | Clear error (RuntimeError surfaced as 500 with message), server stays up | ⏳ |
 | P-7 | Antigravity managed agent | trigger a real failed deploy (see E-1) with `GEMINI_API_KEY` | Interactions API call attempted with `antigravity-preview-05-2026`, `env_id` reused across retries; fallback only if preview unavailable | 🔑 |
 
@@ -80,9 +80,9 @@ Set real keys in `project/.env` first.
 |---|---|---|---|---|
 | L-1 | Learn on failure (unit) | U-1 + U-2 already cover diagnose→author→persist offline | New `SKILL.md` authored and indexed | ✅ |
 | L-2 | Repair wiring | Inspect `deploy_with_retry` / `web.py` use `_repair_failure` | On failure: collect context → Antigravity → save skill → retry; legacy regex fixer is fallback | ✅ (code) |
-| L-3 | Persistence | After a learned skill is saved, check filesystem | `skills/learned/<slug>/SKILL.md` + `skills/learned/_index.json` exist | ⏳ |
-| L-4 | Transfer / pre-emption | `skills_loader.get_skills_context()` includes learned skills | Output contains `LEARNED SKILL (auto-authored...)` block | ⏳ |
-| L-5 | Metrics reflect learning | After L-3, call `GET /api/skills/learned` | `count` increments; learned skill listed | ⏳ |
+| L-3 | Persistence | `save_skill(...)` then check filesystem | `skills/learned/<slug>/SKILL.md` (synthesized from fields) + `skills/learned/_index.json` created | ✅ |
+| L-4 | Transfer / pre-emption | `skills_loader.get_skills_context()` + `skill_library.retrieve_skills()` | Generation context contains `LEARNED SKILL` block; retrieval matched the skill (score 0.59) | ✅ |
+| L-5 | Metrics reflect learning | `GET /api/skills/learned` after L-3 | `count:1`, learned skill listed | ✅ |
 
 ---
 
@@ -128,8 +128,9 @@ Goal: prove "it learns, and the lesson transfers."
 - **Preview model IDs** (`MiniMax-M2`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-live-preview`, `antigravity-preview-05-2026`) require account access; verify before P-/E- tests.
 - **E2E (Section 6)** mutates real cloud resources — run in a throwaway GCP project and destroy after (`terraform destroy`).
 - Voice transcription uses a record-then-POST model (not full duplex streaming); acceptable for the demo.
-- **HTTP auth:** `/api/architecture/*` (incl. generate) require a **JWT** (`Authorization: Bearer`) plus an `X-API-Key`, per the app's existing auth layer and the placeholder `API_KEYS`/`JWT_SECRET_KEY` in `.env`. The frontend's sign-in flow supplies these; for raw API testing, obtain a JWT or relax auth in `.env` for local dev. (Providers themselves were verified directly — see P-1/P-3.)
+- **HTTP auth:** `/api/architecture/*` require a **JWT** + `X-API-Key` per the app's auth layer. **Local dev:** with `API_KEYS=` and `JWT_SECRET_KEY=` empty and `API_ENVIRONMENT=development`, auth is bypassed (verified: `/api/architecture/generate` returned 200 via HTTP). **Do not deploy with auth disabled** — set real keys for production.
 - **MiniMax-M2 reasoning preamble:** responses begin with a `<think>…</think>` block before the ```json output. The current parser extracts the JSON block correctly; keep the ```json instruction in the system prompt.
+- **Gemini live model is WebSocket-only:** `gemini-3.1-flash-live-preview` supports only `bidiGenerateContent` (streaming), so it cannot serve the record-then-POST `/api/voice/transcribe`. Transcription uses `GEMINI_TRANSCRIBE_MODEL` (default `gemini-3.1-flash-lite`, a `generateContent` audio model — verified). The live model remains for the streaming narration WS (`gemini_live.py`).
 
 ---
 

@@ -78,10 +78,16 @@ def vision(image_base64: str, image_format: str, prompt: str, model: str | None 
 
 
 def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm", model: str | None = None) -> str:
-    """Transcribe audio to text using the Gemini Live model (replaces ElevenLabs Scribe)."""
+    """Transcribe audio to text via Gemini (replaces ElevenLabs Scribe).
+
+    Note: the realtime live model (GEMINI_LIVE_MODEL) only supports the WebSocket
+    bidi API, so this record-then-POST path uses a generateContent-capable flash
+    model (GEMINI_TRANSCRIBE_MODEL). The live model is used for streaming narration
+    in gemini_live.py.
+    """
     s = _settings()
-    model = model or (getattr(s, "GEMINI_LIVE_MODEL", "") if s else "") or os.getenv(
-        "GEMINI_LIVE_MODEL", "gemini-3.1-flash-live-preview"
+    model = model or (getattr(s, "GEMINI_TRANSCRIBE_MODEL", "") if s else "") or os.getenv(
+        "GEMINI_TRANSCRIBE_MODEL", "gemini-3.1-flash-lite"
     )
     audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
     parts = [

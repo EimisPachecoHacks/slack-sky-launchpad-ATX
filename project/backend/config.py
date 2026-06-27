@@ -31,7 +31,11 @@ class Settings(BaseSettings):
     )
     GEMINI_LIVE_MODEL: str = Field(
         default="gemini-3.1-flash-live-preview",
-        description="Gemini Live model for real-time voice (narration + transcription)",
+        description="Gemini Live model for real-time streaming narration (WebSocket bidi)",
+    )
+    GEMINI_TRANSCRIBE_MODEL: str = Field(
+        default="gemini-3.1-flash-lite",
+        description="Gemini model for record-then-POST voice transcription (generateContent + audio)",
     )
     ANTIGRAVITY_MODEL: str = Field(
         default="antigravity-preview-05-2026",
