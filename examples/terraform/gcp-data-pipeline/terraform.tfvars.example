@@ -1,0 +1,49 @@
+# =============================================================================
+# GCP Data Pipeline — Example Variable Values
+# =============================================================================
+# Copy this file to terraform.tfvars and replace placeholder values.
+# NEVER commit terraform.tfvars with real credentials or secrets.
+# =============================================================================
+
+# GCP project ID (must be 6-30 chars, lowercase letters/digits/hyphens)
+project_id = "my-data-project-123"
+
+# Region for all resources (choose based on data residency and latency needs)
+region = "us-central1"
+
+# Environment: dev | staging | prod
+# dev     — minimal resources, single-zone, lowest cost
+# staging — moderate resources, mirrors prod topology
+# prod    — full HA, multi-zone, monitoring, backups, deletion protection
+environment = "dev"
+
+# Team responsible for this infrastructure
+team = "data-engineering"
+
+# Cost center for billing attribution
+cost_center = "data-platform"
+
+# Additional labels applied to all resources (optional)
+labels = {
+  project   = "analytics-pipeline"
+  owner     = "data-team"
+  terraform = "true"
+}
+
+# Data retention in days (0 = no automatic deletion)
+# Recommended: 730 for dev, 1095 for staging, 0 for prod
+retention_days = 730
+
+# BigQuery dataset identifier (alphanumeric + underscores)
+bigquery_dataset_id = "data_pipeline_warehouse"
+
+# Pub/Sub message retention duration (seconds as string)
+# 604800s = 7 days (maximum)
+pubsub_message_retention = "604800s"
+
+# Timezone for Cloud Scheduler (IANA tz database format)
+scheduler_timezone = "Etc/UTC"
+
+# Enable deletion protection on stateful resources
+# Always true in production; set false in dev for easier teardown
+deletion_protection = false

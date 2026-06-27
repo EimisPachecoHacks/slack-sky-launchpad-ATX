@@ -1,0 +1,32 @@
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Example Variable Values - GCP Serverless API
+# Copy this file to terraform.tfvars and update with your values.
+# NEVER commit terraform.tfvars with real secrets to version control.
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# GCP project ID (must already exist)
+project_id = "my-gcp-project-123"
+
+# Deployment region (choose closest to your users)
+# Options: us-central1, us-east1, europe-west1, asia-northeast1, etc.
+region = "us-central1"
+
+# Environment: dev | staging | prod
+# dev/staging: Cloud Run scales to zero ($0 when idle)
+# prod: maintains minimum instances for low-latency responses
+environment = "dev"
+
+# Additional labels applied to all resources that support labeling
+labels = {
+  team        = "platform"
+  cost_center = "engineering"
+  product     = "serverless-api"
+}
+
+# Container image for Cloud Run
+# Replace with your own image from Artifact Registry or Container Registry
+container_image = "us-docker.pkg.dev/cloudrun/container/hello"
+
+# Cloud Run scaling (min_instances only applies to prod)
+min_instances = 1   # Prod minimum; dev/staging always scale to zero
+max_instances = 10  # Upper bound for all environments

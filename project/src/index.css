@@ -1,0 +1,889 @@
+/* Import Design Tokens - Single Source of Truth */
+@import './styles/design-tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Transparent glass effect for light mode cards - like ball.jpg with gradient */
+  .glass-card-light {
+    position: relative !important;
+    border-radius: 20px !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.5) 0%, rgba(168, 139, 235, 0.5) 100%) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    overflow: hidden !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  
+  .glass-card-light:hover {
+    transform: translateY(-2px) scale(1.01) !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.55) 0%, rgba(168, 139, 235, 0.55) 100%) !important;
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  }
+  
+  /* Apply transparent glass effect to Card components in light mode - like ball.jpg */
+  .light .glass-card-light {
+    position: relative !important;
+    border-radius: 20px !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.5) 0%, rgba(168, 139, 235, 0.5) 100%) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    overflow: hidden !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  
+  .light .glass-card-light:hover {
+    transform: translateY(-2px) scale(1.01) !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.55) 0%, rgba(168, 139, 235, 0.55) 100%) !important;
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  }
+  
+  /* Icon containers in light mode - matching ref1.jpg */
+  .light .icon-container {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+  }
+  
+  /* Buttons with frosted glass effect in light mode */
+  .light button,
+  .light a.inline-flex,
+  .light .btn {
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.25), rgba(139, 92, 246, 0.25)) !important;
+    backdrop-filter: blur(10px) saturate(100%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 0 4px 16px 0 rgba(31, 38, 135, 0.1) !important;
+    transition: all 0.3s ease !important;
+  }
+  
+  .light button:hover,
+  .light a.inline-flex:hover,
+  .light .btn:hover {
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.3), rgba(139, 92, 246, 0.3)) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 6px 20px 0 rgba(31, 38, 135, 0.15), 0 0 20px rgba(139, 92, 246, 0.1) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Gradient Border Card - No Animation */
+  .gradient-border-card {
+    @apply relative inline-block;
+  }
+  
+  .gradient-border-card > .gradient-border-wrapper {
+    @apply relative p-[3px] rounded-xl overflow-hidden shadow-2xl;
+  }
+  
+  .gradient-border-card .gradient-border-bg {
+    @apply absolute inset-0 bg-gradient-to-r from-blue-800 via-purple-800 to-pink-800 rounded-xl opacity-70 transition-opacity duration-500;
+  }
+  
+  /* In light mode, make the border more subtle */
+  .light .gradient-border-card .gradient-border-bg {
+    @apply opacity-30;
+  }
+  
+  .gradient-border-card:hover .gradient-border-bg {
+    @apply opacity-100;
+  }
+  
+  .light .gradient-border-card:hover .gradient-border-bg {
+    @apply opacity-40;
+  }
+  
+  .gradient-border-card .gradient-border-content {
+    @apply relative z-10 dark:bg-black/50 rounded-xl p-8 transition-all duration-500;
+  }
+  
+  /* Make gradient-border-card match other cards in light mode */
+  .light .gradient-border-card .gradient-border-content {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(99, 102, 241, 0.13), rgba(139, 92, 246, 0.1)) !important;
+    backdrop-filter: blur(8px) saturate(110%) !important;
+    -webkit-backdrop-filter: blur(8px) saturate(110%) !important;
+  }
+  
+  .gradient-border-card .gradient-hover-overlay {
+    @apply absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 opacity-0 rounded-xl;
+  }
+  
+  .gradient-border-card:hover .gradient-hover-overlay {
+    @apply opacity-10;
+  }
+  
+  .gradient-border-card .gradient-icon-glow {
+    @apply absolute inset-0 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 rounded-full blur-xl opacity-90 scale-150;
+  }
+  
+  .gradient-border-card:hover .gradient-icon-glow {
+    @apply opacity-100;
+  }
+  
+  /* Roadmap Card with Blur Glow */
+  .roadmap-card {
+    @apply relative;
+  }
+  
+  .roadmap-card .roadmap-glow {
+    @apply absolute -inset-1 bg-gradient-to-r from-blue-500 via-cyan-300 to-purple-500 rounded-xl blur-lg opacity-70 transition duration-500;
+    pointer-events: none;
+  }
+  
+  .roadmap-card:hover .roadmap-glow {
+    @apply opacity-75;
+  }
+  
+  .roadmap-card .roadmap-content {
+    @apply relative rounded-xl overflow-hidden;
+  }
+
+  /* Make links fully clickable by creating an overlay */
+  a.block {
+    @apply relative;
+    pointer-events: auto !important;
+  }
+
+  /* Create a clickable overlay that covers the entire link area */
+  a.block::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    cursor: pointer;
+  }
+
+  /* Disable pointer events on ALL child elements so clicks go to the overlay */
+  a.block * {
+    pointer-events: none !important;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Frosted glass effect for upload card - DARK MODE ONLY */
+  .dark .upload-glass-frosted {
+    position: relative;
+    background: linear-gradient(135deg,
+      rgba(100, 100, 100, 0.15) 0%,
+      rgba(100, 100, 100, 0.08) 50%,
+      rgba(100, 100, 100, 0.15) 100%) !important;
+    backdrop-filter: blur(15px) !important;
+    -webkit-backdrop-filter: blur(15px) !important;
+    border: 2px solid rgba(100, 100, 100, 0.3) !important;
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1) !important;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark .upload-glass-frosted::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.05) 50%,
+      rgba(255, 255, 255, 0.1) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: inherit;
+    z-index: -1;
+    transition: all 0.4s ease;
+  }
+
+  /* Light mode - restore original frosted glass light styling */
+  .light .upload-glass-frosted {
+    position: relative;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    background: rgba(255, 255, 255, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15) !important;
+  }
+
+  .light .upload-glass-frosted::before {
+    display: none;
+  }
+
+  /* Upload Card Dark Mode - Matching provider card frosted glass style */
+  .dark .upload-card-dark {
+    background: linear-gradient(135deg,
+      rgba(100, 100, 100, 0.15) 0%,
+      rgba(100, 100, 100, 0.08) 50%,
+      rgba(100, 100, 100, 0.15) 100%) !important;
+    backdrop-filter: blur(15px) !important;
+    -webkit-backdrop-filter: blur(15px) !important;
+    border: 2px solid rgba(100, 100, 100, 0.3) !important;
+    box-shadow:
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* Upload Button - Solid Blue */
+  .upload-button {
+    background: #3b82f6 !important;
+    border: 2px solid #3b82f6 !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+    transition: all 0.3s ease !important;
+    display: inline-flex !important;
+    margin: 0 auto !important;
+  }
+
+  .upload-button:hover {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Sign Up Button - Same solid blue style as upload button */
+  .signup-button {
+    background: #3b82f6 !important;
+    border: 2px solid #3b82f6 !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+    transition: all 0.3s ease !important;
+    color: white !important;
+  }
+
+  .signup-button:hover {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5) !important;
+    transform: translateY(-1px);
+    color: white !important;
+  }
+
+  /* Light mode signup button */
+  .light .signup-button {
+    color: black !important;
+  }
+
+  .light .signup-button:hover {
+    color: black !important;
+  }
+
+  /* Component-level glass cards for provider theming */
+  .component-glass-card {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 3px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0.75rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+      0 0 0 1px rgba(255, 255, 255, 0.02),
+      0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+  .component-glass-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 8px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  /* AWS Theme - Orange accents */
+  .aws-theme .component-glass-card {
+    border: 3px solid rgba(255, 153, 0, 0.6);
+    background: rgba(255, 153, 0, 0.03);
+    box-shadow: 
+      0 0 0 1px rgba(255, 153, 0, 0.2),
+      0 0 20px rgba(255, 153, 0, 0.3),
+      0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .aws-theme .component-glass-card:hover {
+    border-color: rgba(255, 153, 0, 0.8);
+    background: rgba(255, 153, 0, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 0 1px rgba(255, 153, 0, 0.3),
+      0 0 30px rgba(255, 153, 0, 0.4),
+      0 8px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .aws-theme .component-button-primary {
+    background: linear-gradient(135deg, rgba(255, 153, 0, 0.9), rgba(255, 153, 0, 1));
+    border: 2px solid rgba(255, 153, 0, 0.8);
+    box-shadow: 0 4px 15px rgba(255, 153, 0, 0.4);
+  }
+
+  .aws-theme .component-form-input:focus {
+    border: 2px solid rgba(255, 153, 0, 0.8);
+    box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.2);
+  }
+
+  .aws-theme .component-text-accent {
+    color: rgb(255, 153, 0);
+  }
+
+  /* Azure Theme - Blue accents */
+  .azure-theme .component-glass-card {
+    border: 3px solid rgba(59, 130, 246, 0.6);
+    background: rgba(59, 130, 246, 0.03);
+    box-shadow: 
+      0 0 0 1px rgba(59, 130, 246, 0.2),
+      0 0 20px rgba(59, 130, 246, 0.3),
+      0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .azure-theme .component-glass-card:hover {
+    border-color: rgba(59, 130, 246, 0.8);
+    background: rgba(59, 130, 246, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 0 1px rgba(59, 130, 246, 0.3),
+      0 0 30px rgba(59, 130, 246, 0.4),
+      0 8px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .azure-theme .component-button-primary {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(59, 130, 246, 1));
+    border: 2px solid rgba(59, 130, 246, 0.8);
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+  }
+
+  .azure-theme .component-form-input:focus {
+    border: 2px solid rgba(59, 130, 246, 0.8);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  }
+
+  .azure-theme .component-text-accent {
+    color: rgb(59, 130, 246);
+  }
+
+  /* GCP Theme - Cyan-green accents */
+  .gcp-theme .component-glass-card {
+    border: 3px solid rgba(79, 209, 197, 0.6);
+    background: rgba(79, 209, 197, 0.03);
+    box-shadow: 
+      0 0 0 1px rgba(79, 209, 197, 0.2),
+      0 0 20px rgba(79, 209, 197, 0.3),
+      0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .gcp-theme .component-glass-card:hover {
+    border-color: rgba(79, 209, 197, 0.8);
+    background: rgba(79, 209, 197, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 0 1px rgba(79, 209, 197, 0.3),
+      0 0 30px rgba(79, 209, 197, 0.4),
+      0 8px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  .gcp-theme .component-button-primary {
+    background: linear-gradient(135deg, rgba(79, 209, 197, 0.9), rgba(79, 209, 197, 1));
+    border: 2px solid rgba(79, 209, 197, 0.8);
+    box-shadow: 0 4px 15px rgba(79, 209, 197, 0.4);
+  }
+
+  .gcp-theme .component-form-input:focus {
+    border: 2px solid rgba(79, 209, 197, 0.8);
+    box-shadow: 0 0 0 3px rgba(79, 209, 197, 0.2);
+  }
+
+  .gcp-theme .component-text-accent {
+    color: rgb(79, 209, 197);
+  }
+
+  /* Purple Method Cards - Special styling for method selection cards */
+  .method-card-purple {
+    background: rgba(147, 51, 234, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 3px solid rgba(147, 51, 234, 0.4);
+    border-radius: 1.5rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+      0 0 0 1px rgba(147, 51, 234, 0.1),
+      0 8px 32px rgba(147, 51, 234, 0.15),
+      0 4px 16px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .method-card-purple:hover {
+    background: rgba(147, 51, 234, 0.12);
+    border-color: rgba(147, 51, 234, 0.6);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 
+      0 0 0 1px rgba(147, 51, 234, 0.2),
+      0 12px 40px rgba(147, 51, 234, 0.25),
+      0 8px 24px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15),
+      0 0 30px rgba(147, 51, 234, 0.3);
+  }
+
+  /* Purple frosted glass overlay effect */
+  .method-card-purple::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg,
+      rgba(147, 51, 234, 0.15) 0%,
+      rgba(147, 51, 234, 0.05) 30%,
+      rgba(168, 85, 247, 0.08) 70%,
+      rgba(147, 51, 234, 0.12) 100%);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: inherit;
+    z-index: -1;
+    transition: all 0.4s ease;
+  }
+
+  .method-card-purple:hover::before {
+    background: linear-gradient(135deg,
+      rgba(147, 51, 234, 0.2) 0%,
+      rgba(147, 51, 234, 0.08) 30%,
+      rgba(168, 85, 247, 0.12) 70%,
+      rgba(147, 51, 234, 0.18) 100%);
+  }
+
+  /* Icon styling for method cards */
+  .method-card-purple .method-icon {
+    background: linear-gradient(135deg, 
+      rgba(147, 51, 234, 0.2), 
+      rgba(168, 85, 247, 0.15));
+    border: 2px solid rgba(147, 51, 234, 0.3);
+    box-shadow: 
+      0 4px 12px rgba(147, 51, 234, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .method-card-purple:hover .method-icon {
+    background: linear-gradient(135deg, 
+      rgba(147, 51, 234, 0.3), 
+      rgba(168, 85, 247, 0.2));
+    border-color: rgba(147, 51, 234, 0.5);
+    box-shadow: 
+      0 6px 20px rgba(147, 51, 234, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 0 20px rgba(147, 51, 234, 0.4);
+    transform: scale(1.05);
+  }
+
+  /* Text accent colors for purple cards */
+  .method-card-purple .text-accent {
+    color: #a855f7;
+    transition: color 0.3s ease;
+  }
+
+  .method-card-purple:hover .text-accent {
+    color: #c084fc;
+  }
+
+  /* Bullet points styling */
+  .method-card-purple .bullet-point {
+    color: #a855f7;
+    text-shadow: 0 0 8px rgba(168, 85, 247, 0.4);
+  }
+
+  /* Action link styling */
+  .method-card-purple .action-link {
+    color: #c084fc;
+    transition: all 0.3s ease;
+    text-shadow: 0 0 10px rgba(192, 132, 252, 0.3);
+  }
+
+  .method-card-purple:hover .action-link {
+    color: #e879f9;
+    text-shadow: 0 0 15px rgba(232, 121, 249, 0.5);
+  }
+
+  /* Component form inputs - provider themed */
+  .component-form-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    transition: all 0.3s ease;
+  }
+
+  .component-form-input:focus {
+    background: rgba(0, 0, 0, 0.4);
+    outline: none;
+  }
+
+  /* Component buttons - provider themed */
+  .component-button-primary {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(59, 130, 246, 1));
+    border: 2px solid rgba(59, 130, 246, 0.8);
+    color: white;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+
+  .component-button-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+  }
+
+  /* Component text accents - provider themed */
+  .component-text-accent {
+    color: rgb(59, 130, 246);
+    transition: color 0.3s ease;
+  }
+}
+
+@layer base {
+  :root {
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    font-weight: 400;
+    
+   /* Centralized card transparency control */
+   --card-glass-alpha: 0.7;
+   
+    /* Dark theme colors (default) */
+    --color-background-primary: 15 15 35;
+    --color-background-secondary: 26 26 46;
+    --color-background-tertiary: 22 33 62;
+    --color-background-card: 0 0 0;
+    --color-background-glass: 15 23 42;
+    
+    --color-text-primary: 255 255 255;
+    --color-text-secondary: 156 163 175;
+    --color-text-tertiary: 107 114 128;
+    --color-text-accent: 59 130 246;
+    
+    --color-border-primary: 59 130 246;
+    --color-border-secondary: 75 85 99;
+    --color-border-accent: 147 197 253;
+    
+    --color-surface-primary: 31 41 55;
+    --color-surface-secondary: 17 24 39;
+    --color-surface-hover: 55 65 81;
+  }
+
+  .light {
+   /* Centralized card transparency control */
+   --card-glass-alpha: 0.3;
+   
+    --color-background-primary: 255 255 255;  /* Pure white background */
+    --color-background-secondary: 255 255 255;  /* White */
+    --color-background-tertiary: 255 255 255;  /* White */
+    --color-background-card: 255 255 255;
+    --color-background-glass: 255 255 255;
+    
+    --color-text-primary: 15 23 42;  /* Darker for better contrast */
+    --color-text-secondary: 51 65 85;  /* Darker secondary text */
+    --color-text-tertiary: 71 85 105;  /* Improved tertiary text */
+    --color-text-accent: 59 130 246;
+    
+    --color-border-primary: 59 130 246;
+    --color-border-secondary: 226 232 240;
+    --color-border-accent: 59 130 246;
+    
+    --color-surface-primary: 255 255 255;
+    --color-surface-secondary: 248 250 252;
+    --color-surface-hover: 241 245 249;
+  }
+
+  /* Removed - using single source of truth above */
+
+  /* Removed - using single source of truth above */
+  
+  /* Removed conflicting pseudo-elements that were interfering with glassmorphism */
+  
+  /* Removed - using single source of truth above */
+  
+  /* Removed overly aggressive background clearing rules */
+
+  /* Removed - using single source of truth above */
+
+  /* In light mode, make roadmap wrapper transparent to avoid double layer */
+  .light .roadmap-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .light .roadmap-card .roadmap-glow {
+    display: none !important;
+  }
+  
+  .light .roadmap-card .roadmap-content {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Ensure roadmap cards also get proper frosted glass */
+  .light .roadmap-card .glass-card-light,
+  .light .roadmap-content .glass-card-light {
+    position: relative !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    background: rgba(255, 255, 255, 0.65) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15) !important;
+  }
+
+  /* Better icon contrast in light mode - no background */
+  .light .icon-container {
+    background: transparent;
+    border: none;
+  }
+
+  .light .glass-card-light .icon-blue,
+  .light .glass-card-light .dark\:text-blue-400 {
+    color: rgb(59, 130, 246) !important;
+  }
+
+  .light .glass-card-light .icon-purple,
+  .light .glass-card-light .dark\:text-purple-400 {
+    color: rgb(147, 51, 234) !important;
+  }
+
+  .light .glass-card-light .icon-green,
+  .light .glass-card-light .dark\:text-green-400 {
+    color: rgb(34, 197, 94) !important;
+  }
+
+  .light .glass-card-light .icon-orange,
+  .light .glass-card-light .dark\:text-orange-400 {
+    color: rgb(251, 146, 60) !important;
+  }
+
+  .light .glass-card-light .icon-red,
+  .light .glass-card-light .dark\:text-red-400,
+  .light .glass-card-light .dark\:text-red-600 {
+    color: rgb(239, 68, 68) !important;
+  }
+  
+  /* Ensure all Lucide icons in light mode cards have proper color */
+  .light .glass-card-light svg[class*="w-"][class*="h-"] {
+    color: rgb(71, 85, 105) !important;
+  }
+  
+  /* Text colors for light mode cards - dark text for gradient cards */
+  .light .glass-card-light h3,
+  .light .glass-card-light .text-2xl,
+  .light .glass-card-light .text-xl {
+    color: rgb(30, 41, 59) !important;
+    font-weight: 600 !important;
+  }
+  
+  .light .glass-card-light p,
+  .light .glass-card-light .text-gray-300,
+  .light .glass-card-light .text-text-secondary,
+  .light .glass-card-light span,
+  .light .glass-card-light li {
+    color: rgb(51, 65, 85) !important;
+  }
+
+  /* LIGHT MODE CARDS - Enhanced glass effect matching ref1.jpg */
+  /* Excluding hero CTA cards which should remain original */
+  
+  /* Remove duplicate - using single source of truth above */
+  
+  /* Remove duplicate hover - using single source of truth above */
+  
+  /* Keep wrappers transparent but don't force it on all children */
+  .light .benefit-card-wrapper {
+    background: transparent;
+  }
+
+  /* Remove duplicate - using single source of truth above */
+
+  /* Icon containers - keep simple */
+  .light .icon-container {
+    background: transparent;
+  }
+
+  /* Text colors for readability - dark text for gradient cards */
+  .light .benefit-card-wrapper h3,
+  .light .glass-card-light h3 {
+    color: rgb(30, 41, 59) !important;
+  }
+
+  .light .benefit-card-wrapper p,
+  .light .glass-card-light p,
+  .light .glass-card-light span,
+  .light .glass-card-light li {
+    color: rgb(51, 65, 85) !important;
+  }
+  
+  /* Bullet points in light mode - dark for gradient cards */
+  .light .glass-card-light .text-red-400,
+  .light .glass-card-light .text-green-400,
+  .light .glass-card-light .text-blue-400 {
+    color: rgb(71, 85, 105) !important;
+  }
+  
+  /* Ensure all cards in Features section get transparent glass effect in light mode */
+  .light section .grid .glass-card-light,
+  .light .Features .glass-card-light,
+  .light div[class*="grid"] .glass-card-light {
+    position: relative !important;
+    border-radius: 20px !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.5) 0%, rgba(168, 139, 235, 0.5) 100%) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+  }
+
+  /* NUCLEAR OPTION: Force remove ALL competing backgrounds */
+  .light .benefit-card-wrapper * {
+    background-image: none !important;
+  }
+
+  .light .benefit-card-wrapper *:not(.group):not(.icon-container):not(.w-16):not(.h-16) {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Ultimate specificity for benefit cards - transparent glass effect like ball.jpg */
+  html.light body main section div div .benefit-card-wrapper .group,
+  html.light .benefit-card-wrapper > div:last-child .group {
+    position: relative !important;
+    border-radius: 20px !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.5) 0%, rgba(168, 139, 235, 0.5) 100%) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    overflow: hidden !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+  
+  html.light body main section div div .benefit-card-wrapper .group:hover,
+  html.light .benefit-card-wrapper > div:last-child .group:hover {
+    transform: translateY(-2px) scale(1.01) !important;
+    background: linear-gradient(90deg, rgba(96, 195, 235, 0.55) 0%, rgba(168, 139, 235, 0.55) 100%) !important;
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  }
+}
+
+@layer base {
+  body {
+    @apply m-0 min-w-80 min-h-screen bg-background-primary text-text-primary transition-colors duration-300;
+  }
+
+  .light body {
+    position: relative;
+    /* Light background to let card gradients stand out */
+    background: #f5f5f7 !important;
+    min-height: 100vh;
+  }
+  
+  /* Floating gradient circles for visual depth in light mode */
+  .light body::after {
+    content: '';
+    position: fixed;
+    border-radius: 50%;
+    background: linear-gradient(120deg, #1D976C, #2c3e50);
+    height: 300px;
+    width: 300px;
+    top: 20%;
+    left: 10%;
+    opacity: 0.8;
+    animation: float 6s cubic-bezier(0.54, 0.085, 0.5, 0.92) infinite alternate;
+    animation-delay: 3.5s;
+    z-index: 0;
+    pointer-events: none;
+  }
+  
+  /* Float animation for gradient circles */
+  @keyframes float {
+    0% {
+      transform: rotateX(0deg) translateY(0px);
+    }
+    50% {
+      transform: rotateX(0deg) translateY(10px) translateX(5px);
+    }
+    100% {
+      transform: rotateX(0deg) translateY(0px) translateX(1px);
+    }
+  }
+  
+  /* Dotted background pattern overlay for light mode */
+  .light body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(circle at 1px 1px, rgba(167, 139, 250, 0.3) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: 0 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  
+  /* Ensure all content is above the dots pattern */
+  .light body > * {
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Make sections transparent in light mode */
+  .light section,
+  .light main,
+  .light div[class*="container"],
+  .light .py-24,
+  .light .py-32 {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+  
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-text-primary tracking-tight;
+  }
+
+  input, textarea, select {
+    @apply bg-background-glass/90 border border-border-secondary/50 rounded-xl px-4 py-3 transition-all duration-300 text-text-primary text-sm leading-5;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    @apply bg-background-glass/95 border-border-accent/60 outline-none shadow-[0_0_0_3px] shadow-border-accent/10 -translate-y-px;
+  }
+
+  input::placeholder, textarea::placeholder {
+    @apply text-text-tertiary;
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-secondary/30 rounded;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-primary/50 rounded border-2 border-surface-secondary/30;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-border-primary/70;
+  }
+}

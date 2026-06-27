@@ -1,0 +1,6 @@
+cryptography>=41.0.0
+
+# Self-improvement loop (all imported lazily; the loop degrades gracefully if missing)
+google-genai>=0.3.0          # Antigravity managed repair agent + Gemini fallback
+google-cloud-logging>=3.0.0  # Cloud Logging enrichment on deployment failure (GCP)
+requests>=2.31.0             # REST fallback transport

@@ -1,0 +1,55 @@
+# Skyrchitect Docker Ignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+*.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Frontend
+node_modules/
+dist/
+src/
+public/
+*.html
+*.config.js
+*.config.ts
+package*.json
+tsconfig*.json
+
+# Documentation
+*.md
+!backend/*.md
+
+# Test files
+test_*.py
+*_test.py
+
+# Git
+.git/
+.gitignore
+
+# AWS
+.aws/
+
+# Misc
+*.log
+.DS_Store

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html><head><title>Loading analysis...</title></head>
+<body style="background:#0a0e1a;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+<div style="text-align:center">
+<h2>Analyzing data_lake_storage.jpg...</h2>
+<p id="status">Uploading image to AI Vision...</p>
+</div>
+<script>
+(async function() {
+  const status = document.getElementById('status');
+  try {
+    status.textContent = 'Sending image to backend for AI analysis...';
+
+    const imgResp = await fetch('/data_lake_storage.jpg');
+    let blob;
+    if (imgResp.ok) {
+      blob = await imgResp.blob();
+    } else {
+      const imgResp2 = await fetch('http://localhost:8000/static/data_lake_storage.jpg');
+      if (imgResp2.ok) blob = await imgResp2.blob();
+    }
+
+    let architecture;
+
+    if (blob) {
+      status.textContent = 'Image loaded, sending to AI Vision for analysis...';
+      const formData = new FormData();
+      formData.append('file', new File([blob], 'data_lake_storage.jpg', { type: 'image/jpeg' }));
+
+      const resp = await fetch('http://localhost:8000/api/architecture/analyze-image', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await resp.json();
+      if (result.success && result.data && result.data.architecture) {
+        architecture = result.data.architecture;
+        status.textContent = 'Analysis complete! ' + architecture.components.length + ' components detected. Loading UI...';
+      } else {
+        throw new Error('Analysis failed: ' + (result.message || 'unknown'));
+      }
+    } else {
+      status.textContent = 'Using pre-analyzed architecture data...';
+      architecture = buildFallbackArchitecture();
+    }
+
+    const now = new Date().toISOString();
+    const fullArch = {
+      id: architecture.id || 'analyzed-data_lake_storage',
+      name: architecture.name || 'AWS Data Lake Storage & Processing',
+      description: 'AI-analyzed from data_lake_storage.jpg: Modern Data Lake Architecture with multi-zone storage, ETL processing, analytics, and ML.',
+      provider: architecture.provider || 'aws',
+      components: (architecture.components || []).map(function(c) {
+        return {
+          id: c.id,
+          name: c.name,
+          description: c.description || c.name,
+          cost: c.cost || 0,
+          icon: mapIcon(c.type || c.category),
+          provider: 'aws',
+          type: mapResourceType(c.type || c.category),
+          alternatives: [],
+          specifications: {}
+        };
+      }),
+      alternatives: [],
+      diagram: buildDiagram(architecture.components || []),
+      optimizationPreference: 'balanced',
+      metadata: {
+        totalCost: architecture.estimated_cost || architecture.components.reduce(function(s,c){return s+(c.cost||0)},0),
+        estimatedPerformance: 85,
+        complexity: architecture.complexity || 'high',
+        tags: ['data-lake', 'aws', 'ai-analyzed', 'image-upload'],
+        lastModified: now,
+        version: '1.0'
+      },
+      createdAt: now,
+      updatedAt: now
+    };
+
+    const storeData = {
+      state: {
+        current: fullArch,
+        list: [],
+        history: [],
+        historyIndex: -1,
+        snapshots: [JSON.parse(JSON.stringify(fullArch))],
+        snapshotIndex: 0,
+        unsavedChanges: false
+      },
+      version: 1
+    };
+
+    localStorage.setItem('skyrchitect-architecture-store', JSON.stringify(storeData));
+    status.textContent = 'Redirecting to architecture review...';
+    setTimeout(function() { window.location.href = '/architecture'; }, 800);
+
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    console.error(e);
+  }
+
+  function mapResourceType(t) {
+    var m = {
+      streaming_ingestion:'serverless', streaming:'serverless', etl:'serverless',
+      data_catalog:'database', object_storage:'storage', file_transfer:'network',
+      transfer:'network', function:'serverless', workflow:'serverless',
+      analytics:'analytics', visualization:'analytics', machine_learning:'ml',
+      security:'security', monitoring:'security', compute:'compute',
+      serverless:'serverless', database:'database', storage:'storage',
+      network:'network', ml:'ml', container:'container'
+    };
+    return m[t] || 'serverless';
+  }
+
+  function mapIcon(t) {
+    var m = {
+      streaming_ingestion:'zap', streaming:'zap', etl:'settings',
+      data_catalog:'book-open', object_storage:'hard-drive', file_transfer:'upload',
+      transfer:'upload', function:'git-branch', workflow:'git-branch',
+      analytics:'bar-chart-2', visualization:'pie-chart', machine_learning:'cpu',
+      security:'shield', monitoring:'activity', compute:'server',
+      serverless:'cloud', database:'database', storage:'hard-drive',
+      network:'globe', ml:'cpu'
+    };
+    return m[t] || 'cloud';
+  }
+
+  function buildDiagram(comps) {
+    var cols = 4, gapX = 280, gapY = 200, startX = 80, startY = 80;
+    var nodes = comps.map(function(c, i) {
+      return {
+        id: c.id, x: startX + (i % cols) * gapX, y: startY + Math.floor(i / cols) * gapY,
+        width: 220, height: 100, label: c.name, subLabel: '$' + (c.cost||0) + '/mo',
+        icon: mapIcon(c.type || c.category), cost: c.cost || 0,
+        description: c.description || c.name, isDragging: false,
+        type: mapResourceType(c.type || c.category), provider: 'aws', metadata: {}
+      };
+    });
+    var edges = [];
+    if (comps.length > 1) {
+      var flow = [
+        [0,3],[5,3],[1,3],[3,1],[1,2],[3,6],[3,7],[6,8],[7,8],[3,9],[10,1],[11,3],[12,1],[13,1]
+      ];
+      flow.forEach(function(pair, idx) {
+        if (pair[0] < comps.length && pair[1] < comps.length) {
+          edges.push({
+            id: 'edge-' + idx, from: comps[pair[0]].id, to: comps[pair[1]].id,
+            type: 'API', label: '', cost: 0
+          });
+        }
+      });
+    }
+    return {
+      nodes: nodes, edges: edges,
+      viewport: { zoom: 0.75, pan: { x: 0, y: 0 } },
+      grid: { size: 20, enabled: true, snapEnabled: false }
+    };
+  }
+
+  function buildFallbackArchitecture() {
+    return {
+      id: 'analyzed-data_lake_storage',
+      name: 'AWS Data Lake Storage & Processing',
+      provider: 'aws',
+      estimated_cost: 3120,
+      complexity: 'high',
+      components: [
+        {id:'streaming-1',name:'Amazon Kinesis Data Firehose',type:'streaming_ingestion',cost:150,description:'Real-time streaming for IoT data ingestion'},
+        {id:'etl-2',name:'AWS Glue',type:'etl',cost:300,description:'ETL service for data transformation and cataloging'},
+        {id:'catalog-3',name:'AWS Glue Data Catalog',type:'data_catalog',cost:10,description:'Centralized metadata repository'},
+        {id:'storage-4',name:'Amazon S3',type:'object_storage',cost:500,description:'Landing, Raw, and Curated data zones'},
+        {id:'transfer-5',name:'AWS Transfer Family (SFTP)',type:'file_transfer',cost:220,description:'Third-party data ingestion via SFTP'},
+        {id:'orchestration-6',name:'AWS Step Functions',type:'workflow',cost:75,description:'Data pipeline orchestration'},
+        {id:'analytics-7',name:'Amazon Athena',type:'analytics',cost:200,description:'Serverless SQL queries on S3 data'},
+        {id:'analytics-8',name:'Amazon EMR',type:'analytics',cost:800,description:'Big data processing with Spark/Hadoop'},
+        {id:'viz-9',name:'Amazon QuickSight',type:'visualization',cost:100,description:'Business intelligence dashboards'},
+        {id:'ml-10',name:'Amazon SageMaker',type:'machine_learning',cost:600,description:'ML model training and deployment'},
+        {id:'security-11',name:'AWS IAM',type:'security',cost:0,description:'Identity and access management'},
+        {id:'security-12',name:'AWS KMS',type:'security',cost:15,description:'Encryption key management'},
+        {id:'audit-13',name:'AWS CloudTrail',type:'security',cost:50,description:'Audit and compliance logging'},
+        {id:'monitoring-14',name:'Amazon CloudWatch',type:'monitoring',cost:100,description:'Monitoring and observability'}
+      ]
+    };
+  }
+})();
+</script>
+</body>
+</html>

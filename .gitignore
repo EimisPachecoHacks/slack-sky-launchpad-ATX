@@ -1,0 +1,45 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Secrets & Credentials
+.env
+.env.local
+*.pem
+*.key
+*-service-account.json
+*_credentials.csv
+*_accessKeys.csv
+*accessKeys*.csv
+credentials/
+~/.skyrchitect/
+.skyrchitect/
+
+# Build artifacts
+__pycache__/
+*.pyc
+node_modules/
+dist/
+coverage/
+
+# skyrchitect: monorepo sync marker (no ignore-behavior change)

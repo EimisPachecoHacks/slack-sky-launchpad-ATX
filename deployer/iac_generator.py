@@ -1,0 +1,335 @@
+"""Generate Terraform configurations for GCP and AWS."""
+
+from pathlib import Path
+
+COMMON_LABELS = """\
+  managed_by  = "skyrchitect"
+  environment = var.environment
+"""
+
+
+def generate_gcp_terraform(
+    project_id: str,
+    region: str = "us-central1",
+    environment: str = "dev",
+    architecture: str = "minimal-test",
+) -> dict[str, str]:
+    """Generate a minimal but real GCP Terraform config for deployment testing."""
+
+    providers_tf = f"""\
+terraform {{
+  required_version = ">= 1.5.0"
+
+  required_providers {{
+    google = {{
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }}
+  }}
+}}
+
+provider "google" {{
+  project     = var.project_id
+  region      = var.region
+  credentials = file(var.credentials_file)
+}}
+"""
+
+    variables_tf = f"""\
+variable "project_id" {{
+  description = "GCP project ID"
+  type        = string
+  default     = "{project_id}"
+}}
+
+variable "region" {{
+  description = "GCP region"
+  type        = string
+  default     = "{region}"
+}}
+
+variable "environment" {{
+  description = "Environment name"
+  type        = string
+  default     = "{environment}"
+}}
+
+variable "credentials_file" {{
+  description = "Path to GCP service account JSON"
+  type        = string
+}}
+"""
+
+    main_tf = f"""\
+locals {{
+  labels = {{
+    environment = var.environment
+    managed_by  = "skyrchitect"
+  }}
+}}
+
+resource "google_storage_bucket" "skyrchitect_test" {{
+  name          = "${{var.project_id}}-skyrchitect-${{var.environment}}"
+  location      = var.region
+  force_destroy = true
+
+  uniform_bucket_level_access = true
+
+  labels = local.labels
+
+  versioning {{
+    enabled = true
+  }}
+
+  lifecycle_rule {{
+    action {{
+      type = "Delete"
+    }}
+    condition {{
+      age = 30
+    }}
+  }}
+
+}}
+
+resource "google_compute_network" "skyrchitect_vpc" {{
+  name                    = "${{var.project_id}}-vpc-${{var.environment}}"
+  auto_create_subnetworks = false
+  description             = "Skyrchitect managed VPC for ${{var.environment}}"
+
+}}
+
+resource "google_compute_subnetwork" "skyrchitect_subnet" {{
+  name          = "${{var.project_id}}-subnet-${{var.environment}}"
+  ip_cidr_range = "10.0.1.0/24"
+  region        = var.region
+  network       = google_compute_network.skyrchitect_vpc.id
+
+  private_ip_google_access = true
+
+  log_config {{
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }}
+}}
+
+resource "google_compute_firewall" "deny_all_ingress" {{
+  name    = "${{var.project_id}}-deny-all-${{var.environment}}"
+  network = google_compute_network.skyrchitect_vpc.name
+
+  priority  = 65534
+  direction = "INGRESS"
+
+  deny {{
+    protocol = "all"
+  }}
+
+  source_ranges = ["0.0.0.0/0"]
+  description   = "Default deny all ingress - Skyrchitect security baseline"
+}}
+"""
+
+    outputs_tf = """\
+output "bucket_name" {
+  description = "Created GCS bucket name"
+  value       = google_storage_bucket.skyrchitect_test.name
+}
+
+output "bucket_url" {
+  description = "Created GCS bucket URL"
+  value       = google_storage_bucket.skyrchitect_test.url
+}
+
+output "vpc_name" {
+  description = "Created VPC name"
+  value       = google_compute_network.skyrchitect_vpc.name
+}
+
+output "subnet_name" {
+  description = "Created subnet name"
+  value       = google_compute_subnetwork.skyrchitect_subnet.name
+}
+"""
+
+    readme_md = f"""\
+# Skyrchitect GCP Deployment — {architecture}
+
+**Auto-generated and deployment-validated by Skyrchitect.**
+
+## Resources Created
+- GCS Bucket with versioning and lifecycle rules
+- Custom VPC with private subnet
+- Deny-all default firewall rule
+
+## Project: `{project_id}`
+## Region: `{region}`
+## Environment: `{environment}`
+"""
+
+    return {
+        "providers.tf": providers_tf,
+        "variables.tf": variables_tf,
+        "main.tf": main_tf,
+        "outputs.tf": outputs_tf,
+        "README.md": readme_md,
+    }
+
+
+def generate_aws_terraform(
+    account_id: str,
+    region: str = "us-east-1",
+    environment: str = "dev",
+    architecture: str = "minimal-test",
+) -> dict[str, str]:
+    """Generate a minimal but real AWS Terraform config for deployment testing."""
+
+    providers_tf = f"""\
+terraform {{
+  required_version = ">= 1.5.0"
+
+  required_providers {{
+    aws = {{
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }}
+  }}
+}}
+
+provider "aws" {{
+  region     = var.region
+  access_key = var.aws_access_key_id
+  secret_key = var.aws_secret_access_key
+}}
+"""
+
+    variables_tf = f"""\
+variable "region" {{
+  description = "AWS region"
+  type        = string
+  default     = "{region}"
+}}
+
+variable "environment" {{
+  description = "Environment name"
+  type        = string
+  default     = "{environment}"
+}}
+
+variable "aws_access_key_id" {{
+  description = "AWS Access Key ID"
+  type        = string
+  sensitive   = true
+}}
+
+variable "aws_secret_access_key" {{
+  description = "AWS Secret Access Key"
+  type        = string
+  sensitive   = true
+}}
+"""
+
+    main_tf = f"""\
+locals {{
+  tags = {{
+    Environment = var.environment
+    ManagedBy   = "skyrchitect"
+  }}
+}}
+
+resource "aws_s3_bucket" "skyrchitect_test" {{
+  bucket        = "skyrchitect-${{var.environment}}-{account_id}"
+  force_destroy = true
+
+  tags = local.tags
+}}
+
+resource "aws_s3_bucket_versioning" "skyrchitect_test" {{
+  bucket = aws_s3_bucket.skyrchitect_test.id
+  versioning_configuration {{
+    status = "Enabled"
+  }}
+}}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "skyrchitect_test" {{
+  bucket = aws_s3_bucket.skyrchitect_test.id
+  rule {{
+    apply_server_side_encryption_by_default {{
+      sse_algorithm = "AES256"
+    }}
+  }}
+}}
+
+resource "aws_s3_bucket_public_access_block" "skyrchitect_test" {{
+  bucket                  = aws_s3_bucket.skyrchitect_test.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}}
+
+resource "aws_vpc" "skyrchitect_vpc" {{
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = merge(local.tags, {{
+    Name = "skyrchitect-vpc-${{var.environment}}"
+  }})
+}}
+
+resource "aws_subnet" "skyrchitect_subnet" {{
+  vpc_id            = aws_vpc.skyrchitect_vpc.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "${{var.region}}a"
+
+  tags = merge(local.tags, {{
+    Name = "skyrchitect-subnet-${{var.environment}}"
+  }})
+}}
+"""
+
+    outputs_tf = """\
+output "bucket_name" {
+  description = "Created S3 bucket name"
+  value       = aws_s3_bucket.skyrchitect_test.id
+}
+
+output "bucket_arn" {
+  description = "Created S3 bucket ARN"
+  value       = aws_s3_bucket.skyrchitect_test.arn
+}
+
+output "vpc_id" {
+  description = "Created VPC ID"
+  value       = aws_vpc.skyrchitect_vpc.id
+}
+
+output "subnet_id" {
+  description = "Created subnet ID"
+  value       = aws_subnet.skyrchitect_subnet.id
+}
+"""
+
+    readme_md = f"""\
+# Skyrchitect AWS Deployment — {architecture}
+
+**Auto-generated and deployment-validated by Skyrchitect.**
+
+## Resources Created
+- S3 Bucket with versioning, encryption, and public access block
+- VPC with DNS support
+- Private subnet
+
+## Account: `{account_id}`
+## Region: `{region}`
+## Environment: `{environment}`
+"""
+
+    return {
+        "providers.tf": providers_tf,
+        "variables.tf": variables_tf,
+        "main.tf": main_tf,
+        "outputs.tf": outputs_tf,
+        "README.md": readme_md,
+    }

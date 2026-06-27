@@ -1,0 +1,375 @@
+/* Provider Card Styles with SVG Pentagon Borders and Hover Effects */
+
+/* Define color variables for each provider */
+:root {
+  --aws-color-rgb: 255, 153, 0;      /* Orange for AWS */
+  --azure-color-rgb: 59, 130, 246;   /* Blue for Azure */
+  --gcp-color-rgb: 79, 209, 197;     /* Cyan-green for GCP */
+}
+
+/* Base game card wrapper for SVG borders */
+.game-card-wrapper {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* SVG border definitions for normal state */
+.azure-game-home .game-card-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(59,130,246,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(59,130,246,1)' stroke-width='6' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(59,130,246,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 10;
+  pointer-events: none;
+  transition: all 0.4s ease;
+}
+
+.aws-game-home .game-card-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(255,153,0,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(255,153,0,1)' stroke-width='6' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(255,153,0,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 10;
+  pointer-events: none;
+  transition: all 0.4s ease;
+}
+
+.gcp-game-home .game-card-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(79,209,197,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(79,209,197,1)' stroke-width='6' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(79,209,197,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 10;
+  pointer-events: none;
+  transition: all 0.4s ease;
+}
+
+/* SVG border glow on hover - enhanced shine effects */
+.azure-game-home .game-card-wrapper:hover::before {
+  filter: drop-shadow(0 0 15px rgba(59,130,246,0.8)) drop-shadow(0 0 25px rgba(59,130,246,0.6));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(59,130,246,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(59,130,246,1)' stroke-width='7' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(59,130,246,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  z-index: 10;
+  pointer-events: none;
+}
+
+.aws-game-home .game-card-wrapper:hover::before {
+  filter: drop-shadow(0 0 15px rgba(255,153,0,0.8)) drop-shadow(0 0 25px rgba(255,153,0,0.6));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(255,153,0,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(255,153,0,1)' stroke-width='7' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(255,153,0,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  z-index: 10;
+  pointer-events: none;
+}
+
+.gcp-game-home .game-card-wrapper:hover::before {
+  filter: drop-shadow(0 0 15px rgba(79,209,197,0.8)) drop-shadow(0 0 25px rgba(79,209,197,0.6));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(79,209,197,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(79,209,197,1)' stroke-width='7' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(79,209,197,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Enhanced external glow around SVG border only */
+.azure-game-home .game-card-wrapper:hover::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  right: -40px;
+  bottom: -40px;
+  background: radial-gradient(ellipse at center, 
+    rgba(var(--azure-color-rgb), 0.4) 0%,
+    rgba(var(--azure-color-rgb), 0.25) 30%,
+    rgba(var(--azure-color-rgb), 0.1) 60%,
+    transparent 80%);
+  border-radius: 50%;
+  z-index: -1;
+  animation: external-pulse 2.5s ease-in-out infinite;
+}
+
+.aws-game-home .game-card-wrapper:hover::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  right: -40px;
+  bottom: -40px;
+  background: radial-gradient(ellipse at center, 
+    rgba(var(--aws-color-rgb), 0.4) 0%,
+    rgba(var(--aws-color-rgb), 0.25) 30%,
+    rgba(var(--aws-color-rgb), 0.1) 60%,
+    transparent 80%);
+  border-radius: 50%;
+  z-index: -1;
+  animation: external-pulse 2.5s ease-in-out infinite;
+}
+
+.gcp-game-home .game-card-wrapper:hover::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  right: -40px;
+  bottom: -40px;
+  background: radial-gradient(ellipse at center, 
+    rgba(var(--gcp-color-rgb), 0.4) 0%,
+    rgba(var(--gcp-color-rgb), 0.25) 30%,
+    rgba(var(--gcp-color-rgb), 0.1) 60%,
+    transparent 80%);
+  border-radius: 50%;
+  z-index: -1;
+  animation: external-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes external-pulse {
+  0%, 100% {
+    transform: scale(0.7);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.8;
+  }
+}
+
+
+.game-card-h-square {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 0;
+  padding: 40px 20px;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: hidden;
+  /* Center content within pentagon */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* Metallic effect */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  border: 2px solid transparent;
+}
+
+
+/* Pentagon card content area with glass effect */
+.game-card-h {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 0;
+  padding: 40px 20px;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  overflow: hidden;
+  /* Pentagon shape pointing upward */
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+  /* Center content within pentagon */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* Metallic effect */
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  z-index: 2;
+  border: 2px solid transparent;
+}
+
+/* AWS specific styling */
+.aws-game-home .game-card-h {
+  background: linear-gradient(135deg, 
+    rgba(var(--aws-color-rgb), 0.15) 0%,
+    rgba(var(--aws-color-rgb), 0.08) 50%,
+    rgba(var(--aws-color-rgb), 0.15) 100%);
+  border-color: rgba(var(--aws-color-rgb), 0.3);
+}
+
+.aws-game-home .game-card-h:hover {
+  background: linear-gradient(135deg, 
+    rgba(var(--aws-color-rgb), 0.25) 0%,
+    rgba(var(--aws-color-rgb), 0.15) 50%,
+    rgba(var(--aws-color-rgb), 0.25) 100%);
+  border-color: rgba(var(--aws-color-rgb), 0.5);
+  transform: scale(1.05);
+  box-shadow: 
+    0 8px 30px rgba(var(--aws-color-rgb), 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Azure specific styling */
+.azure-game-home .game-card-h {
+  background: linear-gradient(135deg, 
+    rgba(var(--azure-color-rgb), 0.15) 0%,
+    rgba(var(--azure-color-rgb), 0.08) 50%,
+    rgba(var(--azure-color-rgb), 0.15) 100%);
+  border-color: rgba(var(--azure-color-rgb), 0.3);
+}
+
+.azure-game-home .game-card-h:hover {
+  background: linear-gradient(135deg, 
+    rgba(var(--azure-color-rgb), 0.25) 0%,
+    rgba(var(--azure-color-rgb), 0.15) 50%,
+    rgba(var(--azure-color-rgb), 0.25) 100%);
+  border-color: rgba(var(--azure-color-rgb), 0.5);
+  transform: scale(1.05);
+  box-shadow: 
+    0 8px 30px rgba(var(--azure-color-rgb), 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* GCP specific styling */
+.gcp-game-home .game-card-h {
+  background: linear-gradient(135deg, 
+    rgba(var(--gcp-color-rgb), 0.15) 0%,
+    rgba(var(--gcp-color-rgb), 0.08) 50%,
+    rgba(var(--gcp-color-rgb), 0.15) 100%);
+  border-color: rgba(var(--gcp-color-rgb), 0.3);
+}
+
+.gcp-game-home .game-card-h:hover {
+  background: linear-gradient(135deg, 
+    rgba(var(--gcp-color-rgb), 0.25) 0%,
+    rgba(var(--gcp-color-rgb), 0.15) 50%,
+    rgba(var(--gcp-color-rgb), 0.25) 100%);
+  border-color: rgba(var(--gcp-color-rgb), 0.5);
+  transform: scale(1.05);
+  box-shadow: 
+    0 8px 30px rgba(var(--gcp-color-rgb), 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Enhanced frosted glass effect for pentagon cards */
+.aws-game-home .game-card-h::before,
+.azure-game-home .game-card-h::before,
+.gcp-game-home .game-card-h::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.1) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: inherit;
+  z-index: -1;
+  transition: all 0.4s ease;
+  clip-path: inherit;
+}
+
+/* Selected state styling */
+.aws-game-home .game-card-h.selected {
+  transform: scale(1.1);
+  border-color: rgba(var(--aws-color-rgb), 0.8);
+  box-shadow: 
+    0 12px 40px rgba(var(--aws-color-rgb), 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.azure-game-home .game-card-h.selected {
+  transform: scale(1.1);
+  border-color: rgba(var(--azure-color-rgb), 0.8);
+  box-shadow: 
+    0 12px 40px rgba(var(--azure-color-rgb), 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.gcp-game-home .game-card-h.selected {
+  transform: scale(1.1);
+  border-color: rgba(var(--gcp-color-rgb), 0.8);
+  box-shadow: 
+    0 12px 40px rgba(var(--gcp-color-rgb), 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Icon styling within pentagon */
+.game-card-h .provider-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 3;
+}
+
+/* Text styling within pentagon */
+.game-card-h h3 {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  z-index: 3;
+  position: relative;
+}
+
+/* Light mode text styling */
+.light .game-card-h h3 {
+  color: #1a1a1a;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Dark mode text styling */
+.dark .game-card-h h3 {
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.game-card-h p {
+  font-size: 16px;
+  margin: 0;
+  z-index: 3;
+  position: relative;
+}
+
+/* Light mode description text */
+.light .game-card-h p {
+  color: rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+/* Dark mode description text */
+.dark .game-card-h p {
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}

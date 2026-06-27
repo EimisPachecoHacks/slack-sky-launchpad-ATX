@@ -1,0 +1,52 @@
+# -------------------------------------------------------
+# GCP Three-Tier Web Application - Example Variable Values
+# -------------------------------------------------------
+# Copy this file to terraform.tfvars and replace with real values.
+# NEVER commit terraform.tfvars to version control.
+
+# GCP project ID (must already exist)
+project_id = "my-gcp-project-id"
+
+# Deployment region
+region = "us-central1"
+
+# Environment: dev | staging | prod
+environment = "dev"
+
+# Team and cost center labels
+team        = "platform"
+cost_center = "engineering"
+
+# Additional labels (optional)
+labels = {
+  application = "three-tier-webapp"
+}
+
+# Cloud SQL tier (vCPU / RAM)
+# dev:     db-f1-micro        (~$8/mo)
+# staging: db-custom-1-3840   (~$50/mo)
+# prod:    db-custom-2-7680   (~$100/mo)
+db_tier = "db-custom-2-7680"
+
+# Database password - use a strong, unique password
+# For production, store in Secret Manager and reference via data source
+db_password = "REPLACE_WITH_STRONG_PASSWORD"
+
+# Compute Engine machine type
+# dev:     e2-small    (~$12/mo)
+# staging: e2-medium   (~$24/mo)
+# prod:    e2-standard-2 (~$49/mo)
+machine_type = "e2-medium"
+
+# Autoscaler bounds
+min_replicas = 1
+max_replicas = 5
+
+# Deletion protection (set to false only for dev/testing)
+enable_deletion_protection = false
+
+# Redis memory (GB)
+# dev:     1
+# staging: 2
+# prod:    5
+redis_memory_size_gb = 1

@@ -1,0 +1,64 @@
+instructions:
+  - name: Terraform Configuration Review
+    fileFilters:
+      - "*.tf"
+      - "!*.tfvars"
+    instructions: |
+      Review Terraform files for GCP best practices:
+
+      1. Provider Configuration:
+         - Verify provider versions are pinned (google ~> 5.0)
+         - Check that a GCS backend is configured for remote state
+         - Ensure required_version is set for Terraform itself
+
+      2. Security:
+         - No hardcoded project IDs, credentials, or secrets
+         - Databases must use private IPs only (ipv4_enabled = false)
+         - SSL enforcement on database connections (ssl_mode = "ENCRYPTED_ONLY")
+         - Service accounts must be dedicated per workload (not default compute SA)
+         - Firewall rules must not allow 0.0.0.0/0 on sensitive ports
+         - Secrets should reference Secret Manager, not inline values
+         - Check for deletion_protection = true on stateful resources in prod
+
+      3. IAM:
+         - Prefer google_project_iam_member (additive) over google_project_iam_binding (authoritative)
+         - Verify least-privilege principle (no roles/owner, roles/editor on service accounts)
+         - Workload Identity should be used for GKE workloads
+
+      4. Cost:
+         - Check for appropriate machine types (e2-medium for general, not n1-standard-8)
+         - Verify environment-aware sizing (smaller in dev, larger in prod)
+         - Cloud Storage should have lifecycle rules for aging data
+         - Cloud Run should have min_instance_count = 0 for non-prod
+
+      5. Code Quality:
+         - All variables have description and type
+         - Resource names follow naming convention: ${var.project_id}-<resource>-${var.environment}
+         - Labels applied to all resources that support them
+         - Meaningful outputs with descriptions
+
+  - name: Terraform Variables Review
+    fileFilters:
+      - "*.tfvars"
+      - "*.tfvars.example"
+    instructions: |
+      Review Terraform variable files:
+
+      1. No secrets, API keys, passwords, or private keys
+      2. No hardcoded GCP project IDs that look like production values
+      3. Variable names match those defined in variables.tf
+      4. Example files (.tfvars.example) use placeholder values, not real data
+
+  - name: Infrastructure Documentation Review
+    fileFilters:
+      - "terraform/**/README.md"
+    instructions: |
+      Review infrastructure documentation:
+
+      1. Architecture description is present and accurate
+      2. Prerequisites are listed (required APIs, permissions)
+      3. Usage instructions include terraform init, plan, and apply commands
+      4. Input variables are documented
+      5. Output values are explained
+      6. Cost estimate is provided
+      7. Security considerations are noted
