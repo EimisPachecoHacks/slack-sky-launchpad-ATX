@@ -179,13 +179,56 @@ def backend_info() -> dict:
 # ---------------------------------------------------------------------------
 # Skills
 # ---------------------------------------------------------------------------
+_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+
+
+def _embed_text(text: str):
+    """Gemini embedding for a string (for Atlas Vector Search). None on any failure."""
+    key = os.getenv("GEMINI_API_KEY", "")
+    if not key or not text:
+        return None
+    try:
+        import httpx
+        r = httpx.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{_EMBED_MODEL}:embedContent?key={key}",
+            json={"model": f"models/{_EMBED_MODEL}", "content": {"parts": [{"text": text[:8000]}]}},
+            timeout=30.0,
+        )
+        r.raise_for_status()
+        return r.json()["embedding"]["values"]
+    except Exception:
+        return None
+
+
+def _skill_blob(doc: dict) -> str:
+    return " ".join(filter(None, [
+        doc.get("error_signature", ""), doc.get("description", ""), doc.get("fix_pattern", ""),
+    ]))
+
+
 def upsert_skill(doc: dict) -> dict:
     """doc keys: slug (required), name, description, error_signature, root_cause,
     fix_pattern, provider, markdown_path, embedding (optional list), created, hit_count."""
     doc = dict(doc)
     doc.setdefault("created", _now())
     doc.setdefault("hit_count", 0)
+    if not doc.get("embedding"):
+        emb = _embed_text(_skill_blob(doc))
+        if emb:
+            doc["embedding"] = emb
     return _get_store().upsert("skills", "slug", doc)
+
+
+def backfill_skill_embeddings() -> int:
+    """Compute + store embeddings for any skills missing one. Returns count updated."""
+    n = 0
+    for s in list_skills():
+        if not s.get("embedding"):
+            emb = _embed_text(_skill_blob(s))
+            if emb:
+                _get_store().update("skills", {"slug": s["slug"]}, {"embedding": emb})
+                n += 1
+    return n
 
 
 def list_skills() -> list[dict]:
@@ -231,27 +274,30 @@ def find_similar_skills(query: str, k: int = 3, query_embedding: Optional[list] 
     """
     store = _get_store()
     # Atlas Vector Search path
-    if store.kind == "mongodb" and _VECTOR_INDEX and query_embedding:
-        try:
-            pipeline = [
-                {"$vectorSearch": {
-                    "index": _VECTOR_INDEX,
-                    "path": "embedding",
-                    "queryVector": query_embedding,
-                    "numCandidates": 100,
-                    "limit": k,
-                }},
-                {"$project": {"_id": 0, "score": {"$meta": "vectorSearchScore"}, "doc": "$$ROOT"}},
-            ]
-            out = []
-            for row in store._db["skills"].aggregate(pipeline):
-                d = _MongoStore._strip(row.get("doc", {}))
-                d["score"] = row.get("score")
-                out.append(d)
-            if out:
-                return out
-        except Exception as exc:
-            logger.debug("vectorSearch failed, falling back: %s", exc)
+    if store.kind == "mongodb" and _VECTOR_INDEX:
+        if query_embedding is None:
+            query_embedding = _embed_text(query)
+        if query_embedding:
+            try:
+                pipeline = [
+                    {"$vectorSearch": {
+                        "index": _VECTOR_INDEX,
+                        "path": "embedding",
+                        "queryVector": query_embedding,
+                        "numCandidates": 100,
+                        "limit": k,
+                    }},
+                    {"$project": {"_id": 0, "score": {"$meta": "vectorSearchScore"}, "doc": "$$ROOT"}},
+                ]
+                out = []
+                for row in store._db["skills"].aggregate(pipeline):
+                    d = _MongoStore._strip(row.get("doc", {}))
+                    d["score"] = row.get("score")
+                    out.append(d)
+                if out:
+                    return out
+            except Exception as exc:
+                logger.debug("vectorSearch failed, falling back: %s", exc)
 
     skills = list_skills()
     scored = []
