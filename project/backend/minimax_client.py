@@ -63,17 +63,32 @@ def minimax_chat(
     }
 
     logger.info(f"[MiniMax] {model}: sending {len(prompt)} chars")
-    resp = httpx.post(
-        f"{base_url.rstrip('/')}/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=120.0,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    import time as _time
+    _t0 = _time.monotonic()
     try:
-        text = data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected MiniMax response shape: {data}") from exc
+        resp = httpx.post(
+            f"{base_url.rstrip('/')}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=120.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        try:
+            text = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RuntimeError(f"Unexpected MiniMax response shape: {data}") from exc
+    except Exception as exc:
+        _record(model, "architecture", (_time.monotonic() - _t0) * 1000, False, str(exc))
+        raise
+    _record(model, "architecture", (_time.monotonic() - _t0) * 1000, True, "")
     logger.info(f"[MiniMax] received {len(text)} chars")
     return text
+
+
+def _record(model: str, kind: str, duration_ms: float, ok: bool, error: str) -> None:
+    try:
+        from backend.observability import record_ai_call
+        record_ai_call(model, kind, duration_ms, ok, error)
+    except Exception:
+        pass

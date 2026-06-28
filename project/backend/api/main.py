@@ -206,6 +206,17 @@ async def file_validation_error_handler(request: Request, exc: FileValidationErr
     )
 
 
+# ── Sky Launchpad: observability (Pydantic Logfire) ───────────────────────────
+# Auto-instruments FastAPI + httpx so every request and every Gemini/MiniMax
+# call is traced. Ships to the Logfire UI when LOGFIRE_TOKEN is set; otherwise
+# instruments locally without erroring.
+try:
+    from backend.observability import configure_observability
+    configure_observability(app)
+except Exception as _obs_exc:  # never block startup on observability
+    logger.warning(f"Observability not configured: {_obs_exc}")
+
+
 # ── Sky Launchpad: self-improvement loop surface ──────────────────────────────
 # Real-time Gemini Live narration of the deploy / learn-on-failure loop.
 try:

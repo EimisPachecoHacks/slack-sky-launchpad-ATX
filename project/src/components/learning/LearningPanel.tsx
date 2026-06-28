@@ -46,12 +46,27 @@ interface TimelineEvent {
   provider: string;
 }
 
+interface ModelStat {
+  model: string;
+  calls: number;
+  errors: number;
+  avg_latency_ms: number | null;
+}
+
+interface Observability {
+  total_calls: number;
+  success_rate: number | null;
+  avg_latency_ms: number | null;
+  by_model: ModelStat[];
+}
+
 interface LearningSummary {
   is_sample: boolean;
   kpis: LearningKpis;
   before_after: BeforeAfter;
   errors_solutions: ErrorSolution[];
   timeline: TimelineEvent[];
+  observability?: Observability;
 }
 
 interface LearningPanelProps {
@@ -389,6 +404,45 @@ const LearningPanel: React.FC<LearningPanelProps> = ({ apiBase = '' }) => {
               </ol>
             )}
           </div>
+
+          {/* Live telemetry (Pydantic Logfire) */}
+          {data.observability && data.observability.total_calls > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-300 mb-3">
+                Live telemetry <span className="text-gray-500 font-normal">· Pydantic Logfire</span>
+              </h3>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="rounded-lg bg-gray-800/60 border border-gray-700/60 p-3">
+                  <div className="text-xs text-gray-500">AI calls traced</div>
+                  <div className="text-lg font-semibold text-gray-100">{data.observability.total_calls}</div>
+                </div>
+                <div className="rounded-lg bg-gray-800/60 border border-gray-700/60 p-3">
+                  <div className="text-xs text-gray-500">Success rate</div>
+                  <div className="text-lg font-semibold text-gray-100">
+                    {data.observability.success_rate == null ? '—' : `${Math.round(data.observability.success_rate * 100)}%`}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-gray-800/60 border border-gray-700/60 p-3">
+                  <div className="text-xs text-gray-500">Avg latency</div>
+                  <div className="text-lg font-semibold text-gray-100">
+                    {data.observability.avg_latency_ms == null ? '—' : `${(data.observability.avg_latency_ms / 1000).toFixed(1)}s`}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                {data.observability.by_model.map((m) => (
+                  <div key={m.model} className="flex items-center justify-between text-xs text-gray-400 px-1">
+                    <span className="font-mono text-gray-300">{m.model}</span>
+                    <span>
+                      {m.calls} call{m.calls === 1 ? '' : 's'}
+                      {m.errors > 0 && <span className="text-red-400"> · {m.errors} err</span>}
+                      {m.avg_latency_ms != null && <span className="text-gray-500"> · {(m.avg_latency_ms / 1000).toFixed(1)}s avg</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>

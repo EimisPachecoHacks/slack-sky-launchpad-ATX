@@ -73,6 +73,16 @@ SAMPLE = {
         {"ts": "2026-06-25T18:12:20Z", "phase": "retry", "text": "Re-applied with google_project_service — deploy succeeded", "provider": "gcp"},
         {"ts": "2026-06-26T10:02:00Z", "phase": "preempted", "text": "New deploy retrieved gcp-enable-compute-api and pre-enabled the API — no failure", "provider": "gcp"},
     ],
+    "observability": {
+        "total_calls": 12,
+        "success_rate": 1.0,
+        "avg_latency_ms": 4200.0,
+        "by_model": [
+            {"model": "MiniMax-M2", "calls": 4, "errors": 0, "avg_latency_ms": 18000.0},
+            {"model": "gemini-3.1-pro-preview", "calls": 5, "errors": 0, "avg_latency_ms": 3100.0},
+            {"model": "gemini-3.1-flash-lite", "calls": 3, "errors": 0, "avg_latency_ms": 1900.0},
+        ],
+    },
 }
 
 
@@ -101,10 +111,13 @@ def _load_events() -> list[dict]:
 
 def build_summary() -> dict:
     """Build the learning-dashboard payload from real data, or SAMPLE if empty."""
+    from backend.observability import summarize_ai_calls
+
     skills = _load_index()
     events = _load_events()
+    obs = summarize_ai_calls()
 
-    if not skills and not events:
+    if not skills and not events and not obs.get("total_calls"):
         return SAMPLE
 
     # --- error -> solution table ---
@@ -163,4 +176,5 @@ def build_summary() -> dict:
         "before_after": before_after,
         "errors_solutions": errors_solutions,
         "timeline": timeline,
+        "observability": obs,
     }

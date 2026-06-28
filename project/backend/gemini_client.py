@@ -37,9 +37,18 @@ def _api_key() -> str:
     return key
 
 
-def _generate_content(model: str, parts: list[dict], temperature: float = 0.2) -> str:
+def _record(model: str, kind: str, duration_ms: float, ok: bool, error: str) -> None:
+    try:
+        from backend.observability import record_ai_call
+        record_ai_call(model, kind, duration_ms, ok, error)
+    except Exception:
+        pass
+
+
+def _generate_content(model: str, parts: list[dict], temperature: float = 0.2, kind: str = "vision") -> str:
     """POST a generateContent request and return the first text part."""
     import httpx
+    import time as _time
 
     url = f"{_API_ROOT}/{model}:generateContent?key={_api_key()}"
     payload = {
@@ -47,14 +56,20 @@ def _generate_content(model: str, parts: list[dict], temperature: float = 0.2) -
         "generationConfig": {"temperature": temperature},
     }
     logger.info(f"[Gemini] {model}: generateContent ({len(parts)} part(s))")
-    resp = httpx.post(url, json=payload, timeout=120.0)
-    resp.raise_for_status()
-    data = resp.json()
+    _t0 = _time.monotonic()
     try:
-        out_parts = data["candidates"][0]["content"]["parts"]
-        text = "".join(p.get("text", "") for p in out_parts)
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected Gemini response shape: {data}") from exc
+        resp = httpx.post(url, json=payload, timeout=120.0)
+        resp.raise_for_status()
+        data = resp.json()
+        try:
+            out_parts = data["candidates"][0]["content"]["parts"]
+            text = "".join(p.get("text", "") for p in out_parts)
+        except (KeyError, IndexError, TypeError) as exc:
+            raise RuntimeError(f"Unexpected Gemini response shape: {data}") from exc
+    except Exception as exc:
+        _record(model, kind, (_time.monotonic() - _t0) * 1000, False, str(exc))
+        raise
+    _record(model, kind, (_time.monotonic() - _t0) * 1000, True, "")
     logger.info(f"[Gemini] received {len(text)} chars")
     return text
 
@@ -94,4 +109,4 @@ def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/webm", model: s
         {"inline_data": {"mime_type": mime_type, "data": audio_b64}},
         {"text": "Transcribe this audio to text. Return ONLY the transcript, no commentary."},
     ]
-    return _generate_content(model, parts).strip()
+    return _generate_content(model, parts, kind="transcribe").strip()
