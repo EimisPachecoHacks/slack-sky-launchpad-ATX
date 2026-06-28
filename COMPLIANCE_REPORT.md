@@ -95,3 +95,34 @@ Every project must build in one of three themes. Sky Launchpad squarely fits **C
 4. **Demo script** that foregrounds the self-improving loop and explicitly separates new work from scaffolding.
 5. *(Bonus points)* Add **Computer Use** (visual cloud-console diagnosis) or **Nano Banana** (generate the architecture diagram) to deepen the Gemini story.
 6. *(If chasing those prizes)* port voice to **LiveKit** and/or deploy to **DigitalOcean**.
+
+---
+
+## Update — 2026-06-28 (expanded build)
+
+Since the original report, the project gained several capabilities that materially strengthen the theme + prize case:
+
+### Gemini $5k — now FOUR Gemini surfaces combined ✅✅
+| Surface | Status |
+|---|---|
+| **Computer Use** (`gemini-2.5-computer-use-preview-10-2025`) | ✅ **Now used** — autonomous UI self-test drives a real browser (Playwright) via a vision-action loop; see `ui_tester/`, `project/backend/uitest/`. |
+| Antigravity managed agent (Interactions API) | ✅ deploy self-repair |
+| Gemini Live (`gemini-3.1-flash-live-preview`) | ✅ narration + voice transcription |
+| Multimodal vision (`gemini-3.1-pro-preview`) | ✅ diagram analysis |
+| Gemini 2.5 Pro | ✅ autonomous code-fix agent |
+Adding **Computer Use** (the brief's flagship suggestion — "build continuous software testers") plus an **autonomous fix→MR** loop is a strong, unprecedented combination, not a wrapper.
+
+### MongoDB Atlas — added sponsor tech ✅
+Skills, apps, test runs, and test cases now persist to **MongoDB Atlas** (`skydb/`), with Atlas Vector Search wired for skill retrieval (cosine fallback). Reps on-site; M0 covered. Diversifies the sponsor footprint without touching the Gemini story.
+
+### Self-Improvement Stack — materially deeper ◑→✅
+- **Deployed-Apps dashboard**: live status per app (passing / failing / untested), autonomous test coverage, error→solution + MR link.
+- **Continuous autonomous QA** (`ui_tester/qa_loop.py`): re-runs Computer-Use workflows on an interval, logs to Atlas, and **auto-opens a GitLab MR on failure**.
+- **Pydantic Logfire** observability tracing every AI call.
+- **Cloud Run**: backend deployed (`https://sky-backend-330741023262.us-central1.run.app`), local Playwright client connects over `wss://` (Benji topology).
+
+### Updated compliance notes
+- **Dashboard-not-the-main-feature**: still respected — the dashboards are evidence panels; the self-improving + self-testing loops are the headline. Keep the demo led by the loops.
+- **"Continuous software tester"** is explicitly encouraged by the Gemini brief — not a banned category.
+- ⚠️ **Secrets hygiene** (carried over): delete `hackuser_accessKeys_elsa.csv` + `cerebras-bot.json`; rotate the AWS key, Atlas password, and `devstar7133` password. Cloud Run runs auth-off / single-instance — demo-grade, not production.
+- **New Work Only** unchanged: keep the demo clearly delimiting hackathon work from the pre-existing Skyrchitect scaffolding.

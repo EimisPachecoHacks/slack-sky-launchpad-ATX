@@ -140,3 +140,29 @@ Goal: prove "it learns, and the lesson transfers."
 2. Start servers → Section 3 (endpoints). 
 3. Add keys → Section 4 (providers) + Section 7 voice/UI.
 4. Section 5 + Section 6 (the learning loop + E2E) — the demo proof.
+
+---
+
+## 11. Added coverage — DB, Apps dashboard, UI self-test, Cloud Run (2026-06-28)
+
+| ID | Area | Check | Status |
+|---|---|---|---|
+| DB-1 | MongoDB Atlas connectivity | `skydb.backend_info()` → `mongodb` (with `MONGODB_URI` + certifi TLS) | ✅ |
+| DB-2 | skydb fallback | unset `MONGODB_URI` → local JSON store; same API | ✅ |
+| DB-3 | Skills persist to Atlas | learned skill upserted; visible in `skills` collection | ✅ |
+| AP-1 | Apps dashboard | `GET /api/apps` → statuses (passing/failing/untested); sample when empty | ✅ |
+| AP-2 | Generate test cases | `POST /api/apps/{id}/generate-tests` (MiniMax) → `test_cases` in Atlas | ✅ |
+| UI-1 | Computer-Use health | `GET /api/uitest/health` → model + `playwright_connected` | ✅ |
+| UI-2 | Self-test run (local) | run a workflow → verdict streamed; `test_run` persisted | ✅ |
+| UI-3 | Autonomous QA suite | 7/7 core flows pass (landing, nav, sign-in, image, arch input, pricing) | ✅ |
+| UI-4 | Self-heal (fix agent) | `POST /api/uitest/fix` → gemini-2.5-pro root-cause + fix + learned skill (MR dry-run w/o `GITLAB_TOKEN`) | ✅ |
+| UI-5 | Continuous QA loop | `ui_tester/qa_loop.py` runs suite on interval, logs to Atlas, auto-fix on fail | ✅ |
+| CR-1 | Cloud Run backend | `https://sky-backend-330741023262.us-central1.run.app/health` 200; Atlas from cloud | ✅ |
+| CR-2 | Local client → cloud | client connects `wss://…/api/uitest/playwright` (`playwright_connected:true`); self-test verdict pass | ✅ |
+| CR-3 | Browser panels → cloud | Self-Test/Apps/Learning panels call cloud; CORS allows `localhost:3001` | ✅ |
+
+**Run the autonomous QA yourself:** ensure backend + local Playwright client + frontend are up, then
+`python ui_tester/qa_loop.py` (or a one-off via the **UI Self-Test** panel on the deploy page).
+
+**Pending live (needs creds):** real GitLab MRs on auto-fix (set `GITLAB_TOKEN` + project on the backend);
+Atlas Vector Search ranking (create a vector index + set `MONGODB_VECTOR_INDEX`).
