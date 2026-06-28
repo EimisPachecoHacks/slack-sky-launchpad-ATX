@@ -472,10 +472,9 @@ def _open_merge_request(
     try:
         client = GitLabClient(token=token, project_path=project_path)
 
-        branch_resp = client.create_branch(branch, ref=target_branch)
-        if isinstance(branch_resp, dict) and branch_resp.get("error"):
-            result["note"] = f"branch create failed: {branch_resp.get('detail') or branch_resp['error']}"
-            return result
+        # Note: we do NOT pre-create the branch — create_commit with start_branch
+        # creates it atomically. Pre-creating + passing start_branch makes GitLab
+        # reject the commit ("branch already exists").
 
         actions = []
         for f in files:
