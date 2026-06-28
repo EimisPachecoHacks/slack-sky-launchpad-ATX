@@ -12,6 +12,7 @@ import {
   Monitor,
   Wifi,
   WifiOff,
+  Wrench,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -154,6 +155,9 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
     null,
   );
   const [running, setRunning] = useState<boolean>(false);
+  const [lastFail, setLastFail] = useState<{ bug: BugInfo | null; workflow: string; targetUrl: string } | null>(null);
+  const [fixing, setFixing] = useState<boolean>(false);
+  const [fixResult, setFixResult] = useState<any>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const logEndRef = useRef<HTMLDivElement | null>(null);
@@ -245,6 +249,9 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
           break;
         case 'verdict':
           appendLog({ ...msg, id: nextId() });
+          if (msg.verdict === 'fail') {
+            setLastFail({ bug: msg.bug, workflow: selectedWorkflow, targetUrl });
+          }
           setRunning(false);
           closeSocket();
           break;
@@ -265,6 +272,8 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
     // reset state for a fresh run
     setLog([]);
     setScreenshot(null);
+    setLastFail(null);
+    setFixResult(null);
     idRef.current = 0;
     closeSocket();
 
@@ -371,6 +380,39 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
                   </pre>
                 </div>
               )}
+              {isFail && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={handleFix}
+                    disabled={fixing}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-medium"
+                  >
+                    {fixing ? <Loader className="w-4 h-4 animate-spin" /> : <Wrench className="w-4 h-4" />}
+                    {fixing ? 'Fixing with AI…' : 'Fix with AI → open GitLab MR'}
+                  </button>
+                  {fixResult && (
+                    <div className="mt-2 rounded-md border border-gray-700 bg-gray-800/60 p-2 text-xs text-gray-300 space-y-1">
+                      {fixResult.error ? (
+                        <div className="text-red-400">Fix failed: {String(fixResult.error)}</div>
+                      ) : (
+                        <>
+                          <div><span className="text-gray-500">Root cause:</span> {fixResult.root_cause || '—'}</div>
+                          <div><span className="text-green-400">Solution:</span> {fixResult.solution || '—'}</div>
+                          {Array.isArray(fixResult.files_changed) && fixResult.files_changed.length > 0 && (
+                            <div className="font-mono text-gray-400">files: {fixResult.files_changed.join(', ')}</div>
+                          )}
+                          {fixResult.mr_url ? (
+                            <a className="text-blue-400 hover:underline" href={fixResult.mr_url} target="_blank" rel="noopener noreferrer">View GitLab MR →</a>
+                          ) : (
+                            <div className="text-amber-400">{fixResult.note || 'GitLab not configured (dry-run)'}</div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -379,6 +421,31 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
         return null;
     }
   };
+
+  const handleFix = useCallback(async () => {
+    if (!lastFail || fixing) return;
+    setFixing(true);
+    setFixResult(null);
+    try {
+      const res = await fetch(`${apiBase}/api/uitest/fix`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bug: {
+            ...(lastFail.bug || {}),
+            workflow: lastFail.workflow,
+            target_url: lastFail.targetUrl,
+            summary: lastFail.bug?.signal || '',
+          },
+        }),
+      });
+      setFixResult(await res.json());
+    } catch (err) {
+      setFixResult({ ok: false, error: err instanceof Error ? err.message : 'Fix request failed' });
+    } finally {
+      setFixing(false);
+    }
+  }, [apiBase, lastFail, fixing]);
 
   const connected = health?.playwright_connected === true;
 

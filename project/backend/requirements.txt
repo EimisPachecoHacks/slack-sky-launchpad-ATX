@@ -39,3 +39,4 @@ pytest-mock>=3.12.0  # Enhanced mocking capabilities
 boto3>=1.34.0  # AWS S3 storage backend (optional)
 logfire[fastapi,httpx]>=0.50.0  # observability/tracing (Self-Improvement Stack)
 pymongo>=4.6  # MongoDB Atlas (skills/apps/tests store)
+google-adk>=0.3.0  # ADK fix agent (Phase 2)

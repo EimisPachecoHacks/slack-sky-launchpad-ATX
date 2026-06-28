@@ -335,6 +335,86 @@ async def workflows() -> list:
         return []
 
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+
+@router.post("/fix")
+async def fix(payload: dict) -> dict:
+    """Autonomous fix for a failed UI workflow (Phase 2).
+
+    Body: {"bug": {"workflow","error"|"signal","console_errors","target_url","summary"},
+           "apply": bool (optional; default env APPLY_FIX)}.
+    Runs the gemini-2.5-pro fix agent → opens a GitLab MR (or dry-run) → records the
+    solution on the app's latest failed run and saves a learned skill. If apply is set,
+    also writes the patch + redeploys locally (re-verify by re-running the self-test).
+    """
+    bug = payload.get("bug") or {}
+    apply_fix = bool(payload.get("apply", os.getenv("APPLY_FIX", "") == "1"))
+    target_url = bug.get("target_url", "")
+
+    try:
+        from backend.uitest.fix_agent import diagnose_and_fix
+        result = await diagnose_and_fix(bug, repo_root=_REPO_ROOT, apply=apply_fix)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("fix agent failed")
+        return {"ok": False, "error": str(exc)}
+
+    redeploy_result = None
+    if apply_fix and not result.get("error") and result.get("files_changed"):
+        try:
+            from backend.uitest.redeploy import redeploy
+            redeploy_result = redeploy()
+        except Exception as exc:  # noqa: BLE001
+            redeploy_result = {"ok": False, "detail": str(exc)}
+
+    # Record the solution on the app's latest failed run + persist a learned skill.
+    root_cause = result.get("root_cause", "")
+    solution = result.get("solution", "")
+    mr_url = result.get("mr_url", "")
+    error_sig = bug.get("error") or bug.get("signal") or bug.get("summary") or "UI workflow failure"
+    try:
+        import skydb
+        app = next((a for a in skydb.list_apps() if a.get("url") and a["url"] == target_url), None)
+        run = skydb.latest_test_run(app["app_id"]) if app else None
+        if run:
+            skydb.add_test_run({
+                **run, "run_id": None, "solution": solution, "mr_url": mr_url,
+                "status": run.get("status", "failed"),
+            })
+    except Exception:
+        pass
+    try:
+        import deployer.skill_library as sl
+        sl.save_skill({
+            "name": f"ui-{_slug(error_sig)}",
+            "description": (solution or root_cause or error_sig)[:160],
+            "error_signature": error_sig,
+            "root_cause": root_cause,
+            "fix_pattern": solution,
+            "provider": "ui",
+        })
+    except Exception:
+        pass
+
+    return {
+        "ok": not result.get("error"),
+        "root_cause": root_cause,
+        "solution": solution,
+        "files_changed": result.get("files_changed", []),
+        "mr_url": mr_url,
+        "applied": result.get("applied", False),
+        "redeploy": redeploy_result,
+        "note": result.get("note", ""),
+        "error": result.get("error", ""),
+    }
+
+
+def _slug(text: str) -> str:
+    import re as _re
+    s = _re.sub(r"[^a-z0-9]+", "-", (text or "fix").lower()).strip("-")
+    return (s[:40] or "fix")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
