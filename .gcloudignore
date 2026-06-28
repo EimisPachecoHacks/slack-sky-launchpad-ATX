@@ -1,0 +1,27 @@
+# Keep the Cloud Build upload small + never upload secrets.
+.git/
+project/node_modules/
+project/venv/
+project/dist/
+project/coverage/
+**/__pycache__/
+*.pyc
+*.pyo
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.gif
+*.csv
+*.env
+project/.env
+project/.env.local
+cerebras-bot.json
+*-bot.json
+*-key.json
+service-account*.json
+gcp-credentials*.json
+agent-transcripts/
+terminals/
+.cursor/
+.codex/

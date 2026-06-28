@@ -228,8 +228,18 @@ async def handle_message(page, capture: ConsoleCapture, ws, message: dict) -> No
 
 async def run_session(page, capture: ConsoleCapture) -> None:
     print(f"📡 Connecting to backend at: {BACKEND_WS_URL}")
+    # For wss:// (e.g. Cloud Run), use certifi's CA bundle so TLS verifies on
+    # macOS/python.org builds (avoids CERTIFICATE_VERIFY_FAILED).
+    ws_ssl = None
+    if BACKEND_WS_URL.startswith("wss://"):
+        import ssl
+        try:
+            import certifi
+            ws_ssl = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ws_ssl = ssl.create_default_context()
     async with websockets.connect(
-        BACKEND_WS_URL, ping_interval=20, ping_timeout=60, max_size=None
+        BACKEND_WS_URL, ping_interval=20, ping_timeout=60, max_size=None, ssl=ws_ssl
     ) as ws:
         print("✅ Connected to backend")
         print("🎯 Ready to receive commands")

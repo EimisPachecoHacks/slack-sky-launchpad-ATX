@@ -49,3 +49,11 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+
+# Credentials — never commit
+cerebras-bot.json
+*-bot.json
+*accessKeys*.csv
+*-key.json
+service-account*.json
+gcp-credentials*.json
