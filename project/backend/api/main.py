@@ -15,6 +15,8 @@ load_dotenv()
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+# Add repo root so the shared `skydb` data layer is importable from the backend.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 # Import configuration (validates env vars at startup)
 from backend.config import settings, validate_configuration

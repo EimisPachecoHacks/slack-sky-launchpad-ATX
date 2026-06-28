@@ -318,6 +318,26 @@ def deploy_with_retry(
         # Get outputs
         _, outputs = terraform_output(workspace)
 
+        # Register the deployed app in the queryable store (for the Apps dashboard).
+        try:
+            import skydb
+            url = ""
+            for v in (outputs or {}).values():
+                val = v.get("value", v) if isinstance(v, dict) else v
+                if isinstance(val, str) and val.startswith("http"):
+                    url = val
+                    break
+            app = skydb.upsert_app({
+                "name": config.get("project_id") or f"{provider}-{config.get('environment', 'dev')}",
+                "provider": provider,
+                "environment": config.get("environment", "dev"),
+                "url": url,
+                "source": "terraform-deploy",
+            })
+            skydb.set_app_health(app["app_id"], bool(url), "deployed")
+        except Exception:
+            pass
+
         result = DeploymentResult(True, output, outputs)
         result.workspace = workspace
         result.files = files

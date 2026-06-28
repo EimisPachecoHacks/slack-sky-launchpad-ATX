@@ -87,6 +87,15 @@ SAMPLE = {
 
 
 def _load_index() -> list[dict]:
+    # Prefer the queryable store (MongoDB Atlas / local fallback).
+    try:
+        import skydb
+        skills = skydb.list_skills()
+        if skills:
+            return skills
+    except Exception:
+        pass
+    # Fallback: the on-disk JSON index written alongside SKILL.md files.
     try:
         if _INDEX_FILE.exists():
             data = json.loads(_INDEX_FILE.read_text(encoding="utf-8"))

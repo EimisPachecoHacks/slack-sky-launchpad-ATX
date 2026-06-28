@@ -266,6 +266,26 @@ def save_skill(new_skill: dict, repo_root: Path | None = None) -> dict:
     index[slug] = entry
     _write_index(index_file, index)
 
+    # Mirror into the queryable store (MongoDB Atlas / local fallback). Best-effort:
+    # the SKILL.md file + JSON index remain the agent/GitLab source; skydb powers dashboards.
+    try:
+        import skydb
+        skydb.upsert_skill({
+            "slug": slug,
+            "name": name,
+            "description": entry["description"],
+            "error_signature": entry["error_signature"],
+            "root_cause": entry.get("root_cause", ""),
+            "fix_pattern": entry.get("fix_pattern", ""),
+            "provider": entry.get("provider", ""),
+            "embedding": entry.get("embedding"),
+            "markdown_path": str(skill_path),
+            "created": entry["created"],
+            "hit_count": entry["hit_count"],
+        })
+    except Exception:
+        pass
+
     return {
         "slug": slug,
         "path": str(skill_path),
