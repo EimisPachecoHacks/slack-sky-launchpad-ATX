@@ -284,13 +284,14 @@ async def _handle_run(stream_ws: WebSocket, workflow: str, target_url: str) -> N
         try:
             from backend.uitest.computer_use_agent import run_workflow
 
-            await run_workflow(
+            result = await run_workflow(
                 workflow,
                 target_url=target_url,
                 request_screenshot=request_screenshot,
                 execute_action=execute_action,
                 emit=emit,
             )
+            _persist_test_run(workflow, target_url, result)
         except WebSocketDisconnect:
             # Either the browser or the Playwright socket dropped mid-run.
             logger.info("Socket disconnected during run")
@@ -337,6 +338,32 @@ async def workflows() -> list:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _persist_test_run(workflow: str, target_url: str, result: Optional[dict]) -> None:
+    """Record a self-test run in skydb, linking to the app by URL. Best-effort."""
+    if not isinstance(result, dict):
+        return
+    try:
+        import skydb
+
+        app = next((a for a in skydb.list_apps() if a.get("url") and a["url"] == target_url), None)
+        verdict = result.get("verdict")
+        status = {"pass": "passed", "fail": "failed"}.get(verdict, "inconclusive")
+        bug = result.get("bug") or {}
+        skydb.add_test_run({
+            "app_id": app["app_id"] if app else None,
+            "target_url": target_url,
+            "workflow": workflow,
+            "status": status,
+            "summary": result.get("summary", ""),
+            "bug": bug or None,
+            "error": bug.get("signal", "") if status == "failed" else "",
+            "solution": "",   # populated by the Phase 2 fix agent when it resolves the bug
+            "mr_url": "",
+        })
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("persist test_run skipped: %s", exc)
 
 
 async def _recv_pw(timeout: float = 30.0) -> dict:

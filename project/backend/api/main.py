@@ -236,6 +236,14 @@ try:
 except Exception as _uitest_exc:
     logger.warning(f"UI self-test router not mounted: {_uitest_exc}")
 
+# Deployed-apps dashboard (status, test coverage, error→solution).
+try:
+    from backend.apps_api import router as apps_router
+    app.include_router(apps_router)
+    logger.info("📦 Apps dashboard router mounted at /api/apps/*")
+except Exception as _apps_exc:
+    logger.warning(f"Apps dashboard router not mounted: {_apps_exc}")
+
 
 @app.get("/api/skills/learned")
 async def list_learned_skills_endpoint():
