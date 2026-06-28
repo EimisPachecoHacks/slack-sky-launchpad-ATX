@@ -13,6 +13,14 @@ import LearningPanel from '../components/learning/LearningPanel';
 import SelfTestPanel from '../components/uitest/SelfTestPanel';
 import AppsDashboard from '../components/apps/AppsDashboard';
 
+// The self-test / apps / learning panels talk to the Cloud Run backend
+// (Benji topology: cloud backend + local Playwright client). Override with
+// VITE_UITEST_API_URL; falls back to '' (same-origin → local backend) if blanked.
+const UITEST_API: string =
+  (import.meta as any).env?.VITE_UITEST_API_URL ??
+  'https://sky-backend-330741023262.us-central1.run.app';
+const UITEST_WS: string = UITEST_API ? UITEST_API.replace(/^http/, 'ws') : 'ws://localhost:8000';
+
 const Deployment: React.FC = () => {
   const location = useLocation();
   const { architecture } = location.state as { architecture: Architecture } || {};
@@ -216,15 +224,15 @@ const Deployment: React.FC = () => {
           )}
 
           <div className="mt-10">
-            <LearningPanel />
+            <LearningPanel apiBase={UITEST_API} />
           </div>
 
           <div className="mt-10">
-            <AppsDashboard />
+            <AppsDashboard apiBase={UITEST_API} />
           </div>
 
           <div className="mt-10">
-            <SelfTestPanel />
+            <SelfTestPanel apiBase={UITEST_API} wsBase={UITEST_WS} />
           </div>
         </div>
       </main>
