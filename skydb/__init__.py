@@ -151,7 +151,15 @@ def _get_store():
         try:
             from pymongo import MongoClient
 
-            client = MongoClient(uri, serverSelectionTimeoutMS=4000)
+            # macOS / python.org builds often lack system CA access -> point TLS at
+            # certifi's bundle so Atlas's cert verifies (fixes CERTIFICATE_VERIFY_FAILED).
+            kwargs = {"serverSelectionTimeoutMS": 4000}
+            try:
+                import certifi
+                kwargs["tlsCAFile"] = certifi.where()
+            except Exception:
+                pass
+            client = MongoClient(uri, **kwargs)
             client.admin.command("ping")
             _store = _MongoStore(client, _DB_NAME)
             logger.info("🍃 skydb using MongoDB Atlas (db=%s)", _DB_NAME)
