@@ -250,6 +250,18 @@ async def list_learned_skills_endpoint():
     }
 
 
+@app.get("/api/learning/summary")
+async def learning_summary():
+    """Learning-dashboard payload: KPIs, before/after, error→solution table, timeline.
+
+    Powers the (secondary) learning panel on the deploy page — evidence that the
+    self-improving loop gets better with use. Returns labeled sample data when no
+    real deploys have run yet.
+    """
+    from backend.learning import build_summary
+    return build_summary()
+
+
 # Dependency to get agent
 def get_agent() -> ArchitectureAgent:
     """Dependency to get architecture agent"""

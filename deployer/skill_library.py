@@ -251,6 +251,10 @@ def save_skill(new_skill: dict, repo_root: Path | None = None) -> dict:
         "name": name,
         "description": new_skill.get("description", "") or "",
         "error_signature": new_skill.get("error_signature", "") or "",
+        # Stored so the learning dashboard can render the error -> solution table.
+        "root_cause": new_skill.get("root_cause", "") or "",
+        "fix_pattern": new_skill.get("fix_pattern", "") or "",
+        "provider": new_skill.get("provider", "") or "",
         "body_excerpt": excerpt,
         "embedding": embedding,
         "path": str(skill_path),

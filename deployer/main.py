@@ -37,6 +37,7 @@ from .gitlab_saver import GitLabSaver
 from .iac_generator import generate_aws_terraform, generate_gcp_terraform
 from .log_collector import collect_failure_context
 from .skill_library import save_skill
+from .deploy_events import record_event
 
 
 def _narrate(phase: str, text: str) -> None:
@@ -70,7 +71,9 @@ def _repair_failure(
     """
     result = DeploymentResult(False, output)
     first_msg = result.errors[0].get("message", "deployment error") if result.errors else "deployment error"
+    run_id = workspace.name
     _narrate("failure", f"Deployment failed: {first_msg}")
+    record_event("failure", first_msg, provider=provider, run_id=run_id, error_signature=first_msg)
 
     project_id = config.get("project_id", "")
     try:
@@ -80,6 +83,7 @@ def _repair_failure(
         print(f"  (failure-context collection degraded: {exc})")
 
     _narrate("diagnose", "Spinning up the Antigravity repair agent to read the logs and diagnose...")
+    record_event("diagnose", "Antigravity agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
     try:
         from .antigravity_client import diagnose_and_author
 
@@ -95,6 +99,11 @@ def _repair_failure(
                 slug = saved.get("slug", new_skill.get("name", "skill"))
                 changes.append(f"Learned skill: {slug}")
                 _narrate("learned", f"Authored a new reusable skill from this failure: {slug}")
+                record_event(
+                    "learned", f"Authored reusable skill: {slug}", provider=provider,
+                    run_id=run_id, error_signature=new_skill.get("error_signature", first_msg),
+                    skill_slug=slug,
+                )
             except Exception as exc:
                 print(f"  (skill save failed: {exc})")
 
@@ -102,6 +111,7 @@ def _repair_failure(
             files = {**files, **fixed}
         if changes:
             _narrate("retry", "Applying the fix and retrying the deployment...")
+            record_event("retry", "Applying fix and retrying deploy", provider=provider, run_id=run_id)
             return files, changes, agent_env_id
     except Exception as exc:
         print(f"  (Antigravity repair unavailable, using legacy auto-fixer: {exc})")
@@ -299,6 +309,11 @@ def deploy_with_retry(
             return DeploymentResult(False, output)
 
         print("  terraform apply: OK")
+        record_event(
+            "success",
+            f"Deployment succeeded on attempt {attempt}",
+            provider=provider, run_id=run_id, attempt=attempt,
+        )
 
         # Get outputs
         _, outputs = terraform_output(workspace)

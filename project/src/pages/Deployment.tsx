@@ -9,6 +9,7 @@ import { Architecture, DeploymentConfig } from '../types';
 import { Loader, CheckCircle, GitBranch } from 'lucide-react';
 import { api } from '../services/api';
 import LiveNarrationToggle from '../components/LiveNarrationToggle';
+import LearningPanel from '../components/learning/LearningPanel';
 
 const Deployment: React.FC = () => {
   const location = useLocation();
@@ -211,6 +212,10 @@ const Deployment: React.FC = () => {
               )}
             </Card>
           )}
+
+          <div className="mt-10">
+            <LearningPanel />
+          </div>
         </div>
       </main>
       
