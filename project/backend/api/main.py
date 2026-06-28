@@ -226,6 +226,14 @@ try:
 except Exception as _live_exc:  # never block startup on the optional voice layer
     logger.warning(f"Gemini Live router not mounted: {_live_exc}")
 
+# Autonomous UI self-test (Gemini Computer Use + Playwright).
+try:
+    from backend.uitest.api import router as uitest_router
+    app.include_router(uitest_router)
+    logger.info("🧪 UI self-test router mounted at /api/uitest/*")
+except Exception as _uitest_exc:
+    logger.warning(f"UI self-test router not mounted: {_uitest_exc}")
+
 
 @app.get("/api/skills/learned")
 async def list_learned_skills_endpoint():

@@ -10,6 +10,7 @@ import { Loader, CheckCircle, GitBranch } from 'lucide-react';
 import { api } from '../services/api';
 import LiveNarrationToggle from '../components/LiveNarrationToggle';
 import LearningPanel from '../components/learning/LearningPanel';
+import SelfTestPanel from '../components/uitest/SelfTestPanel';
 
 const Deployment: React.FC = () => {
   const location = useLocation();
@@ -215,6 +216,10 @@ const Deployment: React.FC = () => {
 
           <div className="mt-10">
             <LearningPanel />
+          </div>
+
+          <div className="mt-10">
+            <SelfTestPanel />
           </div>
         </div>
       </main>

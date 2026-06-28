@@ -1,0 +1,354 @@
+"""FastAPI router bridging the browser UI, the Computer-Use agent, and the
+local Playwright client for "Sky Launchpad".
+
+Three parties talk through this router:
+
+1. The local Playwright client (a separate process) connects as a WS client to
+   ``/api/uitest/playwright``. We keep a single module-level reference to the
+   active client websocket (last connection wins).
+2. The browser UI (the React Self-Test panel) connects to ``/api/uitest/stream``
+   to start a run and watch it live.
+3. The Computer-Use agent (``run_workflow``) is invoked by us; we hand it the
+   ``execute_action`` / ``request_screenshot`` callbacks (which proxy to the
+   Playwright client socket) and ``emit`` (which forwards events to the watching
+   browser UI).
+
+Runs are serialized (one at a time) via an ``asyncio.Lock`` so the single
+request/response Playwright socket only ever has one in-flight exchange.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import base64
+import logging
+import os
+from typing import Optional
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/uitest", tags=["uitest"])
+
+# ---------------------------------------------------------------------------
+# Module-level shared state
+# ---------------------------------------------------------------------------
+
+# The currently-connected local Playwright client socket (last one wins).
+_playwright_ws: Optional[WebSocket] = None
+playwright_connected: bool = False
+
+# Single-reader inbox: the /playwright endpoint is the ONLY coroutine that reads
+# the client socket; it puts every incoming message here. A run consumes replies
+# from this queue (runs are serialized, and the client only ever speaks in reply
+# to a request, so reply ordering is 1:1).
+_pw_inbox: "Optional[asyncio.Queue[dict]]" = None
+
+# Only one run may execute at a time: it owns the Playwright socket for the
+# duration and does strict send-then-receive request/response correlation.
+_run_lock = asyncio.Lock()
+
+DEFAULT_TARGET_URL = "http://localhost:3001"
+DEFAULT_MODEL_ID = "gemini-2.5-computer-use-preview-10-2025"
+
+
+def _model_id() -> str:
+    return os.getenv("COMPUTER_USE_MODEL_ID", DEFAULT_MODEL_ID)
+
+
+# ---------------------------------------------------------------------------
+# Playwright client socket
+# ---------------------------------------------------------------------------
+
+
+@router.websocket("/playwright")
+async def playwright_endpoint(websocket: WebSocket) -> None:
+    """The local Playwright client connects here.
+
+    We keep a single module-level reference to the active client socket; the
+    most recent connection wins. The flag ``playwright_connected`` tracks
+    availability for the ``/health`` and ``/stream`` endpoints.
+    """
+    global _playwright_ws, playwright_connected, _pw_inbox
+
+    await websocket.accept()
+    _playwright_ws = websocket
+    _pw_inbox = asyncio.Queue()
+    playwright_connected = True
+    logger.info("Playwright client connected")
+
+    try:
+        # This is the SINGLE reader of the client socket. Every message the
+        # client sends (screenshot / action_result / started) is pushed onto the
+        # inbox queue, which the active run consumes. This avoids two coroutines
+        # ever calling receive on the same socket concurrently.
+        while True:
+            msg = await websocket.receive_json()
+            await _pw_inbox.put(msg)
+    except WebSocketDisconnect:
+        logger.info("Playwright client disconnected")
+    except Exception:  # noqa: BLE001 - never let this crash the server
+        logger.exception("Playwright client socket error")
+    finally:
+        # Only clear if this socket is still the active one (a newer client may
+        # have replaced us already).
+        if _playwright_ws is websocket:
+            _playwright_ws = None
+            playwright_connected = False
+            _pw_inbox = None
+
+
+# ---------------------------------------------------------------------------
+# Browser UI stream socket
+# ---------------------------------------------------------------------------
+
+
+@router.websocket("/stream")
+async def stream_endpoint(stream_ws: WebSocket) -> None:
+    """The browser UI connects here to start a run and watch it live.
+
+    Expected trigger message from the frontend::
+
+        {"type": "run",
+         "workflow": "<natural-language QA goal>",
+         "target_url": "http://localhost:3001"}  # optional, this is the default
+    """
+    await stream_ws.accept()
+
+    try:
+        while True:
+            try:
+                message = await stream_ws.receive_json()
+            except WebSocketDisconnect:
+                logger.info("Stream client disconnected")
+                return
+
+            if not isinstance(message, dict) or message.get("type") != "run":
+                await _safe_send(
+                    stream_ws,
+                    {
+                        "kind": "status",
+                        "text": "Expected {'type':'run','workflow':...}. Ignoring message.",
+                    },
+                )
+                continue
+
+            workflow = message.get("workflow") or ""
+            target_url = message.get("target_url") or DEFAULT_TARGET_URL
+
+            if not workflow or not isinstance(workflow, str):
+                await _safe_send(
+                    stream_ws,
+                    {"kind": "status", "text": "Missing 'workflow' prompt string."},
+                )
+                await _safe_send(
+                    stream_ws,
+                    {
+                        "kind": "verdict",
+                        "verdict": "inconclusive",
+                        "summary": "No workflow prompt provided.",
+                        "bug": None,
+                    },
+                )
+                await _safe_send(stream_ws, {"kind": "done"})
+                continue
+
+            await _handle_run(stream_ws, workflow, target_url)
+    except WebSocketDisconnect:
+        logger.info("Stream client disconnected")
+    except Exception:  # noqa: BLE001 - never let the socket crash the server
+        logger.exception("Stream endpoint error")
+        await _safe_send(
+            stream_ws,
+            {"kind": "status", "text": "Internal error in self-test stream."},
+        )
+
+
+async def _handle_run(stream_ws: WebSocket, workflow: str, target_url: str) -> None:
+    """Execute a single self-test run, forwarding events to ``stream_ws``."""
+
+    # 1. No Playwright client -> inconclusive, stop.
+    if not playwright_connected or _playwright_ws is None:
+        await _safe_send(
+            stream_ws,
+            {
+                "kind": "status",
+                "text": "No Playwright client connected. Run: python ui_tester/playwright_client.py",
+            },
+        )
+        await _safe_send(
+            stream_ws,
+            {
+                "kind": "verdict",
+                "verdict": "inconclusive",
+                "summary": "No Playwright client connected.",
+                "bug": None,
+            },
+        )
+        await _safe_send(stream_ws, {"kind": "done"})
+        return
+
+    # Serialize runs: only one may use the single Playwright socket at a time.
+    if _run_lock.locked():
+        await _safe_send(
+            stream_ws,
+            {
+                "kind": "status",
+                "text": "A self-test run is already in progress. Please wait.",
+            },
+        )
+        await _safe_send(
+            stream_ws,
+            {
+                "kind": "verdict",
+                "verdict": "inconclusive",
+                "summary": "Another run is in progress.",
+                "bug": None,
+            },
+        )
+        await _safe_send(stream_ws, {"kind": "done"})
+        return
+
+    async with _run_lock:
+        # Pin the socket we will use for the entire run.
+        pw_ws = _playwright_ws
+        if pw_ws is None:
+            await _safe_send(
+                stream_ws,
+                {"kind": "status", "text": "Playwright client dropped before start."},
+            )
+            await _safe_send(
+                stream_ws,
+                {
+                    "kind": "verdict",
+                    "verdict": "inconclusive",
+                    "summary": "Playwright client unavailable.",
+                    "bug": None,
+                },
+            )
+            await _safe_send(stream_ws, {"kind": "done"})
+            return
+
+        # --- Callbacks proxying to the Playwright socket (strict req/resp) ---
+
+        async def request_screenshot() -> bytes:
+            await pw_ws.send_json({"type": "request_screenshot"})
+            reply = await _recv_pw()
+            return base64.b64decode(reply["screenshot"])
+
+        async def execute_action(function_name: str, args: dict) -> dict:
+            await pw_ws.send_json(
+                {
+                    "type": "execute_action",
+                    "function_name": function_name,
+                    "args": args,
+                }
+            )
+            reply = await _recv_pw(timeout=90.0)
+            return {
+                "screenshot": base64.b64decode(reply["screenshot"]),
+                "url": reply.get("url"),
+                "console_errors": reply.get("console_errors", []),
+            }
+
+        async def emit(event: dict) -> None:
+            await stream_ws.send_json(event)
+
+        # Tell the Playwright client a run is starting (best-effort handshake).
+        try:
+            await pw_ws.send_json({"type": "start", "url": target_url})
+            await _recv_pw(timeout=60.0)  # expect {"type":"started",...}
+        except Exception:  # noqa: BLE001
+            logger.exception("Playwright start handshake failed")
+            await _safe_send(
+                stream_ws,
+                {
+                    "kind": "status",
+                    "text": "Failed to start the Playwright client session.",
+                },
+            )
+            await _safe_send(
+                stream_ws,
+                {
+                    "kind": "verdict",
+                    "verdict": "inconclusive",
+                    "summary": "Playwright start handshake failed.",
+                    "bug": None,
+                },
+            )
+            await _safe_send(stream_ws, {"kind": "done"})
+            return
+
+        # --- Run the Computer-Use agent ---
+        try:
+            from backend.uitest.computer_use_agent import run_workflow
+
+            await run_workflow(
+                workflow,
+                target_url=target_url,
+                request_screenshot=request_screenshot,
+                execute_action=execute_action,
+                emit=emit,
+            )
+        except WebSocketDisconnect:
+            # Either the browser or the Playwright socket dropped mid-run.
+            logger.info("Socket disconnected during run")
+        except Exception as exc:  # noqa: BLE001 - never crash the socket
+            logger.exception("Self-test run failed")
+            await _safe_send(
+                stream_ws,
+                {"kind": "status", "text": f"Run failed: {exc}"},
+            )
+            await _safe_send(
+                stream_ws,
+                {
+                    "kind": "verdict",
+                    "verdict": "inconclusive",
+                    "summary": f"Run crashed: {exc}",
+                    "bug": None,
+                },
+            )
+        finally:
+            # The agent emits its own final verdict; we always cap with a done.
+            await _safe_send(stream_ws, {"kind": "done"})
+
+
+# ---------------------------------------------------------------------------
+# HTTP endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/health")
+async def health() -> dict:
+    return {"playwright_connected": playwright_connected, "model": _model_id()}
+
+
+@router.get("/workflows")
+async def workflows() -> list:
+    try:
+        from backend.uitest.computer_use_agent import SAMPLE_WORKFLOWS
+
+        return SAMPLE_WORKFLOWS
+    except ImportError:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+async def _recv_pw(timeout: float = 30.0) -> dict:
+    """Await the next message from the Playwright client (via the single-reader inbox)."""
+    if _pw_inbox is None:
+        raise RuntimeError("Playwright client not connected")
+    return await asyncio.wait_for(_pw_inbox.get(), timeout=timeout)
+
+
+async def _safe_send(ws: WebSocket, payload: dict) -> None:
+    """Send JSON, swallowing errors if the socket is already gone."""
+    try:
+        await ws.send_json(payload)
+    except Exception:  # noqa: BLE001
+        logger.debug("Failed to send on closed socket: %s", payload.get("kind"))
