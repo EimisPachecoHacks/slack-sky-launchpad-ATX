@@ -34,6 +34,14 @@ STREAM_WS = os.getenv(
 )
 TARGET_URL = os.getenv("QA_TARGET_URL", "http://localhost:3001")
 INTERVAL = int(os.getenv("QA_INTERVAL_SECONDS", "1800"))
+# On a failed workflow, auto-invoke the fix agent (diagnose -> GitLab MR / dry-run
+# -> learned skill). Real MRs require GITLAB_TOKEN on the backend; otherwise dry-run.
+AUTOFIX = os.getenv("QA_AUTOFIX", "1") == "1"
+# HTTP base for the fix endpoint, derived from the WS stream URL unless overridden.
+API_URL = os.getenv(
+    "QA_API_URL",
+    STREAM_WS.replace("wss://", "https://").replace("ws://", "http://").replace("/api/uitest/stream", ""),
+)
 
 # Keep the default suite small to bound token cost; expand as needed.
 WORKFLOWS = [
@@ -42,21 +50,42 @@ WORKFLOWS = [
 ]
 
 
-async def _run(workflow: str) -> str:
+async def _run(workflow: str) -> dict:
     use_ssl = _SSL if STREAM_WS.startswith("wss://") else None
     async with websockets.connect(STREAM_WS, ssl=use_ssl, max_size=None) as ws:
         await ws.send(json.dumps({"type": "run", "workflow": workflow, "target_url": TARGET_URL}))
-        verdict = "inconclusive"
+        verdict, bug, summary = "inconclusive", None, ""
         while True:
             try:
                 m = json.loads(await asyncio.wait_for(ws.recv(), timeout=180))
             except asyncio.TimeoutError:
-                return "timeout"
+                return {"verdict": "timeout", "bug": None, "summary": ""}
             if m.get("kind") == "verdict":
                 verdict = m.get("verdict", verdict)
+                bug = m.get("bug")
+                summary = m.get("summary", "")
             elif m.get("kind") == "done":
                 break
-        return verdict
+        return {"verdict": verdict, "bug": bug, "summary": summary}
+
+
+def _autofix(workflow: str, result: dict) -> None:
+    """On a failed run, ask the fix agent to diagnose + open a GitLab MR (or dry-run)."""
+    bug = result.get("bug") or {}
+    payload = {"bug": {
+        **bug,
+        "workflow": workflow,
+        "target_url": TARGET_URL,
+        "summary": result.get("summary", ""),
+    }}
+    try:
+        import httpx
+        r = httpx.post(f"{API_URL}/api/uitest/fix", json=payload, timeout=200.0)
+        d = r.json()
+        mr = d.get("mr_url") or d.get("note") or "(no MR)"
+        print(f"     🛠️  auto-fix: {(d.get('solution') or d.get('error') or '')[:90]} | {mr}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"     🛠️  auto-fix failed: {exc}")
 
 
 async def run_suite() -> None:
@@ -64,11 +93,14 @@ async def run_suite() -> None:
     print(f"\n[{stamp}] QA suite ({len(WORKFLOWS)} workflows) → {TARGET_URL}")
     for wf in WORKFLOWS:
         try:
-            v = await _run(wf)
+            result = await _run(wf)
         except Exception as exc:  # noqa: BLE001
-            v = f"error: {exc}"
+            result = {"verdict": f"error: {exc}", "bug": None, "summary": ""}
+        v = result["verdict"]
         mark = "✅" if v == "pass" else ("❌" if v == "fail" else "⚠️")
         print(f"  {mark} {v:12} | {wf[:70]}")
+        if v == "fail" and AUTOFIX:
+            _autofix(wf, result)
 
 
 async def main() -> None:
