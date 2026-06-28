@@ -261,9 +261,14 @@ async def main() -> None:
     print(f"   Viewport: {VIEWPORT_WIDTH}x{VIEWPORT_HEIGHT}")
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=HEADLESS)
+        browser = await p.chromium.launch(
+            headless=HEADLESS, slow_mo=int(os.getenv("SLOWMO_MS", "0"))
+        )
         context = await browser.new_context(
-            viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT}
+            viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
+            # Pin to 1x so headed/Retina screenshots stay at viewport size
+            # (2x screenshots are too large for the Computer Use model).
+            device_scale_factor=1,
         )
         page = await context.new_page()
         capture = ConsoleCapture()
