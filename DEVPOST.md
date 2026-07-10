@@ -1,174 +1,126 @@
-# Skyrchitect
+# Sky Launchpad
 
-**AI-powered cloud architect that transforms GitLab issues into production-ready GCP Terraform infrastructure in seconds.**
+**Infrastructure that learns from its own failures — Gemma 3 and its own memory, running on an AMD Instinct MI300X.**
 
-<!-- Add project banner/logo image here -->
-<!-- ![Skyrchitect Banner](images/banner.png) -->
+*Submitted to the AMD Developer Hackathon: ACT II — Unicorn Track (🦄)*
 
 ---
 
 ## Inspiration
 
-Every cloud infrastructure journey starts the same way: someone describes what they need, and then a DevOps engineer spends hours — sometimes days — translating those requirements into production-grade Terraform code. For teams without dedicated cloud engineers, this bottleneck is even worse. They struggle with GCP best practices, miss critical security configurations, overpay for resources, and end up with fragile infrastructure that's hard to maintain.
+Every infrastructure tool makes the same mistake twice.
 
-We saw this gap firsthand: the distance between _describing_ what you need and _having_ production-ready Infrastructure as Code is enormous. Manual Terraform authoring demands deep expertise in cloud networking, IAM, encryption, cost optimization, and compliance — knowledge that's expensive and scarce.
+You ask an AI to generate Terraform. It forgets to enable the Compute Engine API. `terraform apply` fails. The AI patches it, you move on. Next week, a different project, a different prompt — and it forgets to enable the Compute Engine API again. The model never got worse, but it never got *better* either. Every deploy starts from zero.
 
-Skyrchitect was built to eliminate that gap entirely. Our goal was to bring GitLab's DevSecOps philosophy directly into infrastructure provisioning — so that any developer can describe their infrastructure needs in a GitLab issue and receive a complete, secure, cost-optimized Terraform configuration delivered as a merge request, ready for review and deployment.
+That's not how engineers work. When an SRE hits a wall at 2am, they write it down. The runbook grows. The team gets faster. The knowledge compounds.
+
+We wanted infrastructure automation that compounds. Not a bigger model — a system with **memory**.
 
 ## What it does
 
-Skyrchitect is an AI-powered infrastructure architect that lives inside your GitLab workflow. It reads a GitLab issue describing infrastructure requirements, generates complete GCP Terraform configurations, and delivers them as a merge request — fully automated, end to end.
+Sky Launchpad turns natural language or an uploaded architecture diagram into multi-cloud Terraform, actually runs `terraform apply`, and opens a GitLab merge request when the infrastructure really stands up.
 
-### Three-Agent Pipeline
+The interesting part is what happens when it **fails**:
 
-The core of Skyrchitect is a GitLab Duo flow with three specialized AI agents working in sequence:
+1. **Collect** — `deployer/log_collector.py` gathers the Terraform error *plus real GCP Cloud Logging* entries, and the exact HCL lines around each error.
+2. **Diagnose** — `deployer/repair_agent.py` hands that context to **Gemma 3**, which finds the root cause and rewrites the broken HCL.
+3. **Author** — the same Gemma 3 call writes a **new, generalized `SKILL.md`** — not "fix line 42", but "enable `compute.googleapis.com` before creating compute resources, and depend on it."
+4. **Remember** — the skill is embedded by **mxbai-embed-large on the MI300X** and indexed in MongoDB Atlas Vector Search.
+5. **Transfer** — the *next* deployment retrieves matching skills by vector similarity and injects them into generation.
 
-| Agent | Purpose | What It Does |
-|-------|---------|--------------|
-| **Requirements Analyzer** | Parse natural language into structured specs | Reads the GitLab issue and comments, scans existing repo Terraform files, and outputs a structured JSON requirements specification with architecture pattern, GCP services, scale, security needs, and budget |
-| **IaC Generator** | Generate production-ready Terraform | Takes the structured requirements and produces a complete 6-file Terraform configuration: `providers.tf`, `main.tf`, `variables.tf`, `outputs.tf`, `terraform.tfvars.example`, and `README.md` |
-| **Code Committer** | Automate the GitLab workflow | Creates a feature branch, commits all generated files, opens a merge request with architecture overview and cost estimates, and comments on the original issue with a summary |
+The same failure never happens twice. No human ever edits a skill.
 
-```
-GitLab Issue (natural language)
-       │
-       ▼
-┌─────────────────────────┐
-│  Requirements Analyzer  │──▶ Structured JSON spec
-└─────────────────────────┘
-       │
-       ▼
-┌─────────────────────────┐
-│     IaC Generator       │──▶ 6 Terraform files
-└─────────────────────────┘
-       │
-       ▼
-┌─────────────────────────┐
-│    Code Committer       │──▶ Branch + Commit + Merge Request
-└─────────────────────────┘
-```
+Run a deploy that fails on a disabled API, watch it repair itself and write `gcp-enable-compute-api`. Run it again — the failure never occurs, because the lesson was retrieved before generation.
 
-### Five Reference Architecture Patterns
+## How AMD makes it work
 
-Skyrchitect supports five production-proven GCP architecture patterns out of the box:
+**AMD silicon is load-bearing for both halves of the loop.** This is not a model call that happens to run on a rented GPU.
 
-| Architecture | Use Case | Estimated Cost |
-|-------------|----------|----------------|
-| **Three-Tier Web App** | Traditional web applications with load balancing, compute, database, and CDN | ~$150–800/mo |
-| **Serverless API** | Event-driven APIs with Cloud Run, Firestore, and Pub/Sub | ~$5–200/mo |
-| **Data Pipeline** | ETL/analytics with Cloud Storage, Pub/Sub, BigQuery, and Cloud Scheduler | ~$50–2,000/mo |
-| **Container Orchestration (GKE)** | Microservices on private GKE clusters with Artifact Registry | ~$200–2,000/mo |
-| **Multi-Region / DR** | Mission-critical workloads with cross-region replication and Cloud Spanner | Custom |
+| Role | Model | Where |
+|---|---|---|
+| Architecture generation | **Gemma 3** (`gemma3:12b`) | Ollama on ROCm (MI300X) |
+| Failure repair + skill authoring | **Gemma 3** | Ollama on ROCm (MI300X) |
+| Diagram vision — Gemma 3 is natively multimodal | **Gemma 3** | Ollama on ROCm (MI300X) |
+| Skill-retrieval embeddings | **mxbai-embed-large** (1024-d) | Ollama on ROCm (MI300X) |
+| Speech-to-text | **openai/whisper-large-v3** | PyTorch-ROCm (MI300X) |
 
-### Security-First Defaults
+The MI300X's 192 GB of VRAM lets Gemma 3, the embedder, and Whisper sit resident on **one GPU simultaneously** — generation, retrieval, and speech, same card, no swapping. `rocm-smi` shows all of them. **No hosted inference anywhere in the loop** — every token and every vector is computed on the MI300X. (The loop still talks to MongoDB Atlas, GCP Cloud Logging, and the GitLab API; those are storage and telemetry, not intelligence.)
 
-Every generated configuration includes security hardening by default — no extra configuration needed:
+Here's the proof that AMD is load-bearing rather than decorative: **embeddings have exactly one model, and no fallback.** Vectors from different models aren't comparable, so a "just use a hosted embedder when the GPU is down" fallback would silently poison the vector index with a foreign coordinate space — the exact class of bug we found and fixed in the original code, which was writing `gemini-embedding-001` vectors from one path and `text-embedding-004` vectors from another into the same retrieval system. So when the embedding endpoint is unreachable, `skydb.find_similar_skills` **degrades to lexical matching** instead. Semantic recall of past failures exists *because* of the AMD GPU. Turn it off and the system measurably forgets how to remember.
 
-| Security Layer | Default Configuration |
-|---------------|----------------------|
-| **Networking** | Custom VPC, deny-all firewall, private subnets, Cloud NAT |
-| **Database** | Private IP only, SSL enforced, automated backups, deletion protection in prod |
-| **IAM** | Per-workload service accounts, least-privilege roles, no `roles/owner` or `roles/editor` |
-| **Encryption** | Cloud KMS CMEK when compliance requires, Secret Manager for credentials |
-| **Audit** | Cloud Audit Logs enabled (admin read, data read, data write) |
-| **Compliance** | Mappings for SOC2, HIPAA, PCI DSS, ISO 27001 |
+The demo needs **no hosted inference at all** — not Fireworks, not anyone. `LLM_PROVIDER=fireworks` remains as a one-flag escape hatch to Fireworks' AMD-hosted Gemma for deployments with no GPU (e.g. Cloud Run), but it is never on the critical path. Because every backend speaks the OpenAI wire format, that swap is **zero code change**.
 
-### Interactive Chat Agent
+**One honest caveat.** The repo also ships an optional GitLab-native surface (a Duo flow, a chat agent, MR-review rules) whose `/api/infrastructure/generate` endpoint calls **GitLab Duo**, a proprietary hosted model. That endpoint is **not part of the self-improving loop**, and the UI never calls it: the Terraform that actually gets applied is generated by `deployer/iac_generator.py` — pure templating, zero LLM calls. Every model call in the failure → repair → learn → retrieve cycle runs on the MI300X. Leave `GITLAB_TOKEN` unset and the proprietary path never executes.
 
-Beyond the automated flow, Skyrchitect also works as an interactive chat agent through GitLab Duo. Developers can ask it to:
+## Best use of Gemma
 
-- Design GCP architectures based on requirements
-- Generate Terraform code snippets on demand
-- Review existing Terraform in merge requests for security and cost issues
-- Estimate infrastructure costs
-- Explain architecture trade-offs
+**One open model, three jobs.** Gemma 3 is the architect, the repairer, and the eyes:
 
-Available in the **GitLab UI**, **VS Code**, and **JetBrains IDEs**.
+- **Architect** — generates the architecture JSON and the Terraform.
+- **Repairer** — reads Cloud Logging output, rewrites failed HCL, and authors the reusable skill. This is the self-improvement engine, and it's Gemma.
+- **Eyes** — Gemma 3 is natively multimodal, so an uploaded architecture diagram goes straight to the *same model* that generates architectures. We deleted the separate vision provider entirely. The model that draws can also read.
 
-### Voice Input Integration
-
-Skyrchitect integrates **ElevenLabs Scribe v2 Realtime** for voice-based infrastructure requirement capture. Users can describe their infrastructure needs verbally with ~150ms latency real-time transcription, which feeds directly into GitLab issue creation or chat interactions — making infrastructure provisioning as easy as talking.
-
-### Automated MR Review
-
-Every generated merge request is paired with a comprehensive review checklist covering:
-- Terraform configuration quality (provider pinning, state backend, version constraints)
-- Security validation (no hardcoded secrets, private IPs, SSL enforcement, least-privilege IAM)
-- Cost efficiency (right-sized instances, lifecycle rules, environment-aware scaling)
-- Code standards (variable validation, naming conventions, labels, documentation)
+Open weights under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms), running on our own hardware, with the repair loop's knowledge accumulating in a plain `skills/` directory we own.
 
 ## How we built it
 
-Skyrchitect is built on the **GitLab Duo Agent Platform** with a companion React UI for interactive architecture design and real cloud deployment:
+Everything the app touches speaks the **OpenAI wire format**, which collapsed four bespoke SDK integrations into one client:
 
-### GitLab Duo Agent Platform Components
+- **`project/backend/llm_client.py`** — `chat`, `vision_chat`, `transcribe`, `embed`. Provider selected by config, with per-provider defaults.
+- **`scripts/pod_up.sh`** — the free hackathon pod is a *managed JupyterLab container* with no `docker run`, so the stack installs as plain processes: Ollama's ROCm build, `gemma3:12b`, `mxbai-embed-large`, and our Whisper shim.
+- **`docker/docker-compose.amd.yml`** — for an AMD Developer Cloud droplet (real Docker host): `ollama` + `whisper` with ROCm device passthrough (`/dev/kfd`, `/dev/dri`, `video`/`render` groups, `--ipc=host`), plus a CPU-only `backend`. Same models as the pod, so the vector index stays valid across both.
+- **`services/whisper_server.py`** — `openai/whisper-large-v3` behind an OpenAI-compatible `/v1/audio/transcriptions`, on the GPU.
+- **`skydb/`** — MongoDB Atlas Vector Search with a graceful local-JSON fallback.
 
-- **Custom Flow** (`flows/skyrchitect-iac-generator.yaml`): A three-component ambient pipeline orchestrating the Requirements Analyzer, IaC Generator, and Code Committer agents with typed inputs, tool access, and locally defined prompts following the flow registry v1 specification.
+The whole submission is containerized: `docker compose -f docker/docker-compose.amd.yml up` on a Docker host, or `bash scripts/pod_up.sh` inside the pod's managed container.
 
-- **Custom Agent** (`agents/skyrchitect-chat-agent.md`): An interactive chat agent configured with 11 GitLab tools (issue reading, file browsing, code search, commit creation, MR management) and a specialized system prompt for GCP architecture expertise. Available in GitLab Duo Chat, VS Code, and JetBrains.
+## Challenges we ran into
 
-- **Five Agent Skills** — reusable knowledge bases loaded automatically by agents:
-  - **Terraform GCP Generator**: Complete HCL patterns for all major GCP services
-  - **GCP Security Hardening**: Defense-in-depth security configurations
-  - **GCP Cost Optimizer**: Pricing models, right-sizing strategies
-  - **GCP Architecture Patterns**: Five reference architectures with cost estimates
-  - **Voice Input Integration**: ElevenLabs Scribe v2 companion for voice-based input
+**Two vector spaces, silently.** The pre-existing code embedded skills with `gemini-embedding-001` in one path and `text-embedding-004` in another, then compared the results. Cosine similarity between vectors from different models is meaningless — retrieval had been quietly degraded the whole time. Converging on a single MI300X-served embedder fixed it, and forced the honest design decision above: no cross-provider embedding fallback, ever.
 
-- **Project Customization**: `AGENTS.md` for project context, `.gitlab/duo/chat-rules.md` for behavior rules, `.gitlab/duo/mr-review-instructions.yaml` for automated MR review criteria.
+**A stale absolute path.** The learned-skill index stored an absolute path into a *different* repo directory. Every retrieval returned an empty skill body — the loop was "learning" and then reading nothing back. Resolving content from the slug instead of a stored path took `content_len` from `0` to `1333` on the first test.
 
-- **CI/CD Pipeline** (`.gitlab-ci.yml`): Automated Terraform validation, skills structure checks, and flow YAML compliance on every merge request.
-
-### Companion Application (React + FastAPI)
-
-- **React Frontend**: Interactive UI for describing infrastructure needs, viewing generated architectures, and triggering deployments with real-time progress tracking.
-- **FastAPI Backend**: Mirrors the Duo Flow pipeline (3-agent sequence) for a deploy-first-validate-then-save workflow. After successful cloud deployment, commits validated Terraform to GitLab via the API.
-- **Deploy-First Workflow**: Unlike the standard flow that generates code into an MR for review, the companion app actually deploys the generated Terraform to a real cloud environment (AWS or GCP), validates it works, then saves the deployment-proven code to GitLab as a merge request.
+**Knowing what to cut.** Going all-in on an open stack meant losing two things with no open equivalent. We dropped server-side streaming TTS (the browser's `speechSynthesis` speaks the narration instead — that fallback was already implemented). And we retired the Computer-Use browser agent: no OpenAI-compatible provider serves a computer-use-tuned model, and Gemma 3 isn't grounded for pixel-level click targeting. Pretending otherwise would have shipped a demo that only works on stage. The endpoint now says so plainly instead of throwing an opaque error.
 
 ## Accomplishments that we're proud of
 
-- **True end-to-end automation**: From a plain-English GitLab issue to a fully-formed merge request with production-ready Terraform — zero manual steps in between.
-
-- **Security by default, not by afterthought**: Every generated configuration ships with private networking, least-privilege IAM, encryption, and audit logging. Developers get secure infrastructure without needing to be security experts.
-
-- **Cost-aware code generation**: Resources are right-sized per environment (dev/staging/prod), include cost estimation comments, and suggest optimizations like committed use discounts and spot VMs.
-
-- **Voice-powered infrastructure**: By integrating ElevenLabs Scribe v2, we made infrastructure provisioning accessible through speech — describe what you need, and Skyrchitect builds it.
-
-- **Quality gates built in**: The automated MR review checklist ensures that generated code meets security, cost, and quality standards before it ever reaches a human reviewer.
-
-- **Five architecture patterns on day one**: Not just a code generator — Skyrchitect understands architecture. It selects the right pattern (serverless, three-tier, data pipeline, GKE, multi-region) based on the requirements and generates the complete topology.
+- **The loop closes on our own hardware.** Failure → Gemma 3 repair → auto-authored skill → embedded on the MI300X → vector-retrieved to pre-empt recurrence. No hosted agent platform anywhere in the path.
+- **Turning the GPU off changes the behavior.** Vector retrieval degrades to lexical. That is the difference between *using* AMD and *depending* on it.
+- **Two real bugs found and fixed** during the port, both in the retrieval path the entire product premise rests on.
+- **One model, three roles.** We removed providers instead of adding them.
 
 ## What we learned
 
-Building Skyrchitect taught us that **Infrastructure as Code generation is fundamentally a workflow design problem**, not just a code generation problem. The challenge isn't producing syntactically correct Terraform — it's understanding requirements, applying the right architecture pattern, enforcing security constraints, optimizing for cost, and integrating seamlessly into the developer's existing workflow.
+Fallbacks are not free. The instinct to add a graceful hosted fallback for *everything* is wrong when the two paths aren't semantically interchangeable. A silent embedding fallback is worse than an honest hard failure, because it corrupts the index instead of returning fewer results.
 
-We learned that **skill modules as reusable knowledge bases** are the key to consistent, high-quality agent output. By encoding GCP best practices, security hardening rules, cost optimization strategies, and architecture patterns as structured reference documents, we gave the agents deep domain expertise that produces reliable results across diverse infrastructure requests.
+And an OpenAI-compatible wire format is a superpower. Ollama on ROCm exposes the same `/v1/chat/completions` as a managed API, which is why one config flag moves the entire application between our GPU and a hosted provider — and why we could write our own Whisper endpoint that the app cannot distinguish from the commercial one it replaced.
 
-We also discovered the power of the **GitLab Duo Agent Platform** for building complex multi-agent workflows. The flow system's ability to chain agents with typed inputs and structured outputs, combined with native GitLab tool access (issues, commits, merge requests), made it possible to build a sophisticated automation pipeline without any custom server infrastructure.
+## What's next for Sky Launchpad
 
-## What's next for Skyrchitect
+- **Cross-project skill transfer** — a shared skill library, so one team's 2am lesson pre-empts another team's failure.
+- **Fine-tune Gemma 3 on accumulated skills** — the corpus of learned failures is exactly the dataset for a Terraform-repair LoRA, trained on the same MI300X that serves it.
+- **Grounded UI agent** — revisit autonomous browser QA once an open VLM with reliable pixel grounding lands.
 
-- **Multi-cloud expansion**: Extend beyond GCP to support AWS (CloudFormation/Terraform) and Azure (Terraform), enabling teams to generate infrastructure for any major cloud provider
-- **`terraform plan` validation**: Run `terraform plan` on generated code before creating the MR, catching configuration errors before human review
-- **Drift detection and remediation**: Monitor deployed infrastructure for configuration drift and automatically generate corrective Terraform
-- **More architecture patterns**: Add support for ML pipelines (Vertex AI), IoT platforms, hybrid cloud, and edge computing topologies
-- **Cost forecasting dashboards**: Generate cost projection reports alongside Terraform code, showing expected spend across environments and growth scenarios
-- **Multi-environment orchestration**: Generate linked dev/staging/prod configurations with promotion workflows built in
+## Product / market potential
+
+Terraform failures are expensive, repetitive, and organizationally forgotten. Cloud teams re-solve the same class of error across projects because the knowledge lives in individual engineers' heads and stale wiki pages.
+
+Sky Launchpad turns each failure into a durable, machine-readable asset that makes the next deploy cheaper. The value compounds with usage, the knowledge base is owned by the customer (plain `SKILL.md` files in their own repo), and the whole stack runs on open weights on hardware they choose — no per-token dependency on a frontier vendor for the thing that makes it valuable.
 
 ## Built with
 
-- GitLab Duo Agent Platform (Custom Flow, Custom Agent, Agent Skills)
-- GitLab Duo Flows (v1 flow registry, ambient environment)
-- GitLab Duo Custom Agents (interactive chat agent with 11 tools)
-- GitLab CI/CD (Terraform validation pipeline)
-- Google Cloud Platform (GCP)
-- Terraform (HCL)
-- React + TypeScript (companion UI)
-- FastAPI + Python (companion backend)
-- Anthropic Claude (via GitLab Duo AI Gateway and direct API)
-- ElevenLabs Scribe v2 (voice input)
-- Infrastructure as Code
-- DevSecOps
+- **AMD Instinct MI300X** + **ROCm** (AMD Developer Cloud)
+- **Ollama (ROCm build)** — OpenAI-compatible serving for both generation and embeddings
+- **Gemma 3** (Google DeepMind, open weights, Gemma Terms of Use) — generation, repair, vision
+- **mxbai-embed-large** (1024-d, Apache 2.0) — skill-retrieval embeddings
+- **openai/whisper-large-v3** (Apache 2.0) on PyTorch-ROCm — self-hosted speech-to-text
+- **Fireworks AI** — optional managed AMD-hosted escape hatch (unused in the demo)
+- **MongoDB Atlas Vector Search** — skill retrieval
+- **Terraform** CLI (BUSL-1.1 — invoked, not redistributed; [OpenTofu](https://opentofu.org) drops in), **GitLab REST API** — real deploys, real merge requests
+- **FastAPI** + **Python**, **React 18** + **TypeScript** + **Vite**
+- **Docker Compose** — fully containerized submission
+
+Full model-and-framework licensing table, including the open-weights-vs-OSI distinction for Gemma, is in the [README](README.md#models--licensing).
 
 ## Media
 
@@ -176,30 +128,23 @@ We also discovered the power of the **GitLab Duo Agent Platform** for building c
 
 ### Screenshots
 
-<!-- ![Pipeline Flow](images/pipeline-flow.png) -->
-`[Screenshot: Skyrchitect 3-agent pipeline flow diagram]`
+`[Screenshot: rocm-smi + `ollama ps` showing gemma3:12b and mxbai-embed-large resident on one MI300X, PROCESSOR=GPU]`
 
-<!-- ![Generated MR](images/generated-mr.png) -->
-`[Screenshot: Example merge request generated by Skyrchitect with architecture overview and cost estimates]`
+`[Screenshot: a deploy failing, Gemma 3 diagnosing, and skills/learned/gcp-enable-compute-api/SKILL.md appearing]`
 
-<!-- ![Chat Agent](images/chat-agent.png) -->
-`[Screenshot: Interactive chat with Skyrchitect agent in GitLab Duo]`
+`[Screenshot: the same requirement re-run — the learned skill is retrieved and the failure never occurs]`
 
-<!-- ![Voice Input](images/voice-input.png) -->
-`[Screenshot: Voice input capturing infrastructure requirements via ElevenLabs Scribe]`
+`[Screenshot: learned-skills dashboard with hit_count and the error -> solution table]`
 
 ### Demo
 
-<!-- ![Demo Video](link-to-demo-video) -->
-`[Demo video link: End-to-end walkthrough from issue creation to merge request]`
+`[Demo video link: fail once, learn, never fail again]`
 
 ## Links
 
-- **GitLab Repository**: <!-- Add your GitLab repo URL here -->
-- **Submitted to**: GitLab AI Hackathon
+- **Repository**: <!-- Add your public repo URL here -->
+- **Submitted to**: AMD Developer Hackathon: ACT II — Unicorn Track
 
 ## Created by
 
 - **Eimis**
-
-<!-- skyrchitect: monorepo sync marker -->

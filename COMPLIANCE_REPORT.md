@@ -1,128 +1,138 @@
-# Sky Launchpad — Hackathon Compliance Report
+# Sky Launchpad — Compliance Report
 
-**Event:** 2026 AI Engineer World's Fair Hackathon
-**Project:** Sky Launchpad (self-improving cloud-infrastructure agent)
-**Date:** 2026-06-27
+**Event:** AMD Developer Hackathon: ACT II
+**Track:** 3 — Unicorn Track (🦄)
+**Last verified:** 2026-07-10
 
-This report assesses Sky Launchpad against the official hackathon requirements and flags what still needs to be done to be fully compliant and competitive.
+> Supersedes an earlier report written against the 2026 AI Engineer World's Fair
+> (Continual Learning theme, Gemini $5k prize). That event is no longer the target.
 
 ---
 
-## 1. Required Theme — ✅ MET
+## 1. Hard requirements
 
-Every project must build in one of three themes. Sky Launchpad squarely fits **Continual Learning** (primary), with a secondary footprint in **The Self-Improvement Stack**.
-
-| Theme | Fit | Evidence in code |
+| Requirement | Status | Evidence |
 |---|---|---|
-| **Continual Learning** | ✅ **Primary** | On a failed deploy, an agent reads logs, fixes the IaC, and **authors a new reusable skill** that is persisted and **retrieved on future deploys** so the same failure is pre-empted — improving with use, no human editing skills. `deployer/antigravity_client.py`, `deployer/skill_library.py`, `deployer/log_collector.py`, `skills/learned/`, `skills_loader.load_learned_skills()`. |
-| **The Self-Improvement Stack** | ◑ Secondary | Learned-skill metrics surface at `GET /api/skills/learned`; the loop is an automated evaluate→fix→persist pipeline around real deployments. |
-| Recursive Intelligence | ✗ | No raw-weight/model self-modification. |
+| **All submissions must be containerized** | ✅ MET | Droplet: [`docker/docker-compose.amd.yml`](docker/docker-compose.amd.yml) (`ollama` + `whisper` + `backend`). Hackathon pod: the pod *is* a managed container; [`scripts/pod_up.sh`](scripts/pod_up.sh) runs the stack inside it. Backend image: [`Dockerfile.backend`](Dockerfile.backend). |
+| **Registered before July 6, 8:00 PM CET** | ✅ MET | Confirmed by participant. |
+| **Team created/joined on lablab.ai** | ✅ MET | Required even for solo entrants; the GPU pod is allocated per team. |
+| **Public repository** | ⚠️ PENDING | No git remote configured. See punch list. |
 
-**Verdict:** Theme requirement satisfied. Pitch as **Continual Learning**.
+## 2. Judged criteria
 
----
+Track 3 is scored on *creativity, originality, completeness, **use of AMD platforms**, and product/market potential*. There is **no** speed, token, or accuracy benchmark.
 
-## 2. Special Prize — Gemini 3.5 ($5,000) — ✅ STRONG, with caveats
+### Use of AMD platforms — ✅ STRONG
 
-> Requires at least one bleeding-edge Gemini feature (bonus for combining several); wants something "unprecedented," not a wrapper chatbot.
+AMD silicon is load-bearing for **both halves** of the self-improving loop, not a bolt-on:
 
-| Required tech | Used? | Where |
+| Role | Model | Where |
 |---|---|---|
-| **Managed Agents (Interactions API / Antigravity)** | ✅ Yes | `deployer/antigravity_client.py` — single-call hosted `antigravity-preview-05-2026`, stateful `env_id` across retries, persona/skills via `AGENTS.md`/`SKILL.md`, direct Gemini fallback. |
-| **Gemini Live API** | ✅ Yes | `project/backend/gemini_live.py` (real-time narration) + voice transcription (`/api/voice/transcribe`), model `gemini-3.1-flash-live-preview`. |
-| **Gemini multimodal image analysis** | ✅ Yes | `project/backend/gemini_client.py` + `image_analysis_agent.py`, model `gemini-3.1-pro-preview`. |
-| Computer Use (3.5 Flash) | ✗ Not yet | Candidate stretch: have the repair agent *visually* read the cloud console. |
-| Nano Banana / Veo / Lyria / Gemma | ✗ Not yet | Optional bonus. |
+| Architecture generation | Gemma 3 (`gemma3:12b`) | Ollama on ROCm (MI300X) |
+| Failure repair + skill authoring | Gemma 3 | Ollama on ROCm (MI300X) |
+| Diagram vision (natively multimodal) | Gemma 3 | Ollama on ROCm (MI300X) |
+| Skill-retrieval embeddings | mxbai-embed-large (1024-d) | Ollama on ROCm (MI300X) |
+| Speech-to-text | openai/whisper-large-v3 | PyTorch-ROCm (MI300X) |
 
-**We combine 3 Gemini surfaces** (Antigravity + Live + multimodal), which the brief explicitly rewards. The "unprecedented" angle — *an agent that learns from real cloud failures and narrates its own self-improvement live* — is a genuine fit, not a wrapper chatbot.
+**No hosted inference anywhere in the loop.** The falsifiable claim: disable the
+embedding endpoint and [`skydb.find_similar_skills`](skydb/__init__.py) degrades
+from vector search to lexical cosine. Semantic recall of past failures exists
+*because* of the GPU.
 
-**Caveat (must verify before judging):** `antigravity-preview-05-2026`, `gemini-3.1-pro-preview`, and `gemini-3.1-flash-live-preview` are **preview model IDs**. Confirm your API key has access; otherwise the documented fallbacks engage. Set `GEMINI_API_KEY` (and `MINIMAX_API_KEY`) in `project/.env`.
+### Creativity / originality — ✅ STRONG
+The self-improving loop: failure → Gemma 3 repair → auto-authored `SKILL.md` →
+embedded on the MI300X → vector-retrieved to pre-empt recurrence. No human edits a skill.
 
-### Other special prizes
-- **Best DigitalOcean:** ✗ — app targets **GCP Cloud Run**. Not eligible unless redeployed to DigitalOcean.
-- **Best LiveKit:** ✗ — voice uses Gemini Live, not LiveKit. Not eligible as-is.
+### Completeness — ◑ PARTIAL
+Code paths are wired and unit-verified offline. **Not yet exercised on real GPU
+hardware.** See punch list items 3–5.
 
----
+### Product / market potential — ✅ STRONG
+Each failure becomes a durable, machine-readable asset owned by the customer
+(plain `SKILL.md` files in their own repo). Value compounds with usage. No
+per-token dependence on a frontier vendor for the part that creates the value.
 
-## 3. Other AI provider
+## 3. "Use any open-source models and frameworks"
 
-- **MiniMax** (`MiniMax-M2`) now powers cloud-architecture JSON generation (`backend/minimax_client.py`, `architecture_agent.py`), replacing Anthropic. This is additive and does not affect theme/prize eligibility.
+**Compliant — and the clause is permissive, not restrictive.** Track 3's judging
+row reads *"any tech stack."* Contrast Track 1, which explicitly warns about
+per-track model restrictions. Track 3 imposes none; nothing there forbids closed
+models.
 
----
+Our inference stack is open-weight and self-hosted regardless. We distinguish
+**open weights** from **OSI open source**, because they are not the same thing:
 
-## 4. Hackathon Rules — ⚠️ ACTION REQUIRED
-
-| Rule | Status | Action needed |
+| Component | License | Note |
 |---|---|---|
-| **Open source / public repo** | ⚠️ | Repo is local only. **Create a public repository and push** before submission. |
-| **Team size ≤ 4** | ✅ | N/A (confirm your team). |
-| **New Work Only** | ⚠️ **Critical** | Sky Launchpad is adapted from a prior project (Skyrchitect). The README's "🆕 Hackathon build" section delimits new work, but you **must clearly demo only what was built at the event** (the self-improving loop + Gemini/MiniMax swaps). Pre-existing scaffolding = architecture→Terraform→GitLab pipeline. Failure to distinguish = **immediate disqualification**. |
-| **Demo shows only what you built** | ⚠️ | Script the demo around: deploy fails → agent learns → skill authored → next deploy pre-empted → live narration. Call out scaffolding explicitly. |
+| Gemma 3 (`gemma3:12b`) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) | **Open weights, not OSI.** Gemma *code* is Apache 2.0; the *weights* are not. Gated on Hugging Face — pulling via Ollama's registry avoids the token. |
+| mxbai-embed-large-v1 | Apache 2.0 | Fully OSI, not gated. |
+| openai/whisper-large-v3 | Apache 2.0 | Fully OSI, not gated. |
+| Ollama | MIT | Serving runtime; bundles its own ROCm build. |
+| ROCm / PyTorch | MIT / BSD-3 | AMD GPU stack. |
+| Terraform CLI 1.7.5 | **BUSL-1.1** | Not open source since v1.6. We invoke the CLI; we do not redistribute or resell it, so the non-compete clause does not bite. [OpenTofu](https://opentofu.org) (MPL-2.0) is a drop-in if a fully open toolchain is required. |
 
----
+**One proprietary AI service remains, disclosed deliberately.**
+`POST /api/infrastructure/generate` calls **GitLab Duo**
+([`project/backend/duo_client.py`](project/backend/duo_client.py)), which powers the
+optional GitLab-native surface ([`flows/`](flows/), [`agents/`](agents/),
+[`.gitlab/duo/`](.gitlab/duo/)). It is **not on the self-improving loop**, the UI
+never calls it, and the Terraform that actually gets applied comes from
+[`deployer/iac_generator.py`](deployer/iac_generator.py) — pure templating, zero
+LLM calls. Leave `GITLAB_TOKEN` unset and that path never executes.
 
-## 5. Banned-Project Check — ✅ CLEAR (with cautions)
+## 4. Credits
 
-| Banned category | Risk | Note |
-|---|---|---|
-| Basic RAG application | ✅ Clear | Skill retrieval is a small internal mechanism, not the product. |
-| Streamlit app | ✅ Clear | React + FastAPI. |
-| **Image analyzer** | ⚠️ Caution | Diagram→architecture image analysis exists but is **a secondary feature, not the main point**. Keep the self-improving loop as the headline so this isn't read as "an image analyzer." |
-| **Dashboard as main feature** | ⚠️ Caution | The learned-skills panel/metrics must stay secondary — do not lead the demo with a dashboard. |
-| Mental health / medical / nutrition / personality / job screener / sports | ✅ Clear | Not applicable. |
+Fireworks AI credits are **not required and not used**. `LLM_PROVIDER=fireworks`
+remains as a one-flag escape hatch for GPU-less deployments (e.g. Cloud Run); it is
+never on the critical path.
 
----
+The hackathon pod (8 GPU-hrs / rolling 24h, one per team) and the $100 AMD Developer
+Cloud credit are **separate, independent** allocations. The pod is not billed against
+the credit.
 
-## 6. Compliance Scorecard
+## 5. Security
 
-| Area | Score | Summary |
-|---|---|---|
-| Required theme | ✅ Met | Continual Learning |
-| Gemini $5k tech | ✅ Strong | 3 Gemini surfaces combined; verify preview access |
-| "Unprecedented" bar | ✅ Likely | Self-learning + live narration, not a wrapper |
-| New Work Only | ⚠️ Action | Must delineate hackathon work in demo + repo |
-| Public repo | ⚠️ Action | Create + push public repo |
-| Banned projects | ✅ Clear | Keep loop (not image/dashboard) as headline |
-| DigitalOcean / LiveKit prizes | ✗ N/A | Not targeted |
-
----
-
-## 7. Punch List to be fully compliant & demo-ready
-
-1. **Set keys** in `project/.env`: `MINIMAX_API_KEY`, `GEMINI_API_KEY` (servers start without them, but calls fail).
-2. **Verify preview model access** for the three Gemini IDs; otherwise document the fallback in the demo.
-3. **Push a public repo** and confirm license/visibility.
-4. **Demo script** that foregrounds the self-improving loop and explicitly separates new work from scaffolding.
-5. *(Bonus points)* Add **Computer Use** (visual cloud-console diagnosis) or **Nano Banana** (generate the architecture diagram) to deepen the Gemini story.
-6. *(If chasing those prizes)* port voice to **LiveKit** and/or deploy to **DigitalOcean**.
-
----
-
-## Update — 2026-06-28 (expanded build)
-
-Since the original report, the project gained several capabilities that materially strengthen the theme + prize case:
-
-### Gemini $5k — now FOUR Gemini surfaces combined ✅✅
-| Surface | Status |
+| Item | Status |
 |---|---|
-| **Computer Use** (`gemini-2.5-computer-use-preview-10-2025`) | ✅ **Now used** — autonomous UI self-test drives a real browser (Playwright) via a vision-action loop; see `ui_tester/`, `project/backend/uitest/`. |
-| Antigravity managed agent (Interactions API) | ✅ deploy self-repair |
-| Gemini Live (`gemini-3.1-flash-live-preview`) | ✅ narration + voice transcription |
-| Multimodal vision (`gemini-3.1-pro-preview`) | ✅ diagram analysis |
-| Gemini 2.5 Pro | ✅ autonomous code-fix agent |
-Adding **Computer Use** (the brief's flagship suggestion — "build continuous software testers") plus an **autonomous fix→MR** loop is a strong, unprecedented combination, not a wrapper.
+| Secrets in git history | ✅ NONE — `git rev-list --all --objects` finds no credential blob |
+| `hackuser_accessKeys_elsa.csv` (AWS `AKIA…`) | ✅ gitignored · ⚠️ **rotate before publishing** |
+| `cerebras-bot.json` (GCP SA key) | ✅ gitignored · ⚠️ **rotate** |
+| `eimis-bot-hacks.json` (GCP SA key) | ✅ gitignored · ⚠️ **rotate** — was *not* ignored until 2026-07-10 |
+| Secrets in container images | ✅ NONE — no `COPY` of repo root; `.dockerignore` hardened |
 
-### MongoDB Atlas — added sponsor tech ✅
-Skills, apps, test runs, and test cases now persist to **MongoDB Atlas** (`skydb/`), with Atlas Vector Search wired for skill retrieval (cosine fallback). Reps on-site; M0 covered. Diversifies the sponsor footprint without touching the Gemini story.
+## 6. Scorecard
 
-### Self-Improvement Stack — materially deeper ◑→✅
-- **Deployed-Apps dashboard**: live status per app (passing / failing / untested), autonomous test coverage, error→solution + MR link.
-- **Continuous autonomous QA** (`ui_tester/qa_loop.py`): re-runs Computer-Use workflows on an interval, logs to Atlas, and **auto-opens a GitLab MR on failure**.
-- **Pydantic Logfire** observability tracing every AI call.
-- **Cloud Run**: backend deployed (`https://sky-backend-330741023262.us-central1.run.app`), local Playwright client connects over `wss://` (Benji topology).
+| Criterion | Status |
+|---|---|
+| Containerized (hard requirement) | ✅ |
+| Use of AMD platforms | ✅ |
+| Creativity / originality | ✅ |
+| Product / market potential | ✅ |
+| Open-source models & frameworks | ✅ |
+| Completeness | ◑ — blocked on a real GPU run |
+| Public repo | ⚠️ |
+| Secrets rotated | ⚠️ |
 
-### Updated compliance notes
-- **Dashboard-not-the-main-feature**: still respected — the dashboards are evidence panels; the self-improving + self-testing loops are the headline. Keep the demo led by the loops.
-- **"Continuous software tester"** is explicitly encouraged by the Gemini brief — not a banned category.
-- ⚠️ **Secrets hygiene** (carried over): delete `hackuser_accessKeys_elsa.csv` + `cerebras-bot.json`; rotate the AWS key, Atlas password, and `devstar7133` password. Cloud Run runs auth-off / single-instance — demo-grade, not production.
-- **New Work Only** unchanged: keep the demo clearly delimiting hackathon work from the pre-existing Skyrchitect scaffolding.
+## 7. Punch list
+
+1. **Rotate** the AWS access key and both GCP service-account keys, then delete the local files.
+2. **Push a public repo** — no git remote is configured today.
+3. **Run on the pod:** `bash scripts/pod_up.sh --check`, then bring the stack up.
+   Confirm `rocminfo` reports `gfx942` and `ollama ps` shows `PROCESSOR = GPU`.
+4. **Create the Atlas vector index** (`numDimensions: 1024`, `path: "embedding"`,
+   `similarity: cosine`), then run `python3 scripts/migrate_vector_index.py`.
+5. **Record the demo:** fail a deploy on a disabled GCP API → Gemma 3 authors
+   `gcp-enable-compute-api` → re-run the same requirement → the failure never occurs.
+6. **Fill the DEVPOST placeholders** — repo URL, screenshots, demo video.
+
+## 8. Known risks
+
+- **Gemma 3 vision via Ollama** is the least-proven path. Text generation is
+  well-trodden; multimodal on ROCm has sharp edges. Test diagram upload early — the
+  loop does not depend on it.
+- **`ffmpeg` must be present** on the pod, or browser `audio/webm;codecs=opus` will not
+  decode and voice input returns 500. `pod_up.sh --check` reports this.
+- **cloudflared quick tunnels** do not support SSE and cap at 200 concurrent requests.
+  The narration WebSocket may misbehave over one; verify before a remote demo.
+- **Pre-existing:** 10 failures in `project/backend/tests/test_api.py`, an identical set
+  before and after the AMD port. Not introduced by this work.

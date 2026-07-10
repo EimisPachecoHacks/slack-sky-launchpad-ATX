@@ -3,7 +3,11 @@ WORKDIR /build
 COPY project/package*.json ./
 RUN npm ci
 COPY project/ .
-ENV VITE_API_URL=https://skyrchitect-81189935460.us-central1.run.app
+# Blank = the SPA calls its own origin's /api proxy, which is correct when nginx
+# and uvicorn share this image. Override only for a split deployment:
+#   docker build --build-arg VITE_API_URL=https://your-host .
+ARG VITE_API_URL=""
+ENV VITE_API_URL=${VITE_API_URL}
 RUN npm run build
 
 FROM python:3.11-slim

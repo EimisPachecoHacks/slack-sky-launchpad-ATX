@@ -1,3 +1,18 @@
+> **SUPERSEDED — historical design doc, not the shipped architecture.**
+>
+> This plan targeted Gemini Computer Use + Google ADK. Both were removed when the
+> project moved to a fully open, AMD-hosted stack for the AMD Developer Hackathon:
+> ACT II. No OpenAI-compatible provider serves a computer-use-tuned model, and
+> Gemma 3 is not grounded for pixel-level click targeting, so the autonomous
+> vision-action driver (`computer_use_agent.py`) was cut.
+>
+> **What shipped instead:** bug *discovery* is manual (drive the app with
+> `ui_tester/playwright_client.py`); bug *repair* remains autonomous via
+> `POST /api/uitest/fix`, which now runs Gemma 3 on the MI300X through
+> `backend/llm_client.py`. Kept for provenance.
+
+---
+
 # Sky Launchpad — Autonomous UI Self-Healing (Benji-inspired)
 
 ## Goal

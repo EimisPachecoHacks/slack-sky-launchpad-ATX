@@ -1,10 +1,10 @@
 # Sky Launchpad — Test Plan
 
 **Project:** Sky Launchpad (self-improving cloud-infrastructure agent)
-**Scope:** the hackathon contribution (self-improving loop) + the AI-provider swaps (MiniMax, Gemini vision, Gemini Live voice), plus the surrounding app.
-**Date:** 2026-06-27
+**Scope:** the self-improving loop, the all-AMD inference stack (Gemma 3 + mxbai-embed-large + Whisper on ROCm), and the surrounding app.
+**Last updated:** 2026-07-10
 
-Legend: ✅ verified · ⏳ ready to run · 🔑 needs live API key · 👤 manual/UI
+Legend: ✅ verified · ⏳ ready to run · 🎮 needs the GPU pod · 👤 manual/UI · 🔑 needs live cloud creds
 
 ---
 
@@ -12,157 +12,162 @@ Legend: ✅ verified · ⏳ ready to run · 🔑 needs live API key · 👤 manu
 
 | Item | Value |
 |---|---|
-| Backend | FastAPI + uvicorn, `http://localhost:8000` |
-| Frontend | Vite dev server, `http://localhost:3001` (proxies `/api` → `:8000`) |
-| Python venv | `project/venv` (deps from `backend/requirements.txt` + `boto3`) |
+| Backend | FastAPI + uvicorn, `http://localhost:8080` |
+| Frontend | Vite dev server, `http://localhost:3001` (proxies `/api` → backend) |
+| Inference | Ollama on ROCm, `http://localhost:11434/v1` (`gemma3:12b`, `mxbai-embed-large`) |
+| Speech-to-text | `services/whisper_server.py`, `http://localhost:8100/v1` |
 | CLI / loop | `deployer/` package (run from repo root) |
-| Keys needed for live tests | `MINIMAX_API_KEY`, `GEMINI_API_KEY` in `project/.env` |
+| Keys needed | **None for inference.** `MONGODB_URI` for Atlas; `GITLAB_TOKEN` for MRs; cloud creds for real deploys. |
 
-**Setup commands**
+**Setup**
 ```bash
+# GPU stack — hackathon pod (managed container, no docker run)
+bash scripts/pod_up.sh --check     # probe only, does not start the GPU clock
+bash scripts/pod_up.sh             # Ollama + models + Whisper
+
+# GPU stack — Developer Cloud droplet (real Docker host)
+docker compose -f docker/docker-compose.amd.yml up
+
 # Backend
-cd project && ./venv/bin/uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
-# Frontend (separate shell)
-cd project && npm run dev
+cd project && uvicorn backend.api.main:app --host 0.0.0.0 --port 8080
 ```
 
-**Exit criteria:** all ✅/⏳ tests pass; all 🔑 tests pass once real keys are set; no P1 defects open; demo flow (Section 6) runs end-to-end.
+**Exit criteria:** all ✅/⏳ pass; all 🎮 pass on the pod; no P1 defects; the demo flow (§6) runs end to end and the *second* run of the same requirement does not fail.
 
 ---
 
-## 2. Unit / smoke tests (offline — no keys, no network)
+## 2. Unit / smoke tests (offline — no keys, no network, no GPU)
 
 | ID | Component | Command | Expected | Status |
 |---|---|---|---|---|
-| U-1 | Antigravity repair agent | `python deployer/antigravity_client.py` | Prints `PASS`; returns `fixed_files`, `new_skill.markdown`, `env_id`; uses fallback path | ✅ |
-| U-2 | Skill library (save + retrieve) | `python deployer/skill_library.py` | `PASS`; compute-API skill ranks first for query "compute.googleapis.com has not been enabled"; real `skills/learned/` untouched | ✅ |
-| U-3 | Log collector | `python deployer/log_collector.py` | `PASS`; `terraform_errors` non-empty; `cloud_logs == []` with explanatory note (no creds) | ✅ |
-| U-4 | Backend modules compile | `python -m py_compile backend/config.py backend/minimax_client.py backend/gemini_client.py backend/agents/*.py backend/gemini_live.py backend/api/main.py` | Exit 0 | ✅ |
-| U-5 | Client imports load | `./venv/bin/python -c "from backend.minimax_client import minimax_chat; from backend.gemini_client import vision, transcribe_audio; print('OK')"` | Prints `OK` | ✅ |
-| U-6 | Config tolerates extra .env keys | Start backend with `.env` containing `ANTIGRAVITY_MODEL` | No `extra_forbidden` error; config validates | ✅ |
-| U-7 | Existing backend pytest suite | `cd project && ./venv/bin/pytest backend/tests -q` | Suite runs; note `test_api.py` asserts `/health` service string (unchanged by design) | ⏳ |
+| U-1 | Repair agent | `python3 deployer/repair_agent.py` | Prints `PASS`; returns `fixed_files`, `new_skill.markdown`, `env_id="single-shot"`; unparseable model output still yields a synthesized skill | ✅ |
+| U-2 | Skill library (save + retrieve) | `python3 deployer/skill_library.py` | `PASS`; compute-API skill ranks first for "compute.googleapis.com has not been enabled"; real `skills/learned/` untouched | ✅ |
+| U-3 | Log collector | `python3 deployer/log_collector.py` | `terraform_errors` non-empty; `cloud_logs == []` with `cloud_logs_note` explaining no GCP creds. Never raises | ✅ |
+| U-4 | Everything compiles | `python3 -m compileall -q project/backend deployer skydb scripts services` | Exit 0 | ✅ |
+| U-5 | App imports, routes intact | `cd project && python3 -c "import sys;sys.path.insert(0,'.');from backend.api.main import app;print(len(app.routes))"` | `33` | ✅ |
+| U-6 | Config tolerates stale `.env` keys | Start backend with a `.env` still containing `GEMINI_API_KEY`, `MINIMAX_*` | No `extra_forbidden`; config validates (`extra="ignore"`) | ✅ |
+| U-7 | Backend pytest suite | `cd project/backend && pytest` | Runs bare, without `pytest-cov` installed: **10 failed, 83 passed, 11 skipped**. All 10 failures are in `test_api.py` and are an *identical set* before and after the AMD port — pre-existing, not introduced here | ✅ |
+| U-8 | Retrieval reads the real SKILL.md | `python3 -c "import sys;sys.path.insert(0,'.');from deployer.skill_library import retrieve_skills;print(len(retrieve_skills('generate architecture button no loading feedback')[0]['content']))"` | Non-zero (`1333`). Guards the stale-absolute-path defect | ✅ |
+| U-9 | Retrieval degrades without a GPU | Same as U-8 with no embedding endpoint reachable | Logs `embedding unavailable …; retrieval falls back to lexical`; still returns a scored hit | ✅ |
 
 ---
 
-## 3. API endpoint tests (backend running, no keys required)
+## 3. Inference-client contract tests (no GPU — stub server)
 
-| ID | Endpoint | Command | Expected | Status |
+| ID | Surface | Expected | Status |
+|---|---|---|---|
+| C-1 | `chat()` | `POST {LLM_BASE_URL}/chat/completions`, `Authorization: Bearer …`, parses `choices[0].message.content` | ✅ |
+| C-2 | `vision_chat()` | Content array `[{type:"image_url", image_url:{url:"data:image/png;base64,…"}}, {type:"text"}]`. Ollama accepts base64 data URIs; it rejects remote `http(s)` image URLs | ✅ |
+| C-3 | `transcribe()` | `multipart/form-data` to `{LLM_AUDIO_BASE_URL}/audio/transcriptions` with `file` + `model` | ✅ |
+| C-4 | `embed()` — no `dimensions` | Payload keys are exactly `{model, input}`. Sending `dimensions` 422s on bge-large and is ignored by Ollama | ✅ |
+| C-5 | `embed()` — opt-in `dimensions` | `EMBED_SEND_DIMENSIONS=true` re-adds the field (Matryoshka models only) | ✅ |
+| C-6 | Embedding width guard | Endpoint returns 1024-d while `EMBED_DIMENSIONS=768` → returns `None`, logs an error, writes nothing | ✅ |
+| C-7 | Provider switching | `LLM_PROVIDER=amd` → `gemma3:12b` @ `:11434`; `=fireworks` → `accounts/fireworks/models/gemma-3-27b-it`; an explicit `LLM_MODEL` overrides both | ✅ |
+
+---
+
+## 4. GPU tests 🎮 (on the pod — these burn the 8h/24h budget)
+
+| ID | Check | Command | Expected | Status |
 |---|---|---|---|---|
-| A-1 | Health | `curl -s localhost:8000/health` | `{"status":"ok",...}` 200 | ✅ |
-| A-2 | Learned-skills metrics | `curl -s localhost:8000/api/skills/learned` | `{"count":...,"total_retries_avoided":...,"skills":[...]}` 200 | ✅ |
-| A-3 | Gemini Live health | `curl -s localhost:8000/api/live/health` | `{"gemini_live":<bool>,"model":"gemini-3.1-flash-live-preview"}` | ✅ |
-| A-4 | Live narration WS | connect WS `ws://localhost:8000/api/live/narrate` | Accepts; sends `{"type":"ready",...}`; streams text frames; no crash when key/SDK absent | ⏳👤 |
-| A-5 | Voice transcribe (no audio) | `curl -s -X POST localhost:8000/api/voice/transcribe` (no file) | 422/400 validation error, not 500 | ⏳ |
-| A-6 | Removed ElevenLabs route | `curl -s -o /dev/null -w "%{http_code}" localhost:8000/api/scribe-token` | 404/405 (endpoint removed) | ✅ |
-| A-7 | Rate limiting | fire >10 req/min to a rate-limited route | 429 after limit | ⏳ |
+| G-1 | Environment probe | `bash scripts/pod_up.sh --check` | `gfx942`; ROCm version printed; reports whether `docker` and `ffmpeg` exist | ⏳🎮 |
+| G-2 | **GPU residency** | `ollama ps` | `PROCESSOR` column reads **GPU**. If it reads `CPU`, the ROCm runtime never loaded — stop and fix before anything else | ⏳🎮 |
+| G-3 | Both models resident | `rocm-smi` | Gemma 3 and the embedder visible on one MI300X | ⏳🎮 |
+| G-4 | Chat endpoint | `curl :11434/v1/chat/completions -d '{"model":"gemma3:12b","messages":[{"role":"user","content":"hi"}]}'` | 200, non-empty `choices[0].message.content` | ⏳🎮 |
+| G-5 | Embedding width | `curl :11434/v1/embeddings -d '{"model":"mxbai-embed-large","input":"compute api disabled"}'` | `data[0].embedding` length **1024** | ⏳🎮 |
+| G-6 | **Gemma 3 vision** (highest risk) | Upload a diagram via the UI | Structured JSON returned. Multimodal on ROCm is the least-proven path; the loop does not depend on it | ⏳🎮👤 |
+| G-7 | Whisper health | `curl :8100/health` | `{"gpu": true, "hip": "…"}` — a non-null `hip` proves it is an AMD build | ⏳🎮 |
+| G-8 | Whisper decodes webm | Record via the mic button | Transcript returned. **Requires the `ffmpeg` binary**; without it, expect a 500 naming ffmpeg | ⏳🎮👤 |
+| G-9 | Stop the clock | `bash scripts/pod_down.sh` | Both processes stopped; `rocm-smi --showpids` clean | ⏳🎮 |
 
 ---
 
-## 4. Provider integration tests (🔑 require live keys)
+## 5. Self-improving loop tests (the star) 🎮🔑
 
-Set real keys in `project/.env` first.
-
-| ID | Provider | How | Expected | Status |
-|---|---|---|---|---|
-| P-1 | MiniMax — architecture JSON | agent `generate_architecture()` + `parse_claude_architecture_response()` (verified directly; HTTP route needs JWT) | Parsed `architecture` JSON: 8 GCP services, total_cost $175.85. MiniMax-M2 emits a `<think>` preamble then a ```json block — parser handles it. | ✅ |
-| P-2 | MiniMax model id honored | backend log on startup | `MiniMax Model: MiniMax-M2` | ✅ |
-| P-3 | Gemini vision — image analysis | `vision()` on a sample diagram (verified directly; HTTP route needs JWT) | Correctly identified AWS data-lake services (Kinesis, Glue, S3, Athena, EMR, SageMaker, …) | ✅ |
-| P-4 | Gemini vision model id | confirm call uses `gemini-3.1-pro-preview` (default) | Vision call succeeded on `gemini-3.1-pro-preview` | ✅ |
-| P-5 | Gemini voice transcription | `POST /api/voice/transcribe` with a short audio clip | 200; `{"success":true,"text":"Design a photo sharing application on Google Cloud…"}` in ~1.9s (model `gemini-3.1-flash-lite`) | ✅ |
-| P-6 | Graceful failure w/o key | unset a key, call its route | Clear error (RuntimeError surfaced as 500 with message), server stays up | ⏳ |
-| P-7 | Antigravity managed agent | trigger a real failed deploy (see E-1) with `GEMINI_API_KEY` | Interactions API call attempted with `antigravity-preview-05-2026`, `env_id` reused across retries; fallback only if preview unavailable | 🔑 |
+| ID | Step | Expected | Status |
+|---|---|---|---|
+| L-1 | Atlas index created | Vector index on `skills`: `numDimensions: 1024`, `path: "embedding"`, `similarity: cosine` | ⏳ |
+| L-2 | Re-embed after a model change | `python3 scripts/migrate_vector_index.py` refuses if the endpoint is down or the width mismatches; otherwise re-embeds every skill with `force=True` | ⏳🎮 |
+| L-3 | Failure → repair | Deploy a config that fails on a disabled GCP API. Gemma 3 diagnoses and rewrites the HCL | ⏳🎮🔑 |
+| L-4 | Repair → skill | `skills/learned/<slug>/SKILL.md` appears; `_index.json` gains an entry with a **repo-relative** `path` and a 1024-d `embedding` | ⏳🎮🔑 |
+| L-5 | **Transfer (the money shot)** | Re-run the *same* requirement. The learned skill is retrieved by `$vectorSearch` and injected into generation. **The failure does not recur.** | ⏳🎮🔑 |
+| L-6 | Reuse is counted | `GET /api/skills/learned` shows `hit_count > 0` for the retrieved skill | ⏳🎮🔑 |
+| L-7 | No GPU → graceful | Stop `ollama`. Retrieval falls back to lexical cosine; nothing writes a foreign vector into Atlas | ✅ (unit-level, U-9) |
 
 ---
 
-## 5. Self-improving loop tests (the hackathon star)
+## 6. End-to-end demo flow 🎮🔑👤
 
-| ID | Scenario | Steps | Expected | Status |
-|---|---|---|---|---|
-| L-1 | Learn on failure (unit) | U-1 + U-2 already cover diagnose→author→persist offline | New `SKILL.md` authored and indexed | ✅ |
-| L-2 | Repair wiring | Inspect `deploy_with_retry` / `web.py` use `_repair_failure` | On failure: collect context → Antigravity → save skill → retry; legacy regex fixer is fallback | ✅ (code) |
-| L-3 | Persistence | `save_skill(...)` then check filesystem | `skills/learned/<slug>/SKILL.md` (synthesized from fields) + `skills/learned/_index.json` created | ✅ |
-| L-4 | Transfer / pre-emption | `skills_loader.get_skills_context()` + `skill_library.retrieve_skills()` | Generation context contains `LEARNED SKILL` block; retrieval matched the skill (score 0.59) | ✅ |
-| L-5 | Metrics reflect learning | `GET /api/skills/learned` after L-3 | `count:1`, learned skill listed | ✅ |
-
----
-
-## 6. End-to-end demo flow (👤 needs GCP creds + keys)
-
-Goal: prove "it learns, and the lesson transfers."
-
-| ID | Step | Expected |
-|---|---|---|
-| E-1 | Deploy a config that fails deterministically (e.g. GCP project with a **disabled API**) via CLI `python -m deployer.main --provider gcp` or the web UI | `terraform apply` fails; loop captures error + cloud logs |
-| E-2 | Agent diagnoses + fixes + retries | Repair agent runs; IaC fixed; retry **succeeds**; a new `skills/learned/*` SKILL.md is authored |
-| E-3 | (Optional) Live narration on | Toggle voice on the deploy page → hear/read narration of the loop phases |
-| E-4 | Second, different deploy that would hit the same error class | Learned skill retrieved + injected; deploy **succeeds on attempt 1** (failure pre-empted) |
-| E-5 | Metrics + GitLab | Learned-skills panel ticks up; (if configured) validated code committed to GitLab as an MR |
+1. Bring up the stack (`pod_up.sh` or `docker compose`). Show `rocm-smi` and `ollama ps` (PROCESSOR = GPU).
+2. Describe an infrastructure need in the UI → Gemma 3 returns architecture JSON + Terraform.
+3. `terraform apply` **fails** on a disabled Compute Engine API.
+4. Narration streams the phases: `failure` → `diagnose` → `learned` → `retry`.
+5. Gemma 3 authors `skills/learned/gcp-enable-compute-api/SKILL.md`.
+6. Retry succeeds → GitLab MR opens.
+7. **Re-run the identical requirement.** The skill is retrieved; the API is pre-enabled; there is no failure.
+8. `bash scripts/pod_down.sh` (or `docker compose down`).
 
 ---
 
-## 7. Frontend / UI tests (👤)
+## 7. API endpoint tests (backend running, no GPU needed)
 
-| ID | Area | Steps | Expected | Status |
-|---|---|---|---|---|
-| F-1 | App loads & branding | open `http://localhost:3001` | App renders; brand reads "Sky Launchpad"; no console import errors | ⏳👤 |
-| F-2 | TypeScript build | `cd project && npx tsc --noEmit` (or `npm run build`) | No type errors; `LiveNarrationToggle.tsx`, `VoiceInput.tsx` compile | ⏳ |
-| F-3 | Voice input (Gemini) | click mic on requirements form, speak, stop | Records via MediaRecorder, POSTs to `/api/voice/transcribe`, transcript fills field | 🔑👤 |
-| F-4 | Live narration toggle | enable on deploy page | Opens WS; plays audio or browser-speech fallback; no UI break | 🔑👤 |
-| F-5 | No ElevenLabs references | grep `src/` for `elevenlabs` | Zero matches; dependency removed from `package.json` | ✅ |
+| ID | Endpoint | Expected | Status |
+|---|---|---|---|
+| A-1 | `GET /` | `llm_provider` and `model_id` reflect the resolved provider; `llm_connected` bool | ⏳ |
+| A-2 | `GET /api/skills/learned` | `{"count":…,"skills":[…]}` 200 | ⏳ |
+| A-3 | `GET /api/live/health` | `{"server_audio": false, "transport": "websocket-text"}` | ⏳ |
+| A-4 | WS `/api/live/narrate` | Accepts; sends `{"type":"ready","server_audio":false}`; text frames carry `audio:false` so the browser speaks them | ✅ (bus round-trip unit-tested) |
+| A-5 | `POST /api/voice/transcribe` with no file | 422/400, not 500 | ⏳ |
+| A-6 | `GET /api/uitest/health` | `model` is the resolved `LLM_MODEL`, not a Gemini id | ⏳ |
+| A-7 | WS `/api/uitest/stream` | Emits an `inconclusive` verdict explaining the Computer-Use driver was retired — must not throw `ImportError` | ⏳ |
+| A-8 | Rate limiting | >10 req/min → 429 | ⏳ |
 
 ---
 
 ## 8. Regression / negative tests
 
-| ID | Check | Expected | Status |
+| ID | Case | Expected | Status |
 |---|---|---|---|
-| R-1 | No stray Anthropic/ElevenLabs imports in backend | `grep -rn "import anthropic\|from elevenlabs" project/backend` | none | ✅ |
-| R-2 | Servers start with placeholder keys | start backend with default `.env` | Boots; warns that keys unset; endpoints up | ✅ |
-| R-3 | Repo hygiene | `git status` | `venv/`, `node_modules/`, `.env` not tracked | ✅ |
-| R-4 | Offline degradation | run loop with no `GEMINI_API_KEY` | Falls back gracefully; no crash | ✅ |
+| R-1 | No inference endpoint at all | Backend still starts; generation raises a clear error rather than crashing on import | ✅ |
+| R-2 | `LLM_PROVIDER=openai` | `ValidationError` at startup (allow-list is `amd`/`fireworks`) | ✅ |
+| R-3 | `LLM_PROVIDER=fireworks` with no key | Startup warns; no crash | ✅ |
+| R-4 | No `MONGODB_URI` | `skydb` falls back to `~/.skyrchitect/db/` local JSON | ✅ |
+| R-5 | Deleted modules stay deleted | Nothing imports `gemini_client`, `gemini_live`, `minimax_client`, `computer_use_agent`, or `antigravity_client` | ✅ |
+| R-6 | No retired SDKs | No `import anthropic` / `google.genai` / `google.adk` / `google.generativeai` anywhere in the tree | ✅ |
 
 ---
 
-## 9. Known limitations / preview risks (track as test blockers)
+## 9. Known limitations / risks
 
-- **Preview model IDs** (`MiniMax-M2`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-live-preview`, `antigravity-preview-05-2026`) require account access; verify before P-/E- tests.
-- **E2E (Section 6)** mutates real cloud resources — run in a throwaway GCP project and destroy after (`terraform destroy`).
-- Voice transcription uses a record-then-POST model (not full duplex streaming); acceptable for the demo.
-- **HTTP auth:** `/api/architecture/*` require a **JWT** + `X-API-Key` per the app's auth layer. **Local dev:** with `API_KEYS=` and `JWT_SECRET_KEY=` empty and `API_ENVIRONMENT=development`, auth is bypassed (verified: `/api/architecture/generate` returned 200 via HTTP). **Do not deploy with auth disabled** — set real keys for production.
-- **MiniMax-M2 reasoning preamble:** responses begin with a `<think>…</think>` block before the ```json output. The current parser extracts the JSON block correctly; keep the ```json instruction in the system prompt.
-- **Gemini live model is WebSocket-only:** `gemini-3.1-flash-live-preview` supports only `bidiGenerateContent` (streaming), so it cannot serve the record-then-POST `/api/voice/transcribe`. Transcription uses `GEMINI_TRANSCRIBE_MODEL` (default `gemini-3.1-flash-lite`, a `generateContent` audio model — verified). The live model remains for the streaming narration WS (`gemini_live.py`).
+- **Gemma 3 vision via Ollama** — the least-proven path. vLLM's V1 engine does not exactly reproduce Gemma 3's mixed bidirectional image attention, and ROCm multimodal has sharp edges generally. Run G-6 early; demo it last.
+- **`ffmpeg` is required** for browser `audio/webm;codecs=opus` (G-8). `transformers` shells out to the binary; pip does not bundle it.
+- **cloudflared quick tunnels** do not support SSE and cap at 200 concurrent requests. The narration WebSocket may misbehave over one; use ngrok (free authtoken) or demo from inside the pod.
+- **10 pre-existing failures** in `project/backend/tests/test_api.py`. Verified as an identical set before and after the AMD port — not introduced by it.
+- **Changing `EMBED_MODEL` invalidates the index.** Vectors from different models are not comparable. Recreate the Atlas index and re-run `scripts/migrate_vector_index.py`.
 
 ---
 
 ## 10. Quick run order
 
-1. Section 2 (offline smoke) — fast confidence. ✅ already green.
-2. Start servers → Section 3 (endpoints). 
-3. Add keys → Section 4 (providers) + Section 7 voice/UI.
-4. Section 5 + Section 6 (the learning loop + E2E) — the demo proof.
+```bash
+# 1. Offline — no GPU, no keys, no network                       (§2, §3)
+python3 -m compileall -q project/backend deployer skydb scripts services
+python3 deployer/repair_agent.py
+python3 deployer/skill_library.py
+cd project/backend && pytest && cd ../..
 
----
+# 2. Probe the pod without starting the GPU clock                (G-1)
+bash scripts/pod_up.sh --check
 
-## 11. Added coverage — DB, Apps dashboard, UI self-test, Cloud Run (2026-06-28)
+# 3. Bring up the GPU, verify residency                          (G-2..G-5)
+bash scripts/pod_up.sh
+ollama ps                      # PROCESSOR must read GPU
+rocm-smi
 
-| ID | Area | Check | Status |
-|---|---|---|---|
-| DB-1 | MongoDB Atlas connectivity | `skydb.backend_info()` → `mongodb` (with `MONGODB_URI` + certifi TLS) | ✅ |
-| DB-2 | skydb fallback | unset `MONGODB_URI` → local JSON store; same API | ✅ |
-| DB-3 | Skills persist to Atlas | learned skill upserted; visible in `skills` collection | ✅ |
-| AP-1 | Apps dashboard | `GET /api/apps` → statuses (passing/failing/untested); sample when empty | ✅ |
-| AP-2 | Generate test cases | `POST /api/apps/{id}/generate-tests` (MiniMax) → `test_cases` in Atlas | ✅ |
-| UI-1 | Computer-Use health | `GET /api/uitest/health` → model + `playwright_connected` | ✅ |
-| UI-2 | Self-test run (local) | run a workflow → verdict streamed; `test_run` persisted | ✅ |
-| UI-3 | Autonomous QA suite | 7/7 core flows pass (landing, nav, sign-in, image, arch input, pricing) | ✅ |
-| UI-4 | Self-heal (fix agent) | `POST /api/uitest/fix` → gemini-2.5-pro root-cause + fix + learned skill (MR dry-run w/o `GITLAB_TOKEN`) | ✅ |
-| UI-5 | Continuous QA loop | `ui_tester/qa_loop.py` runs suite on interval, logs to Atlas, auto-fix on fail | ✅ |
-| CR-1 | Cloud Run backend | `https://sky-backend-330741023262.us-central1.run.app/health` 200; Atlas from cloud | ✅ |
-| CR-2 | Local client → cloud | client connects `wss://…/api/uitest/playwright` (`playwright_connected:true`); self-test verdict pass | ✅ |
-| CR-3 | Browser panels → cloud | Self-Test/Apps/Learning panels call cloud; CORS allows `localhost:3001` | ✅ |
+# 4. Atlas index + re-embed                                      (L-1, L-2)
+python3 scripts/migrate_vector_index.py
 
-**Run the autonomous QA yourself:** ensure backend + local Playwright client + frontend are up, then
-`python ui_tester/qa_loop.py` (or a one-off via the **UI Self-Test** panel on the deploy page).
-
-**Pending live (needs creds):** real GitLab MRs on auto-fix (set `GITLAB_TOKEN` + project on the backend);
-Atlas Vector Search ranking (create a vector index + set `MONGODB_VECTOR_INDEX`).
+# 5. The demo                                                    (§6)
+#    ... then stop the clock
+bash scripts/pod_down.sh
+```
