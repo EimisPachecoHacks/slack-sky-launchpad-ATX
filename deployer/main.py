@@ -44,7 +44,7 @@ def _narrate(phase: str, text: str) -> None:
     """Print a loop event and, if the Gemini Live narration bus is reachable, stream it."""
     print(f"  [{phase}] {text}")
     try:  # the web backend ships the Gemini Live bus; degrade silently from the CLI
-        from backend.gemini_live import narrate as _live_narrate
+        from backend.narration import narrate as _live_narrate
 
         _live_narrate(phase, text)
     except Exception:
@@ -82,10 +82,10 @@ def _repair_failure(
         ctx = {"provider": provider, "terraform_errors": result.errors, "summary": output[:1000]}
         print(f"  (failure-context collection degraded: {exc})")
 
-    _narrate("diagnose", "Spinning up the Antigravity repair agent to read the logs and diagnose...")
-    record_event("diagnose", "Antigravity agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
+    _narrate("diagnose", "Handing the logs to the Gemma 3 repair agent to diagnose...")
+    record_event("diagnose", "Gemma 3 repair agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
     try:
-        from .antigravity_client import diagnose_and_author
+        from .repair_agent import diagnose_and_author
 
         out = diagnose_and_author(ctx, files, existing_skills=None, env_id=agent_env_id)
         agent_env_id = out.get("env_id", agent_env_id)
@@ -114,7 +114,7 @@ def _repair_failure(
             record_event("retry", "Applying fix and retrying deploy", provider=provider, run_id=run_id)
             return files, changes, agent_env_id
     except Exception as exc:
-        print(f"  (Antigravity repair unavailable, using legacy auto-fixer: {exc})")
+        print(f"  (Gemma 3 repair unavailable, using legacy auto-fixer: {exc})")
 
     # Fallback: deterministic regex auto-fixer.
     files, changes = analyze_and_fix(files, result.errors)

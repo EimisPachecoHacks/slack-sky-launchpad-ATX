@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 # Set test environment variables BEFORE importing the app
-os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test-key-12345"
-os.environ["ANTHROPIC_MODEL"] = "claude-opus-4-6"
+os.environ["LLM_PROVIDER"] = "fireworks"
+os.environ["FIREWORKS_API_KEY"] = "fw-test-key-12345"
 os.environ["API_ENVIRONMENT"] = "development"
 os.environ["CORS_ORIGINS"] = "http://localhost:3000"
 os.environ["RATE_LIMIT_ENABLED"] = "false"  # Disable rate limiting in tests

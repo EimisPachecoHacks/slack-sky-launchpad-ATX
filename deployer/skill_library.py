@@ -106,26 +106,15 @@ def _cosine_vec(a: list[float], b: list[float]) -> float:
 # Optional embedding path (lazy, best-effort, never required)
 # --------------------------------------------------------------------------- #
 def _embed(text: str) -> list[float] | None:
-    """Best-effort embedding via Gemini if available. Returns None on any
-    failure so the caller falls back to the offline cosine path."""
-    if not os.environ.get("GEMINI_API_KEY"):
-        return None
-    try:  # pragma: no cover - depends on optional SDK + network
-        import google.generativeai as genai  # type: ignore
+    """Delegate to skydb's canonical embedder so the file index and the Atlas
+    index share ONE vector space. Returns None on any failure, so the caller
+    falls back to the offline cosine path."""
+    try:  # pragma: no cover - depends on the embedding service being reachable
+        import skydb
 
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-        resp = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-        )
-        vec = resp["embedding"] if isinstance(resp, dict) else getattr(resp, "embedding", None)
-        if isinstance(vec, dict):  # some SDK shapes nest under 'values'
-            vec = vec.get("values")
-        if vec and isinstance(vec, (list, tuple)):
-            return [float(x) for x in vec]
+        return skydb._embed_text(text)
     except Exception:
         return None
-    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -201,6 +190,25 @@ def _synthesize_markdown(skill: dict, slug: str) -> str:
     return "\n".join(lines)
 
 
+def _resolve_skill_md(slug: str, repo_root: Path | None = None) -> Path:
+    """Locate a learned skill's SKILL.md from its slug.
+
+    The index used to store an absolute path, which broke whenever the repo was
+    copied or renamed. The slug plus the learned dir is the real address.
+    """
+    _, learned_dir, _ = _dirs(repo_root)
+    return learned_dir / slug / "SKILL.md"
+
+
+def _read_skill_md(slug: str, repo_root: Path | None = None) -> str:
+    """Read a learned skill's SKILL.md body, or '' if it is missing/unreadable."""
+    try:
+        p = _resolve_skill_md(slug, repo_root)
+        return p.read_text(encoding="utf-8") if p.exists() else ""
+    except Exception:
+        return ""
+
+
 def _body_excerpt(markdown: str, skill: dict, limit: int = 500) -> str:
     """Text used for retrieval matching: error_signature + description +
     first ~limit chars of the SKILL.md body."""
@@ -257,7 +265,9 @@ def save_skill(new_skill: dict, repo_root: Path | None = None) -> dict:
         "provider": new_skill.get("provider", "") or "",
         "body_excerpt": excerpt,
         "embedding": embedding,
-        "path": str(skill_path),
+        # Repo-relative: an absolute path breaks the moment the repo is copied.
+        # Readers resolve content from the slug anyway (see _resolve_skill_md).
+        "path": f"skills/learned/{slug}/SKILL.md",
         # Preserve original creation time on update; otherwise stamp now.
         "created": existing.get("created") or datetime.now(timezone.utc).isoformat(),
         # Preserve accumulated hits across re-saves.
@@ -325,14 +335,7 @@ def retrieve_skills(query: str, k: int = 3, repo_root: Path | None = None) -> li
         else:
             score = _cosine_counter(query_tf, _tf_vector(entry.get("body_excerpt", "")))
 
-        path = entry.get("path", "")
-        content = ""
-        try:
-            p = Path(path)
-            if p.exists():
-                content = p.read_text(encoding="utf-8")
-        except Exception:
-            content = ""
+        content = _read_skill_md(slug, repo_root)
 
         scored.append(
             {
@@ -342,7 +345,7 @@ def retrieve_skills(query: str, k: int = 3, repo_root: Path | None = None) -> li
                 "error_signature": entry.get("error_signature", ""),
                 "score": round(float(score), 6),
                 "content": content,
-                "path": path,
+                "path": str(_resolve_skill_md(slug, repo_root)),
             }
         )
 
@@ -361,13 +364,6 @@ def get_learned_skills_context(query: str | None = None, k: int = 3) -> str:
         index = _read_index(INDEX_FILE)
         results = []
         for slug, entry in index.items():
-            content = ""
-            try:
-                p = Path(entry.get("path", ""))
-                if p.exists():
-                    content = p.read_text(encoding="utf-8")
-            except Exception:
-                content = ""
             results.append(
                 {
                     "slug": slug,
@@ -375,8 +371,8 @@ def get_learned_skills_context(query: str | None = None, k: int = 3) -> str:
                     "description": entry.get("description", ""),
                     "error_signature": entry.get("error_signature", ""),
                     "score": 1.0,
-                    "content": content,
-                    "path": entry.get("path", ""),
+                    "content": _read_skill_md(slug),
+                    "path": str(_resolve_skill_md(slug)),
                 }
             )
 

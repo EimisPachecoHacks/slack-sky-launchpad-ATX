@@ -440,7 +440,7 @@ def run_pipeline(config):
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         workspace = prepare_workspace(provider, run_id)
         final_files = files
-        _agent_env = {"id": None}  # Antigravity stateful-memory env id across retries
+        _agent_env = {"id": None}  # repair-agent id threaded across retries
 
         for attempt in range(1, MAX_DEPLOY_RETRIES + 1):
             pipeline_state["current_step"] = f"Deploy attempt {attempt}/{MAX_DEPLOY_RETRIES}..."

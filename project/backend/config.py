@@ -9,41 +9,38 @@ from pydantic import Field, validator
 class Settings(BaseSettings):
     """Application settings with validation"""
 
-    # Anthropic API Configuration (legacy/optional — replaced by MiniMax + Gemini)
-    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key (legacy/optional)")
-    ANTHROPIC_MODEL: str = Field(
-        default="claude-opus-4-6",
-        description="Anthropic model ID (legacy)"
-    )
+    # ---------------------------------------------------------------------
+    # Inference — every backend speaks the OpenAI wire format (see llm_client.py)
+    # ---------------------------------------------------------------------
+    # LLM_PROVIDER picks the defaults: "amd" (Gemma 3 on a ROCm MI300X, served by
+    # Ollama or vLLM) or "fireworks" (managed, also AMD-hosted, needs a paid key).
+    # Any explicit LLM_* below wins.
+    LLM_PROVIDER: str = Field(default="amd", description="Inference backend: amd | fireworks")
+    LLM_BASE_URL: str = Field(default="", description="OpenAI-compatible base URL (blank = provider default)")
+    LLM_API_KEY: str = Field(default="", description="Bearer token; falls back to FIREWORKS_API_KEY")
+    LLM_MODEL: str = Field(default="", description="Text-generation model id (blank = provider default)")
+    LLM_VISION_MODEL: str = Field(default="", description="VLM for diagram analysis (blank = provider default)")
 
-    # MiniMax API Configuration — powers cloud-architecture JSON generation (replaces Anthropic)
-    MINIMAX_API_KEY: str = Field(default="", description="MiniMax API key")
-    MINIMAX_MODEL: str = Field(default="MiniMax-M2", description="MiniMax model id (best general model)")
-    MINIMAX_BASE_URL: str = Field(
-        default="https://api.minimax.io/v1",
-        description="MiniMax OpenAI-compatible base URL",
-    )
+    FIREWORKS_API_KEY: str = Field(default="", description="Fireworks AI API key (only for LLM_PROVIDER=fireworks)")
 
-    # Google Gemini API Configuration — image analysis + real-time voice (replaces Claude Vision + ElevenLabs)
-    GEMINI_API_KEY: str = Field(default="", description="Google Gemini API key")
-    GEMINI_VISION_MODEL: str = Field(
-        default="gemini-3.1-pro-preview", description="Gemini model for image analysis"
+    # Speech-to-text runs on our own GPU shim (services/whisper_server.py), which
+    # lives on a different port than the LLM — hence a separate base URL.
+    LLM_AUDIO_BASE_URL: str = Field(
+        default="http://localhost:8100/v1",
+        description="OpenAI-compatible audio base URL (Whisper)",
     )
-    GEMINI_LIVE_MODEL: str = Field(
-        default="gemini-3.1-flash-live-preview",
-        description="Gemini Live model for real-time streaming narration (WebSocket bidi)",
-    )
-    GEMINI_TRANSCRIBE_MODEL: str = Field(
-        default="gemini-3.1-flash-lite",
-        description="Gemini model for record-then-POST voice transcription (generateContent + audio)",
-    )
-    ANTIGRAVITY_MODEL: str = Field(
-        default="antigravity-preview-05-2026",
-        description="Gemini Interactions API managed-agent model (self-improvement loop)",
-    )
+    LLM_TRANSCRIBE_MODEL: str = Field(default="openai/whisper-large-v3", description="Speech-to-text model id")
 
-    # ElevenLabs API Configuration (deprecated — voice now powered by Gemini Live)
-    ELEVENLABS_API_KEY: str = Field(default="", description="Deprecated; voice uses Gemini Live")
+    # Embeddings are NOT provider-switchable: vectors from different models are
+    # not comparable, so one model owns the Atlas index. Served on the AMD GPU.
+    EMBED_BASE_URL: str = Field(default="http://localhost:11434/v1", description="OpenAI-compatible embeddings URL")
+    EMBED_API_KEY: str = Field(default="", description="Embeddings bearer token; falls back to LLM_API_KEY")
+    EMBED_MODEL: str = Field(default="mxbai-embed-large", description="Canonical skill-retrieval embedder (1024-d)")
+    EMBED_DIMENSIONS: int = Field(default=1024, description="Must match the Atlas index numDimensions")
+    # `dimensions` is only honoured by Matryoshka models behind a serving layer that
+    # forwards it. bge-large rejects it; Ollama ignores it. Off by default: our models
+    # emit their native 1024-d width, which is what the Atlas index expects.
+    EMBED_SEND_DIMENSIONS: bool = Field(default=False, description="Send `dimensions` in embedding requests")
 
     # API Configuration
     API_ENVIRONMENT: str = Field(default="development", description="Environment (development/production)")
@@ -103,24 +100,12 @@ class Settings(BaseSettings):
             )
         return v
 
-    @validator("ANTHROPIC_MODEL")
-    def validate_model_id(cls, v: str) -> str:
-        """Validate Anthropic model ID"""
-        allowed_models = [
-            "claude-opus-4-6",  # Claude Opus 4.6 (Feb 2026) — default frontier model
-            "claude-opus-4-1-20250805",    # Claude Opus 4.1 (Aug 2025)
-            "claude-sonnet-4-6",  # Claude Sonnet 4.6 (Feb 2026)
-            "claude-sonnet-4-5-20250929",  # Claude Sonnet 4.5
-            "claude-3-7-sonnet-20250219",  # Claude 3.7 Sonnet (Feb 2025)
-            "claude-haiku-4-5-20251001",   # Claude Haiku 4.5 (Oct 2025)
-            "claude-3-5-sonnet-20241022",  # Legacy
-        ]
-        if v not in allowed_models:
-            raise ValueError(
-                f"Invalid Anthropic model ID: {v}. "
-                f"Allowed models: {', '.join(allowed_models)}"
-            )
-        return v
+    @validator("LLM_PROVIDER")
+    def validate_llm_provider(cls, v: str) -> str:
+        allowed = ("amd", "fireworks")
+        if v.strip().lower() not in allowed:
+            raise ValueError(f"Invalid LLM_PROVIDER: {v}. Allowed: {', '.join(allowed)}")
+        return v.strip().lower()
 
     @validator("RATE_LIMIT_PER_MINUTE")
     def validate_rate_limit(cls, v: int) -> int:
@@ -171,13 +156,13 @@ try:
 except Exception as e:
     print(f"❌ Configuration Error: {e}")
     print("\n🔧 Please check your .env file and ensure all required variables are set.")
-    print("\nKey environment variables (set the providers you use):")
-    print("  - MINIMAX_API_KEY     (cloud architecture JSON generation)")
-    print("  - GEMINI_API_KEY      (image analysis + real-time voice)")
+    print("\nKey environment variables:")
+    print("  - LLM_PROVIDER        (amd | fireworks)")
+    print("  - FIREWORKS_API_KEY   (or LLM_API_KEY) — required when LLM_PROVIDER=fireworks")
     print("\nOptional environment variables:")
-    print("  - MINIMAX_MODEL (default: MiniMax-M2)")
-    print("  - GEMINI_VISION_MODEL (default: gemini-3.1-pro-preview)")
-    print("  - GEMINI_LIVE_MODEL (default: gemini-3.1-flash-live-preview)")
+    print("  - LLM_MODEL, LLM_VISION_MODEL, LLM_BASE_URL (blank = provider default)")
+    print("  - EMBED_BASE_URL (default: http://vllm-embed:8001/v1)")
+    print("  - EMBED_MODEL (default: BAAI/bge-large-en-v1.5), EMBED_DIMENSIONS (default: 1024)")
     print("  - API_ENVIRONMENT (default: development)")
     print("  - CORS_ORIGINS (default: http://localhost:5173,http://localhost:3000)")
     print("  - RATE_LIMIT_PER_MINUTE (default: 10)")
@@ -201,11 +186,9 @@ def validate_configuration():
     if settings.is_production and not settings.API_KEYS and not settings.JWT_SECRET_KEY:
         issues.append("⚠️  No authentication configured (API_KEYS or JWT_SECRET_KEY)")
 
-    # Check for Anthropic API key format (basic check)
-    if settings.ANTHROPIC_API_KEY and not settings.ANTHROPIC_API_KEY.startswith("sk-ant-"):
-        issues.append(
-            "⚠️  ANTHROPIC_API_KEY should start with 'sk-ant-'. Please verify your API key."
-        )
+    # Fireworks is a hosted API and cannot work without a key; AMD/vLLM needs none.
+    if settings.LLM_PROVIDER == "fireworks" and not (settings.LLM_API_KEY or settings.FIREWORKS_API_KEY):
+        issues.append("⚠️  LLM_PROVIDER=fireworks but neither FIREWORKS_API_KEY nor LLM_API_KEY is set")
 
     if issues:
         print("\n🔍 Configuration Issues Found:")
@@ -216,17 +199,15 @@ def validate_configuration():
             raise ValueError("Critical configuration issues found. Please fix before starting.")
 
     # Print configuration summary
+    from backend.llm_client import _resolve  # provider defaults applied
+
     print("\n✅ Configuration validated successfully")
     print(f"   Environment: {settings.API_ENVIRONMENT}")
-    print(f"   MiniMax Model: {settings.MINIMAX_MODEL}")
-    print(f"   Gemini Vision Model: {settings.GEMINI_VISION_MODEL}")
-    print(f"   Gemini Live Model: {settings.GEMINI_LIVE_MODEL}")
+    print(f"   Inference Provider: {settings.LLM_PROVIDER}")
+    print(f"   Text Model: {_resolve('LLM_MODEL')}")
+    print(f"   Vision Model: {_resolve('LLM_VISION_MODEL')}")
+    print(f"   Embeddings: {settings.EMBED_MODEL} ({settings.EMBED_DIMENSIONS}-d) @ {settings.EMBED_BASE_URL}")
     print(f"   CORS Origins: {len(settings.get_cors_origins())} origin(s)")
-    # Warn if no provider keys are configured (servers still start; calls fail until set)
-    if not settings.MINIMAX_API_KEY:
-        print("   ⚠️  MINIMAX_API_KEY not set — architecture generation will fail until configured")
-    if not settings.GEMINI_API_KEY:
-        print("   ⚠️  GEMINI_API_KEY not set — image analysis & voice will fail until configured")
     print(f"   Rate Limiting: {'Enabled' if settings.RATE_LIMIT_ENABLED else 'Disabled'}")
     if settings.RATE_LIMIT_ENABLED:
         print(f"   Rate Limit: {settings.RATE_LIMIT_PER_MINUTE} req/min")

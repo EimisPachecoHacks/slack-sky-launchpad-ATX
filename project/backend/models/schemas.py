@@ -144,7 +144,8 @@ class HealthCheck(BaseModel):
     status: str
     version: str
     agent_ready: bool
-    anthropic_connected: bool
+    llm_connected: bool
+    llm_provider: str
     model_id: str
 
 

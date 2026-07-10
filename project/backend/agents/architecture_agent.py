@@ -1,18 +1,17 @@
 """
 AI Agent for Cloud Architecture Recommendations
 
-Routes all text-based AI requests (architecture JSON + markdown) through the
-MiniMax model (see backend/minimax_client.py), replacing the previous
-Anthropic-backed path.
+Routes all text-based AI requests (architecture JSON + markdown) through Gemma 3
+(see backend/llm_client.py), served either by vLLM on an AMD ROCm GPU or by the
+Fireworks AI managed API.
 
-Image/vision analysis lives in image_analysis_agent.py (Google Gemini).
+Image/vision analysis lives in image_analysis_agent.py (Gemma 3 as a VLM).
 """
 
 import logging
-import os
 from typing import Optional
 
-from backend.minimax_client import minimax_chat
+from backend import llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -68,19 +67,18 @@ After the JSON block, provide markdown with:
 
 
 class ArchitectureAgent:
-    """AI Agent for cloud architecture design routed via GitLab Duo CLI."""
+    """AI Agent for cloud architecture design, powered by Gemma 3."""
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
-        # Architecture text/JSON generation is powered by MiniMax.
-        self.model = model or os.getenv("MINIMAX_MODEL", "MiniMax-M2")
-        self.api_key = api_key or os.getenv("MINIMAX_API_KEY", "")
-        logger.info("ArchitectureAgent initialized (MiniMax backend)")
+        self.model = model or llm_client._resolve("LLM_MODEL")
+        self.api_key = api_key or ""
+        logger.info(f"ArchitectureAgent initialized ({llm_client._provider()} backend, {self.model})")
 
     def _call_duo(self, prompt: str) -> str:
-        """Generate an architecture response via MiniMax (name kept for call-site stability)."""
-        logger.info(f"[ArchitectureAgent] Sending to MiniMax ({len(prompt)} chars)")
-        response = minimax_chat(prompt, system=_SYSTEM_PROMPT)
-        logger.info(f"[ArchitectureAgent] Received {len(response)} chars from MiniMax")
+        """Generate an architecture response (name kept for call-site stability)."""
+        logger.info(f"[ArchitectureAgent] Sending {len(prompt)} chars to {self.model}")
+        response = llm_client.chat(prompt, system=_SYSTEM_PROMPT, kind="architecture")
+        logger.info(f"[ArchitectureAgent] Received {len(response)} chars")
         return response
 
     def generate_architecture(self, requirements: str) -> str:

@@ -19,8 +19,9 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 def skip_if_no_api_key():
     """Skip tests if no valid API key is configured"""
-    if not settings.ANTHROPIC_API_KEY or settings.ANTHROPIC_API_KEY == "sk-ant-test-key-12345":
-        pytest.skip("Skipping: No valid Anthropic API key configured")
+    key = settings.LLM_API_KEY or settings.FIREWORKS_API_KEY
+    if not key or key == "fw-test-key-12345":
+        pytest.skip("Skipping: No valid Fireworks API key configured")
 
 
 class TestRealArchitectureGeneration:
@@ -387,10 +388,13 @@ class TestRealHealthCheck:
             data = response.json()
             print(f"Root Status: {json.dumps(data, indent=2)}")
 
+            from backend.llm_client import _resolve
+
             assert data["status"] == "healthy"
             assert data["agent_ready"] is True
-            assert data["anthropic_connected"] is True
-            assert data["model_id"] == settings.ANTHROPIC_MODEL
+            assert data["llm_connected"] is True
+            assert data["llm_provider"] == settings.LLM_PROVIDER
+            assert data["model_id"] == _resolve("LLM_MODEL")
             print("✅ PASSED: Root health check")
 
 

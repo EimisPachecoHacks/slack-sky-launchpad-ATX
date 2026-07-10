@@ -50,11 +50,13 @@ _pw_inbox: "Optional[asyncio.Queue[dict]]" = None
 _run_lock = asyncio.Lock()
 
 DEFAULT_TARGET_URL = "http://localhost:3001"
-DEFAULT_MODEL_ID = "gemini-2.5-computer-use-preview-10-2025"
 
 
 def _model_id() -> str:
-    return os.getenv("COMPUTER_USE_MODEL_ID", DEFAULT_MODEL_ID)
+    """The model behind /api/uitest/fix (bug repair)."""
+    from backend.llm_client import _resolve
+
+    return _resolve("LLM_MODEL")
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +282,14 @@ async def _handle_run(stream_ws: WebSocket, workflow: str, target_url: str) -> N
             await _safe_send(stream_ws, {"kind": "done"})
             return
 
-        # --- Run the Computer-Use agent ---
+        # --- Drive the workflow ---
+        #
+        # The autonomous vision-action driver was retired with the move to a
+        # fully open stack: no OpenAI-compatible provider serves a
+        # computer-use-tuned model, and Gemma 3 is not grounded for pixel-level
+        # click targeting. Bug *discovery* is now the operator's job (drive the
+        # app with ui_tester/playwright_client.py); bug *repair* is still
+        # autonomous via POST /api/uitest/fix.
         try:
             from backend.uitest.computer_use_agent import run_workflow
 
@@ -292,6 +301,27 @@ async def _handle_run(stream_ws: WebSocket, workflow: str, target_url: str) -> N
                 emit=emit,
             )
             _persist_test_run(workflow, target_url, result)
+        except ImportError:
+            await _safe_send(
+                stream_ws,
+                {
+                    "kind": "status",
+                    "text": (
+                        "Autonomous UI driving is not available in the open stack. "
+                        "Drive the app with ui_tester/playwright_client.py, then "
+                        "POST the observed bug to /api/uitest/fix."
+                    ),
+                },
+            )
+            await _safe_send(
+                stream_ws,
+                {
+                    "kind": "verdict",
+                    "verdict": "inconclusive",
+                    "summary": "Computer-Use driver retired; use the Playwright client + /fix.",
+                    "bug": None,
+                },
+            )
         except WebSocketDisconnect:
             # Either the browser or the Playwright socket dropped mid-run.
             logger.info("Socket disconnected during run")

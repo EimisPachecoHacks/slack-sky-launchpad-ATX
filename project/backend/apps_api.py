@@ -3,11 +3,11 @@
 Exposes an :class:`fastapi.APIRouter` (``router``) under ``/api/apps`` that the
 orchestrator (``backend/api/main.py``) mounts. Powers the "Apps" dashboard:
 listing tracked apps with a derived status, generating end-to-end UI test
-workflows via MiniMax, and drilling into a single app's cases + run history.
+workflows via Gemma 3, and drilling into a single app's cases + run history.
 
 Design notes
 ------------
-* Every handler imports ``skydb`` / ``minimax_client`` **lazily** so a missing
+* Every handler imports ``skydb`` / ``llm_client`` **lazily** so a missing
   dependency degrades to a graceful response instead of crashing import-time.
 * Nothing on a normal path raises an unhandled 500: failures fall back to safe
   defaults (sample payload, generic test cases, empty lists).
@@ -43,14 +43,14 @@ def _skydb():
         return None
 
 
-def _minimax_chat():
-    """Return the ``minimax_chat`` callable lazily, or ``None`` if unavailable."""
+def _llm_chat():
+    """Return the ``llm_client.chat`` callable lazily, or ``None`` if unavailable."""
     try:
-        from backend.minimax_client import minimax_chat
+        from backend.llm_client import chat
 
-        return minimax_chat
+        return chat
     except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("minimax_client unavailable: %s", exc)
+        logger.warning("llm_client unavailable: %s", exc)
         return None
 
 
@@ -281,7 +281,7 @@ async def list_apps_dashboard() -> dict:
 
 @router.post("/{app_id}/generate-tests")
 async def generate_tests(app_id: str) -> dict:
-    """Propose 4 end-to-end UI test workflows for an app via MiniMax.
+    """Propose 4 end-to-end UI test workflows for an app via Gemma 3.
 
     Falls back to 2 generic cases on any LLM/parse failure. Ensures the app is
     tracked in skydb (e.g. when it originated as a sample) before storing cases.
@@ -319,9 +319,9 @@ async def generate_tests(app_id: str) -> dict:
         except Exception as exc:
             logger.warning("upsert_app failed for %s: %s", app_id, exc)
 
-    # Ask MiniMax for concise workflows.
+    # Ask Gemma 3 for concise workflows.
     proposed: Optional[list] = None
-    chat = _minimax_chat()
+    chat = _llm_chat()
     if chat:
         system = (
             "You are a senior QA engineer. You design concise, end-to-end UI "
@@ -340,7 +340,7 @@ async def generate_tests(app_id: str) -> dict:
             "No prose, no markdown, no code fences."
         )
         try:
-            raw = chat(prompt, system=system, temperature=0.3, max_tokens=1500)
+            raw = chat(prompt, system=system, temperature=0.3, max_tokens=1500, kind="qa-workflow")
             parsed = _extract_json_array(raw)
             if parsed:
                 cleaned = []
@@ -354,7 +354,7 @@ async def generate_tests(app_id: str) -> dict:
                 if cleaned:
                     proposed = cleaned[:4]
         except Exception as exc:
-            logger.warning("MiniMax test generation failed for %s: %s", app_id, exc)
+            logger.warning("Gemma 3 test generation failed for %s: %s", app_id, exc)
 
     if not proposed:
         proposed = _generic_cases()

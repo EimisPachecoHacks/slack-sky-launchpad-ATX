@@ -1,0 +1,16 @@
+{
+  "ui-clicking-generate-architecture-gives-no": {
+    "slug": "ui-clicking-generate-architecture-gives-no",
+    "name": "ui-clicking-generate-architecture-gives-no-",
+    "description": "The fix adds a loading overlay to UseCaseForm that displays when generation is in progress, using existing state and logic. The submit button is also explicitly",
+    "error_signature": "Clicking Generate Architecture gives no visible loading feedback, so the user clicks repeatedly and fires duplicate generation requests. The submit button is not disabled while the request is in flight.",
+    "root_cause": "The UseCaseForm component was missing JSX to render a loading state when the `isGenerating` prop was true. Additionally, the 'Generate Architecture' button was not explicitly disabled, allowing users to click it multiple times and trigger duplicate requests before the UI updated.",
+    "fix_pattern": "The fix adds a loading overlay to UseCaseForm that displays when generation is in progress, using existing state and logic. The submit button is also explicitly disabled and its text and icon are updated to reflect the loading state, preventing duplicate submissions.",
+    "provider": "ui",
+    "body_excerpt": "Clicking Generate Architecture gives no visible loading feedback, so the user clicks repeatedly and fires duplicate generation requests. The submit button is not disabled while the request is in flight.\nThe fix adds a loading overlay to UseCaseForm that displays when generation is in progress, using existing state and logic. The submit button is also explicitly\n---\nname: ui-clicking-generate-architecture-gives-no-\ndescription: >\n  The fix adds a loading overlay to UseCaseForm that displays when generation is in progress, using existing state and logic. The submit button is also explicitly\nmetadata:\n  slash-command: enabled\n  source: learned\n  slug: ui-clicking-generate-architecture-gives-no\n---\n\n## ui-clicking-generate-architecture-gives-no-\n\n> Auto-authored learned skill. Captured from a past deployment failure so a\n> future deployment can pre-empt th",
+    "embedding": null,
+    "path": "skills/learned/ui-clicking-generate-architecture-gives-no/SKILL.md",
+    "created": "2026-06-28T10:53:18.706991+00:00",
+    "hit_count": 0
+  }
+}

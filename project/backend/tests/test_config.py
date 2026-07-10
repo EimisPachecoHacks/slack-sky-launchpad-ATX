@@ -14,8 +14,7 @@ class TestConfigSettings:
         from backend.config import settings
 
         # Settings should be loaded from .env file
-        assert settings.ANTHROPIC_API_KEY.startswith("sk-ant")
-        assert settings.ANTHROPIC_MODEL == "claude-opus-4-6"
+        assert settings.LLM_PROVIDER in ("amd", "fireworks")
         assert settings.API_ENVIRONMENT == "development"
 
     def test_config_defaults(self):
@@ -29,17 +28,19 @@ class TestConfigSettings:
         assert settings.API_HOST == "0.0.0.0"
         assert settings.API_PORT == 8000
 
-    def test_config_validates_anthropic_model(self):
-        """Test that Anthropic model validation works"""
+    def test_config_validates_llm_provider(self):
+        """Test that LLM_PROVIDER validation works"""
         from backend.config import Settings
 
-        # Valid model should work
-        with patch.dict("os.environ", {
-            "ANTHROPIC_API_KEY": "sk-ant-test-key",
-            "ANTHROPIC_MODEL": "claude-opus-4-6"
-        }, clear=False):
+        # Valid provider should work, and be normalized to lowercase
+        with patch.dict("os.environ", {"LLM_PROVIDER": "AMD"}, clear=False):
             settings = Settings()
-            assert settings.ANTHROPIC_MODEL == "claude-opus-4-6"
+            assert settings.LLM_PROVIDER == "amd"
+
+        # Unknown provider is rejected
+        with patch.dict("os.environ", {"LLM_PROVIDER": "openai"}, clear=False):
+            with pytest.raises(ValidationError):
+                Settings()
 
     def test_config_cors_origins(self):
         """Test CORS origins configuration"""
@@ -78,29 +79,35 @@ class TestConfigSettings:
         assert isinstance(exts, list)
         assert len(exts) > 0
 
-    def test_config_model_name_validation(self):
-        """Test model name follows expected pattern"""
+    def test_config_model_defaults_resolve(self):
+        """Blank LLM_MODEL falls back to the provider's default — a Gemma 3 id either way"""
+        from backend.llm_client import _resolve, _PROVIDER_DEFAULTS
+
+        for provider in _PROVIDER_DEFAULTS:
+            with patch.dict("os.environ", {"LLM_PROVIDER": provider}, clear=False):
+                model = _resolve("LLM_MODEL")
+                assert "gemma" in model.lower(), f"{provider} default is not a Gemma model: {model}"
+                assert any(char.isdigit() for char in model)
+
+    def test_embed_dimensions_match_index(self):
+        """EMBED_DIMENSIONS must match the Atlas index numDimensions"""
         from backend.config import settings
 
-        # Model should start with claude
-        assert settings.ANTHROPIC_MODEL.startswith("claude")
+        assert settings.EMBED_DIMENSIONS == 1024
+        assert settings.EMBED_MODEL == "mxbai-embed-large"
 
-        # Should contain version info
-        assert any(char.isdigit() for char in settings.ANTHROPIC_MODEL)
-
-    def test_config_api_key_format(self):
-        """Test API key has expected format"""
+    def test_dimensions_not_sent_by_default(self):
+        """`dimensions` is unhonoured by Ollama and rejected by bge-large: never send it by default"""
         from backend.config import settings
 
-        # Should start with sk-ant
-        assert settings.ANTHROPIC_API_KEY.startswith("sk-ant")
+        assert settings.EMBED_SEND_DIMENSIONS is False
 
     def test_config_values_are_correct_types(self):
         """Test that config values are properly typed"""
         from backend.config import settings
 
-        assert isinstance(settings.ANTHROPIC_API_KEY, str)
-        assert isinstance(settings.ANTHROPIC_MODEL, str)
+        assert isinstance(settings.LLM_PROVIDER, str)
+        assert isinstance(settings.EMBED_DIMENSIONS, int)
         assert isinstance(settings.API_ENVIRONMENT, str)
         assert isinstance(settings.CORS_ORIGINS, str)
         assert isinstance(settings.JWT_SECRET_KEY, str)
@@ -157,12 +164,13 @@ class TestConfigValidation:
         from backend.config import Settings
 
         with patch.dict("os.environ", {
-            "ANTHROPIC_API_KEY": "sk-ant-test-key-minimal"
+            "FIREWORKS_API_KEY": "fw-test-key-minimal"
         }, clear=True):
             settings = Settings()
-            assert settings.ANTHROPIC_API_KEY == "sk-ant-test-key-minimal"
-            # Should use default model
-            assert settings.ANTHROPIC_MODEL == "claude-opus-4-6"
+            assert settings.FIREWORKS_API_KEY == "fw-test-key-minimal"
+            # Defaults to the AMD GPU, and leaves the model to the provider default
+            assert settings.LLM_PROVIDER == "amd"
+            assert settings.LLM_MODEL == ""
 
 
 class TestConfigEnvironments:
@@ -183,7 +191,7 @@ class TestConfigEnvironments:
         # Valid environments
         for env in ["development", "staging", "production"]:
             with patch.dict("os.environ", {
-                "ANTHROPIC_API_KEY": "sk-ant-test",
+                "FIREWORKS_API_KEY": "fw-test",
                 "API_ENVIRONMENT": env
             }, clear=True):
                 s = Settings()

@@ -222,7 +222,7 @@ except Exception as _obs_exc:  # never block startup on observability
 # ── Sky Launchpad: self-improvement loop surface ──────────────────────────────
 # Real-time Gemini Live narration of the deploy / learn-on-failure loop.
 try:
-    from backend.gemini_live import router as live_router
+    from backend.narration import router as live_router
     app.include_router(live_router)
     logger.info("🎙️  Gemini Live narration router mounted at /api/live/*")
 except Exception as _live_exc:  # never block startup on the optional voice layer
@@ -298,27 +298,30 @@ def get_agent() -> ArchitectureAgent:
         return get_architecture_agent()
     except Exception as e:
         logger.error(f"Failed to get agent: {e}")
-        raise HTTPException(status_code=503, detail="AI Agent not available. Please check Anthropic API configuration.")
+        raise HTTPException(status_code=503, detail="AI Agent not available. Please check your LLM_PROVIDER configuration.")
 
 
 # Health check endpoint
 @app.get("/", response_model=HealthCheck)
 async def root():
     """API root and health check"""
+    from backend import llm_client
+
     try:
         agent = get_architecture_agent()
         agent_ready = True
-        anthropic_connected = True
+        llm_connected = True
     except Exception:
         agent_ready = False
-        anthropic_connected = False
+        llm_connected = False
 
     return HealthCheck(
         status="healthy" if agent_ready else "degraded",
         version="1.0.0",
         agent_ready=agent_ready,
-        anthropic_connected=anthropic_connected,
-        model_id=os.getenv("ANTHROPIC_MODEL", "claude-opus-4-6")
+        llm_connected=llm_connected,
+        llm_provider=llm_client._provider(),
+        model_id=llm_client._resolve("LLM_MODEL"),
     )
 
 
@@ -1522,21 +1525,20 @@ async def transcribe_voice(
     auth_context: dict = Security(optional_authentication)
 ):
     """
-    Transcribe uploaded audio to text using the Gemini Live model
-    (gemini-3.1-flash-live-preview), replacing ElevenLabs Scribe.
+    Transcribe uploaded audio to text using Whisper via the Fireworks audio API.
 
     **Authentication**: Optional
     **Rate Limit**: Yes
     """
     try:
-        from backend.gemini_client import transcribe_audio
+        from backend.llm_client import transcribe
 
         audio_bytes = await file.read()
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="Empty audio upload")
 
-        logger.info(f"🎙️  Transcribing {len(audio_bytes)} bytes via Gemini Live...")
-        text = transcribe_audio(audio_bytes, file.content_type or "audio/webm")
+        logger.info(f"🎙️  Transcribing {len(audio_bytes)} bytes via Whisper...")
+        text = transcribe(audio_bytes, file.content_type or "audio/webm")
         logger.info("✅ Transcription complete")
 
         return {"success": True, "text": text}

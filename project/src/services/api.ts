@@ -46,7 +46,8 @@ export interface HealthCheck {
   status: string;
   version: string;
   agent_ready: boolean;
-  bedrock_connected: boolean;
+  llm_connected: boolean;
+  llm_provider: string;
   model_id: string;
 }
 

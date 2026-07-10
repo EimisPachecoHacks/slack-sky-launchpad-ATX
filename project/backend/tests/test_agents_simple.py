@@ -12,30 +12,25 @@ class TestArchitectureAgentBasics:
     def architecture_agent(self):
         """Create ArchitectureAgent instance for testing"""
         from backend.agents.architecture_agent import ArchitectureAgent
-        with patch("anthropic.Anthropic"):
-            agent = ArchitectureAgent(
-                model="claude-opus-4-6",
-                api_key="test-key"
-            )
-            return agent
+        return ArchitectureAgent(model="gemma-3-test", api_key="test-key")
 
     def test_agent_initialization(self, architecture_agent):
         """Test agent initializes correctly"""
-        assert architecture_agent.model == "claude-opus-4-6"
+        assert architecture_agent.model == "gemma-3-test"
         assert architecture_agent.api_key == "test-key"
 
     def test_generate_architecture(self, architecture_agent):
         """Test architecture generation"""
-        architecture_agent._call_claude = Mock(return_value="Architecture design response")
+        architecture_agent._call_duo = Mock(return_value="Architecture design response")
 
         result = architecture_agent.generate_architecture("Build a web app")
 
         assert isinstance(result, str)
-        architecture_agent._call_claude.assert_called_once()
+        architecture_agent._call_duo.assert_called_once()
 
     def test_optimize_architecture(self, architecture_agent):
         """Test architecture optimization"""
-        architecture_agent._call_claude = Mock(return_value="Optimization suggestions")
+        architecture_agent._call_duo = Mock(return_value="Optimization suggestions")
 
         result = architecture_agent.optimize_architecture(
             "Current architecture with EC2",
@@ -43,25 +38,25 @@ class TestArchitectureAgentBasics:
         )
 
         assert isinstance(result, str)
-        architecture_agent._call_claude.assert_called_once()
+        architecture_agent._call_duo.assert_called_once()
 
     def test_validate_design(self, architecture_agent):
         """Test design validation"""
-        architecture_agent._call_claude = Mock(return_value="Validation results")
+        architecture_agent._call_duo = Mock(return_value="Validation results")
 
         result = architecture_agent.validate_design("Architecture with load balancer and EC2")
 
         assert isinstance(result, str)
-        architecture_agent._call_claude.assert_called_once()
+        architecture_agent._call_duo.assert_called_once()
 
     def test_compare_providers(self, architecture_agent):
         """Test provider comparison"""
-        architecture_agent._call_claude = Mock(return_value="Provider comparison")
+        architecture_agent._call_duo = Mock(return_value="Provider comparison")
 
         result = architecture_agent.compare_providers("compute")
 
         assert isinstance(result, str)
-        architecture_agent._call_claude.assert_called_once()
+        architecture_agent._call_duo.assert_called_once()
 
 
 class TestImageAnalysisAgentBasics:
@@ -71,16 +66,11 @@ class TestImageAnalysisAgentBasics:
     def image_agent(self):
         """Create ImageAnalysisAgent instance for testing"""
         from backend.agents.image_analysis_agent import ImageAnalysisAgent
-        with patch("anthropic.Anthropic"):
-            agent = ImageAnalysisAgent(
-                model="claude-opus-4-6",
-                api_key="test-key"
-            )
-            return agent
+        return ImageAnalysisAgent(model="gemma-3-test", api_key="test-key")
 
     def test_image_agent_initialization(self, image_agent):
         """Test image agent initializes correctly"""
-        assert image_agent.model == "claude-opus-4-6"
+        assert image_agent.model == "gemma-3-test"
         assert image_agent.api_key == "test-key"
 
     def test_analyze_architecture_diagram(self, image_agent):
@@ -92,12 +82,13 @@ class TestImageAnalysisAgentBasics:
             "estimated_monthly_cost": 150.0
         }
 
-        mock_response = Mock()
-        mock_response.content = [Mock(text=json.dumps(analysis_data))]
-        image_agent.client.messages.create = Mock(return_value=mock_response)
+        with patch(
+            "backend.agents.image_analysis_agent.llm_client.vision_chat",
+            return_value=json.dumps(analysis_data),
+        ) as mock_vision:
+            result = image_agent.analyze_architecture_diagram("base64image", "png")
 
-        result = image_agent.analyze_architecture_diagram("base64image", "png")
-
+        mock_vision.assert_called_once()
         assert result["provider"] == "aws"
         assert "detected_components" in result
         assert "estimated_monthly_cost" in result

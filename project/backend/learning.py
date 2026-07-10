@@ -68,7 +68,7 @@ SAMPLE = {
     ],
     "timeline": [
         {"ts": "2026-06-25T18:11:30Z", "phase": "failure", "text": "terraform apply failed: Compute Engine API has not been enabled", "provider": "gcp"},
-        {"ts": "2026-06-25T18:11:45Z", "phase": "diagnose", "text": "Antigravity agent read the cloud logs and identified the disabled API", "provider": "gcp"},
+        {"ts": "2026-06-25T18:11:45Z", "phase": "diagnose", "text": "Gemma 3 repair agent read the cloud logs and identified the disabled API", "provider": "gcp"},
         {"ts": "2026-06-25T18:12:00Z", "phase": "learned", "text": "Authored reusable skill: gcp-enable-compute-api", "provider": "gcp"},
         {"ts": "2026-06-25T18:12:20Z", "phase": "retry", "text": "Re-applied with google_project_service — deploy succeeded", "provider": "gcp"},
         {"ts": "2026-06-26T10:02:00Z", "phase": "preempted", "text": "New deploy retrieved gcp-enable-compute-api and pre-enabled the API — no failure", "provider": "gcp"},
@@ -78,9 +78,8 @@ SAMPLE = {
         "success_rate": 1.0,
         "avg_latency_ms": 4200.0,
         "by_model": [
-            {"model": "MiniMax-M2", "calls": 4, "errors": 0, "avg_latency_ms": 18000.0},
-            {"model": "gemini-3.1-pro-preview", "calls": 5, "errors": 0, "avg_latency_ms": 3100.0},
-            {"model": "gemini-3.1-flash-lite", "calls": 3, "errors": 0, "avg_latency_ms": 1900.0},
+            {"model": "gemma-3-12b-it (AMD MI300X)", "calls": 9, "errors": 0, "avg_latency_ms": 2400.0},
+            {"model": "BAAI/bge-large-en-v1.5 (AMD MI300X)", "calls": 3, "errors": 0, "avg_latency_ms": 40.0},
         ],
     },
 }

@@ -1,25 +1,18 @@
 """Self-improving repair core: diagnose a failed deployment and author a skill.
 
 When a cloud deployment FAILS this module hands the rich failure context (from
-``log_collector``) to Google's **Gemini Interactions API**, which spins up an
-**Antigravity** managed agent (model ``antigravity-preview-05-2026``). That
-agent reasons / browses provider docs / executes code inside an ephemeral
-hosted Linux environment, then returns:
+``log_collector``) to **Gemma 3** — served either by vLLM on an AMD ROCm GPU or
+by the Fireworks AI managed API (see ``backend/llm_client.py``). The model
+returns:
 
   * corrected Terraform files, and
   * a NEW generalized SKILL.md capturing the lesson learned.
 
-Statefulness: the Interactions API returns an ``env_id`` for the hosted
-environment. We thread it back on retries so the agent keeps its memory across
-attempts on the same deployment.
-
-The Interactions / Antigravity surface is a PREVIEW API. The primary path is
-written against its described interface but is fully wrapped: on ANY failure we
-fall back to a DIRECT call to ``gemini-3.5-flash`` so the demo never hard-fails.
-
-All third-party deps (``google-genai``, ``requests``) are imported LAZILY,
-inside functions in try/except, with clear error messages. The orchestrator
-consolidates requirements later.
+``env_id`` is threaded through on retries so callers can correlate attempts on
+the same deployment. It no longer refers to a hosted environment: repair is a
+single-shot LLM call against an open model, not a managed agent with its own
+sandbox. We trade agentic doc-browsing and code execution for a fully open
+stack that runs on our own AMD silicon.
 """
 
 from __future__ import annotations
@@ -28,22 +21,11 @@ import json
 import os
 import re
 
-# --- Model constants -------------------------------------------------------
-# Antigravity managed agent (preview) driven via the Gemini Interactions API.
-ANTIGRAVITY_MODEL = "antigravity-preview-05-2026"
-# Direct-call fallback model (a Gemini 3.5 class model).
-GEMINI_FALLBACK_MODEL = "gemini-3.5-flash"
-
-# Base endpoints. The Interactions API is a preview surface; the shape assumed
-# below is documented inline at ``_run_antigravity``.
-_GENAI_BASE = "https://generativelanguage.googleapis.com/v1beta"
-_INTERACTIONS_BASE = "https://generativelanguage.googleapis.com/v1alpha"
+# Repair runs on the same open model that generates architectures.
+REPAIR_KIND = "repair"
 
 # Where this module's persona lives, declared as the agent's system identity.
 _AGENTS_MD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "AGENTS.md")
-
-# Network timeout (seconds) for any HTTP call.
-_HTTP_TIMEOUT = 90
 
 
 # ---------------------------------------------------------------------------
@@ -66,8 +48,8 @@ def diagnose_and_author(
         tf_files: ``filename -> terraform content`` to be repaired.
         existing_skills: ``name -> SKILL.md`` content; the agent's starting
             toolkit, declared as its available skills.
-        env_id: Pass the prior ``env_id`` to RESUME the agent's stateful memory
-            across retries on the same deployment.
+        env_id: Prior ``env_id``, threaded back so callers can correlate
+            retries on the same deployment.
 
     Returns:
         ``{fixed_files, new_skill, env_id, changes, used_fallback}`` — see the
@@ -78,235 +60,43 @@ def diagnose_and_author(
     tf_files = tf_files or {}
 
     prompt = _build_prompt(failure_context, tf_files, existing_skills)
-
-    used_fallback = False
-    new_env_id = env_id
-
-    # --- Primary path: Antigravity managed agent --------------------------
-    try:
-        text, new_env_id = _run_antigravity(prompt, env_id, existing_skills)
-    except Exception:
-        # ANY failure (lib missing, endpoint unreachable, non-2xx, bad shape)
-        # falls back to a direct Gemini call so the demo never hard-fails.
-        used_fallback = True
-        text = _run_gemini_fallback(prompt)
-        # No hosted environment in fallback mode; keep/seed a synthetic id so
-        # callers always have something to thread on the next retry.
-        new_env_id = env_id or "fallback-no-env"
-
+    text = _run_llm(prompt)
     parsed = _extract_json(text) or {}
 
     return _assemble_result(
         parsed=parsed,
         failure_context=failure_context,
         tf_files=tf_files,
-        env_id=new_env_id,
-        used_fallback=used_fallback,
+        env_id=env_id or "single-shot",
+        used_fallback=False,
     )
 
 
 # ---------------------------------------------------------------------------
-# Primary path: Antigravity via the Gemini Interactions API
+# Repair path: Gemma 3 (AMD vLLM or Fireworks)
 # ---------------------------------------------------------------------------
 
 
-def _run_antigravity(
-    prompt: str,
-    env_id: str | None,
-    existing_skills: dict[str, str],
-) -> tuple[str, str]:
-    """Create or resume an Antigravity hosted agent session; return its reply.
+def _run_llm(prompt: str) -> str:
+    """Send the repair prompt to Gemma 3 and return the raw reply text.
 
-    Returns ``(text_response, new_env_id)``.
-
-    ASSUMED PREVIEW ENDPOINT SHAPE (Gemini Interactions API)
-    --------------------------------------------------------
-    The Interactions API creates a stateful, tool-using *interaction* backed by
-    an ephemeral hosted Linux environment. We model it as::
-
-        POST {INTERACTIONS_BASE}/interactions:run?key=API_KEY
-        {
-          "model": "antigravity-preview-05-2026",
-          "environmentId": "<env_id or omitted to create new>",
-          "agent": {
-            "persona": "<AGENTS.md body>",
-            "skills": [ {"name": "...", "content": "<SKILL.md>"} ]
-          },
-          "tools": ["code_execution", "web_browse"],
-          "input": "<prompt>"
-        }
-
-    Response::
-
-        {
-          "environmentId": "<env id to resume with>",
-          "output": {"text": "<agent final answer>"}
-        }
-
-    Since the exact preview surface may not be reachable, the actual HTTP is
-    wrapped; ANY failure raises and the caller falls back. We try the
-    ``google-genai`` SDK first (if it exposes an interactions client), then a
-    raw REST call via ``requests``/``urllib``.
-    """
-    api_key = _require_api_key()
-    persona = _load_persona()
-    skills_payload = [
-        {"name": name, "content": content}
-        for name, content in (existing_skills or {}).items()
-    ]
-
-    # --- Attempt 1: google-genai SDK (if it surfaces interactions) --------
-    sdk_text, sdk_env = _run_antigravity_sdk(
-        prompt, env_id, persona, skills_payload, api_key
-    )
-    if sdk_text is not None:
-        return sdk_text, sdk_env or env_id or "antigravity-env"
-
-    # --- Attempt 2: raw REST against the Interactions endpoint ------------
-    body: dict = {
-        "model": ANTIGRAVITY_MODEL,
-        "agent": {"persona": persona, "skills": skills_payload},
-        "tools": ["code_execution", "web_browse"],
-        "input": prompt,
-    }
-    if env_id:
-        body["environmentId"] = env_id
-
-    url = f"{_INTERACTIONS_BASE}/interactions:run?key={api_key}"
-    data = _http_post_json(url, body)
-
-    new_env = (
-        data.get("environmentId")
-        or data.get("env_id")
-        or env_id
-        or "antigravity-env"
-    )
-    text = _extract_interactions_text(data)
-    if not text:
-        raise RuntimeError("Antigravity response contained no text output")
-    return text, new_env
-
-
-def _run_antigravity_sdk(
-    prompt: str,
-    env_id: str | None,
-    persona: str,
-    skills_payload: list[dict],
-    api_key: str,
-) -> tuple[str | None, str | None]:
-    """Try the ``google-genai`` SDK's interactions surface.
-
-    Returns ``(text, env_id)`` on success, or ``(None, None)`` if the SDK is
-    unavailable or does not expose an interactions client (so the REST path is
-    used instead). Real call errors are allowed to propagate to the fallback.
+    Imported lazily so the deployer stays usable as a standalone CLI (matching
+    how ``deployer/main.py`` reaches into ``backend``).
     """
     try:
-        from google import genai  # type: ignore
-    except Exception:
-        return None, None
+        from backend.llm_client import chat
+    except Exception as exc:  # pragma: no cover - import-topology guard
+        raise RuntimeError(
+            "backend.llm_client is not importable; cannot run the repair agent."
+        ) from exc
 
-    client = genai.Client(api_key=api_key)
-
-    # The interactions surface is preview and may not exist on the installed
-    # SDK version. If the attribute is missing, defer to the REST path.
-    interactions = getattr(client, "interactions", None)
-    if interactions is None or not hasattr(interactions, "run"):
-        return None, None
-
-    result = interactions.run(
-        model=ANTIGRAVITY_MODEL,
-        environment_id=env_id,
-        agent={"persona": persona, "skills": skills_payload},
-        tools=["code_execution", "web_browse"],
-        input=prompt,
+    return chat(
+        prompt,
+        system=_load_persona(),
+        temperature=0.1,
+        max_tokens=8192,
+        kind=REPAIR_KIND,
     )
-
-    text = getattr(result, "text", None)
-    if text is None and hasattr(result, "output"):
-        text = getattr(result.output, "text", None)
-    new_env = getattr(result, "environment_id", None) or env_id
-    if not text:
-        raise RuntimeError("Antigravity SDK returned no text")
-    return text, new_env
-
-
-def _extract_interactions_text(data: dict) -> str:
-    """Pull the agent's final text out of an Interactions API response dict."""
-    output = data.get("output")
-    if isinstance(output, dict):
-        if output.get("text"):
-            return str(output["text"])
-        # Some shapes nest parts like generateContent.
-        parts = output.get("parts")
-        if isinstance(parts, list):
-            joined = "".join(
-                p.get("text", "") for p in parts if isinstance(p, dict)
-            )
-            if joined:
-                return joined
-    if isinstance(output, str):
-        return output
-    # Last resort: a generateContent-style candidates array.
-    return _extract_generatecontent_text(data)
-
-
-# ---------------------------------------------------------------------------
-# Fallback path: direct gemini-3.5-flash generateContent
-# ---------------------------------------------------------------------------
-
-
-def _run_gemini_fallback(prompt: str) -> str:
-    """Direct call to ``gemini-3.5-flash`` ``generateContent``. Returns text.
-
-    Prefers the ``google-genai`` SDK; falls back to REST. Raises with a clear
-    message if neither the SDK nor ``requests``/``urllib`` can complete the
-    call (this is the last line of defense, so failures here are real).
-    """
-    api_key = _require_api_key()
-
-    # --- Attempt 1: google-genai SDK -------------------------------------
-    try:
-        from google import genai  # type: ignore
-
-        client = genai.Client(api_key=api_key)
-        resp = client.models.generate_content(
-            model=GEMINI_FALLBACK_MODEL,
-            contents=prompt,
-        )
-        text = getattr(resp, "text", None)
-        if text:
-            return text
-    except Exception:
-        # Fall through to REST.
-        pass
-
-    # --- Attempt 2: REST generateContent ---------------------------------
-    url = (
-        f"{_GENAI_BASE}/models/{GEMINI_FALLBACK_MODEL}:generateContent"
-        f"?key={api_key}"
-    )
-    body = {"contents": [{"parts": [{"text": prompt}]}]}
-    data = _http_post_json(url, body)
-    text = _extract_generatecontent_text(data)
-    if not text:
-        raise RuntimeError("Gemini fallback returned no text output")
-    return text
-
-
-def _extract_generatecontent_text(data: dict) -> str:
-    """Extract concatenated text from a generateContent response dict."""
-    candidates = data.get("candidates") or []
-    for cand in candidates:
-        content = cand.get("content") if isinstance(cand, dict) else None
-        if not isinstance(content, dict):
-            continue
-        parts = content.get("parts") or []
-        joined = "".join(
-            p.get("text", "") for p in parts if isinstance(p, dict)
-        )
-        if joined:
-            return joined
-    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -355,8 +145,8 @@ failure context, then (1) correct the Terraform and (2) author ONE new,
 GENERALIZED reusable skill that captures the lesson so future deployments avoid
 this class of error.
 
-You may browse provider documentation and execute code in your hosted
-environment to verify your reasoning before answering.
+Reason from the failure context alone. You have no tools, no network access, and
+no shell — do not claim to have run or verified anything.
 
 ## Your existing skills (toolkit)
 {skills_block}
@@ -615,17 +405,6 @@ def _slugify(value: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _require_api_key() -> str:
-    """Read ``GEMINI_API_KEY`` from the environment or raise a clear error."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set; cannot call the Gemini Interactions "
-            "API or the gemini-3.5-flash fallback."
-        )
-    return api_key
-
-
 def _load_persona() -> str:
     """Load the AGENTS.md persona that declares the repair agent's identity."""
     try:
@@ -634,37 +413,6 @@ def _load_persona() -> str:
     except OSError:
         # Persona file optional; degrade to a one-line identity.
         return "Sky Launchpad Repair Agent: an SRE/Terraform expert."
-
-
-def _http_post_json(url: str, body: dict) -> dict:
-    """POST JSON and return the parsed JSON response.
-
-    Prefers ``requests``; falls back to stdlib ``urllib``. Raises on transport
-    errors or non-JSON responses (callers handle the fallback).
-    """
-    payload = json.dumps(body).encode("utf-8")
-    headers = {"Content-Type": "application/json"}
-
-    # --- Attempt 1: requests ---------------------------------------------
-    try:
-        import requests  # type: ignore
-
-        resp = requests.post(
-            url, data=payload, headers=headers, timeout=_HTTP_TIMEOUT
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except ImportError:
-        pass  # requests not installed; use urllib below.
-
-    # --- Attempt 2: stdlib urllib ----------------------------------------
-    import urllib.request
-
-    req = urllib.request.Request(
-        url, data=payload, headers=headers, method="POST"
-    )
-    with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT) as resp:
-        return json.loads(resp.read().decode("utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -694,17 +442,11 @@ Here is the repair:
 ```
 """
 
-    def _fake_antigravity(prompt, env_id, existing_skills):  # type: ignore
-        return _CANNED, env_id or "env-smoke-123"
-
-    def _fake_fallback(prompt):  # type: ignore
+    def _fake_llm(prompt):  # type: ignore
         return _CANNED
 
-    # Monkeypatch the network entry points.
-    _run_antigravity = _fake_antigravity  # noqa: F811
-    _run_gemini_fallback = _fake_fallback  # noqa: F811
-    globals()["_run_antigravity"] = _fake_antigravity
-    globals()["_run_gemini_fallback"] = _fake_fallback
+    # Monkeypatch the single network entry point.
+    globals()["_run_llm"] = _fake_llm
 
     failure = {
         "provider": "gcp",
@@ -718,31 +460,26 @@ Here is the repair:
     }
     tf = {"main.tf": 'resource "google_compute_network" "vpc" {}\n'}
 
-    # 1) Primary path (mocked antigravity).
+    # 1) Happy path: strict JSON parsed, skill authored.
     result = diagnose_and_author(failure, tf, existing_skills={"x": "..."})
     assert isinstance(result, dict), "result must be a dict"
     assert result["fixed_files"], "expected fixed_files"
     assert "main.tf" in result["fixed_files"], "fixed_files must keep keys"
     assert result["new_skill"]["markdown"].strip(), "new_skill.markdown required"
     assert result["new_skill"]["name"] == "gcp-enable-compute-api", "slug kept"
-    assert result["env_id"] == "env-smoke-123", "env_id must thread through"
-    assert result["used_fallback"] is False, "primary path should not fall back"
+    assert result["env_id"] == "single-shot", "absent env_id gets a synthetic id"
+    assert result["used_fallback"] is False, "there is only one path now"
     assert result["changes"], "expected changes list"
 
-    # 2) Resume with a prior env_id (stateful memory thread).
-    result2 = diagnose_and_author(failure, tf, env_id="env-smoke-123")
-    assert result2["env_id"] == "env-smoke-123", "resume must keep env_id"
+    # 2) A caller-supplied env_id threads through for retry correlation.
+    result2 = diagnose_and_author(failure, tf, env_id="prev-env")
+    assert result2["env_id"] == "prev-env", "env_id must thread through"
 
-    # 3) Fallback path: force antigravity to raise -> direct gemini fallback.
-    def _boom(prompt, env_id, existing_skills):  # type: ignore
-        raise RuntimeError("interactions endpoint unreachable")
-
-    globals()["_run_antigravity"] = _boom
-    result3 = diagnose_and_author(failure, tf, env_id="prev-env")
-    assert result3["used_fallback"] is True, "should report fallback"
-    assert result3["fixed_files"], "fallback still returns fixed_files"
-    assert result3["new_skill"]["markdown"].strip(), "fallback markdown required"
-    assert result3["env_id"] == "prev-env", "fallback keeps prior env_id"
+    # 3) Unparseable model output still yields a synthesized skill, not a crash.
+    globals()["_run_llm"] = lambda prompt: "I could not produce JSON, sorry."
+    result3 = diagnose_and_author(failure, tf)
+    assert result3["new_skill"]["markdown"].strip(), "markdown synthesized on bad JSON"
+    assert result3["new_skill"]["error_signature"], "signature derived from context"
 
     # 4) Markdown synthesis when the model omits it.
     synth = _build_new_skill(

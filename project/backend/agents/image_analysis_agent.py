@@ -1,22 +1,20 @@
 """
-Image Analysis Agent for Sky Launchpad — Google Gemini (multimodal)
+Image Analysis Agent for Sky Launchpad — Gemma 3 (multimodal)
 
-A single Gemini call (default gemini-3.1-pro-preview) looks at the uploaded
-cloud-architecture diagram and returns the full structured analysis as JSON:
-detected components, categories, cost estimates, connections, and
-recommendations.
+A single Gemma 3 call looks at the uploaded cloud-architecture diagram and
+returns the full structured analysis as JSON: detected components, categories,
+cost estimates, connections, and recommendations.
 
-This replaces the previous hybrid Anthropic Claude Vision + GitLab Duo flow —
-Gemini is natively multimodal, so vision extraction and architectural analysis
-happen in one step.
+Gemma 3 is natively multimodal, so vision extraction and architectural analysis
+happen in one step — the same open model that generates architectures also
+reads them.
 """
 
-import os
 import json
 from typing import Dict, Optional
 import logging
 
-from backend.gemini_client import vision
+from backend import llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -55,13 +53,11 @@ IMPORTANT:
 
 
 class ImageAnalysisAgent:
-    """Multimodal agent: Gemini analyzes a diagram image and returns structured JSON."""
+    """Multimodal agent: Gemma 3 analyzes a diagram image and returns structured JSON."""
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
-        self.model = model or os.getenv("GEMINI_VISION_MODEL", "gemini-3.1-pro-preview")
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
-            raise ValueError("GEMINI_API_KEY is required for image analysis")
+        self.model = model or llm_client._resolve("LLM_VISION_MODEL")
+        self.api_key = api_key or ""
 
     def analyze_architecture_diagram(
         self,
@@ -69,14 +65,14 @@ class ImageAnalysisAgent:
         image_format: str = 'png'
     ) -> Dict:
         try:
-            logger.info("🖼️  Analyzing diagram via Gemini (image → structured JSON)...")
-            response_text = vision(
+            logger.info(f"🖼️  Analyzing diagram via {self.model} (image → structured JSON)...")
+            response_text = llm_client.vision_chat(
                 image_base64=image_base64,
                 image_format=image_format,
                 prompt=_IMAGE_ANALYSIS_PROMPT,
                 model=self.model,
             )
-            logger.info(f"✅ Gemini analysis complete: {len(response_text)} chars")
+            logger.info(f"✅ Diagram analysis complete: {len(response_text)} chars")
             return self._parse_analysis_response(response_text)
 
         except Exception as e:
@@ -84,7 +80,7 @@ class ImageAnalysisAgent:
             raise
 
     def _parse_analysis_response(self, response_text: str) -> Dict:
-        """Parse the Gemini analysis JSON response."""
+        """Parse the VLM analysis JSON response."""
         try:
             if "```json" in response_text:
                 start = response_text.find("```json") + 7

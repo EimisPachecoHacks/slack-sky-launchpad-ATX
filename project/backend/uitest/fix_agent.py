@@ -1,10 +1,10 @@
 """Autonomous UI fix agent for "Sky Launchpad" (Phase 2 of the self-healing loop).
 
-Given a bug captured by the Computer-Use self-test agent, this module:
+Given a bug captured by the Playwright UI test runner, this module:
 
 1. Investigates: heuristically picks a handful of likely-relevant frontend
    source files (keyword overlap with the error/workflow), reads them.
-2. Asks gemini-2.5-pro to produce a structured fix as STRICT JSON
+2. Asks Gemma 3 to produce a structured fix as STRICT JSON
    (root_cause, solution, files, mr_title, mr_body).
 3. Optionally writes the proposed files to disk (guarded against path escapes).
 4. Optionally opens a GitLab merge request with the changed files.
@@ -12,9 +12,8 @@ Given a bug captured by the Computer-Use self-test agent, this module:
 Design notes:
 - ``diagnose_and_fix`` never raises. On any failure it returns a dict with an
   ``error`` field plus whatever was gathered so far.
-- The Gemini call prefers the Google ADK path when ``google.adk`` is importable;
-  otherwise it falls back to a direct ``google.genai`` call (the reliable
-  default). The fallback is what we depend on; ADK is a bonus.
+- The model call goes through ``backend.llm_client``, so it runs on whichever
+  backend LLM_PROVIDER selects (AMD vLLM or Fireworks).
 """
 
 from __future__ import annotations
@@ -32,20 +31,15 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "gemini-2.5-pro"
 MAX_FILES_TO_READ = 4
 MAX_FILE_BYTES = 6 * 1024  # ~6KB per file injected into the prompt
 SOURCE_EXTENSIONS = (".tsx", ".ts", ".jsx", ".js")
 # Directories we never want to walk into.
 SKIP_DIRS = {"node_modules", "dist", "build", ".git", "__pycache__", "coverage"}
 
-# Record whether the ADK path or the direct-gemini fallback produced the answer.
+# Records which inference backend produced the answer ("amd" / "fireworks").
 # Exposed so callers/tests can introspect which path ran.
 LAST_BACKEND_USED: str = "none"
-
-
-def _model_name() -> str:
-    return os.getenv("FIX_AGENT_MODEL", DEFAULT_MODEL) or DEFAULT_MODEL
 
 
 # ---------------------------------------------------------------------------
@@ -283,111 +277,30 @@ def _extract_json(text: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Model calls: ADK preferred, direct genai fallback (the reliable default)
+# Model call: Gemma 3 via the unified OpenAI-compatible client
 # ---------------------------------------------------------------------------
-
-
-def _call_gemini_direct(system_instruction: str, user_prompt: str) -> str:
-    """Direct google.genai call. Returns raw text. Raises on failure."""
-    from google import genai  # lazy import
-    from google.genai import types
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set")
-
-    client = genai.Client(api_key=api_key)
-    resp = client.models.generate_content(
-        model=_model_name(),
-        contents=user_prompt,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=0.2,
-            response_mime_type="application/json",
-        ),
-    )
-    text = getattr(resp, "text", None)
-    if not text:
-        # Fall back to digging through candidate parts.
-        parts_text: List[str] = []
-        for cand in getattr(resp, "candidates", None) or []:
-            content = getattr(cand, "content", None)
-            for part in getattr(content, "parts", None) or []:
-                t = getattr(part, "text", None)
-                if t:
-                    parts_text.append(t)
-        text = "\n".join(parts_text)
-    if not text:
-        raise RuntimeError("empty response from gemini")
-    return text
-
-
-async def _call_gemini_adk(system_instruction: str, user_prompt: str) -> str:
-    """Google ADK path. Returns raw text. Raises if ADK is unavailable/fails."""
-    from google.adk.agents.llm_agent import LlmAgent
-    from google.adk.runners import Runner
-    from google.adk.sessions import InMemorySessionService
-    from google.genai import types
-
-    app_name = "sky_launchpad_fix_agent"
-    agent = LlmAgent(
-        model=_model_name(),
-        name="ui_fix_agent",
-        instruction=system_instruction,
-    )
-    session_service = InMemorySessionService()
-    runner = Runner(
-        app_name=app_name,
-        agent=agent,
-        session_service=session_service,
-    )
-    session = await session_service.create_session(
-        state={}, app_name=app_name, user_id=f"fix-{uuid.uuid4()}"
-    )
-    content = types.Content(role="user", parts=[types.Part(text=user_prompt)])
-    events = runner.run_async(
-        session_id=session.id, user_id=session.user_id, new_message=content
-    )
-    chunks: List[str] = []
-    async for event in events:
-        content_obj = getattr(event, "content", None)
-        for part in getattr(content_obj, "parts", None) or []:
-            t = getattr(part, "text", None)
-            if t:
-                chunks.append(t)
-    text = "\n".join(chunks).strip()
-    if not text:
-        raise RuntimeError("empty response from ADK runner")
-    return text
 
 
 async def _reason_about_fix(
     system_instruction: str, user_prompt: str
 ) -> Tuple[str, str]:
-    """Run the model. Returns (raw_text, backend_used).
-
-    Prefers ADK when importable; on any ADK failure falls back to direct genai.
-    """
+    """Run the model. Returns (raw_text, backend_used)."""
     global LAST_BACKEND_USED
 
-    adk_available = False
-    try:
-        import google.adk  # noqa: F401
-        adk_available = True
-    except Exception:
-        adk_available = False
+    from backend.llm_client import chat, _provider
 
-    if adk_available:
-        try:
-            text = await _call_gemini_adk(system_instruction, user_prompt)
-            LAST_BACKEND_USED = "adk"
-            return text, "adk"
-        except Exception as e:  # noqa: BLE001
-            logger.warning("fix_agent: ADK path failed, falling back to direct genai: %s", e)
+    text = chat(
+        user_prompt,
+        system=system_instruction,
+        temperature=0.2,
+        max_tokens=4096,
+        kind="ui-fix",
+    )
+    if not text.strip():
+        raise RuntimeError("empty response from the fix model")
 
-    text = _call_gemini_direct(system_instruction, user_prompt)
-    LAST_BACKEND_USED = "direct"
-    return text, "direct"
+    LAST_BACKEND_USED = _provider()
+    return text, LAST_BACKEND_USED
 
 
 # ---------------------------------------------------------------------------

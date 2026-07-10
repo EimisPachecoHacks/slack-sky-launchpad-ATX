@@ -179,25 +179,56 @@ def backend_info() -> dict:
 # ---------------------------------------------------------------------------
 # Skills
 # ---------------------------------------------------------------------------
-_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+_EMBED_MODEL = os.getenv("EMBED_MODEL", "mxbai-embed-large")
+_EMBED_BASE_URL = os.getenv("EMBED_BASE_URL", "http://localhost:11434/v1")
+# Expected output width. Must match the Atlas index's numDimensions. This is an
+# assertion about the model, NOT a request parameter — see _SEND_DIMENSIONS.
+_EMBED_DIMENSIONS = int(os.getenv("EMBED_DIMENSIONS", "1024"))
+# A `dimensions` request field is only meaningful for Matryoshka models, and only
+# when the serving layer forwards it. Non-Matryoshka models (bge-large) reject it
+# outright, and Ollama's OpenAI shim does not honour it. Leave off: every model we
+# ship emits its native width, which is the 1024 the Atlas index expects.
+_SEND_DIMENSIONS = os.getenv("EMBED_SEND_DIMENSIONS", "").lower() in ("1", "true", "yes")
 
 
 def _embed_text(text: str):
-    """Gemini embedding for a string (for Atlas Vector Search). None on any failure."""
-    key = os.getenv("GEMINI_API_KEY", "")
-    if not key or not text:
+    """Canonical skill embedding, served on the AMD GPU. None on any failure.
+
+    This is the ONLY embedder in the system. Vectors from different models are
+    not comparable, so there is deliberately no cross-provider fallback: when
+    the endpoint is unreachable we return None and `find_similar_skills` drops
+    to lexical cosine rather than poisoning the index with a foreign vector
+    space.
+    """
+    if not text:
         return None
+    key = os.getenv("EMBED_API_KEY") or os.getenv("LLM_API_KEY") or "EMPTY"
+    payload = {"model": _EMBED_MODEL, "input": text[:8000]}
+    if _SEND_DIMENSIONS:
+        payload["dimensions"] = _EMBED_DIMENSIONS
     try:
         import httpx
         r = httpx.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{_EMBED_MODEL}:embedContent?key={key}",
-            json={"model": f"models/{_EMBED_MODEL}", "content": {"parts": [{"text": text[:8000]}]}},
+            f"{_EMBED_BASE_URL.rstrip('/')}/embeddings",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json=payload,
             timeout=30.0,
         )
         r.raise_for_status()
-        return r.json()["embedding"]["values"]
-    except Exception:
+        vec = r.json()["data"][0]["embedding"]
+    except Exception as exc:
+        logger.warning("embedding unavailable (%s); retrieval falls back to lexical", exc)
         return None
+
+    # A width change means the Atlas index no longer matches: refuse the vector
+    # rather than write a doc $vectorSearch will silently never return.
+    if len(vec) != _EMBED_DIMENSIONS:
+        logger.error(
+            "embedder returned %d dims but EMBED_DIMENSIONS=%d — refusing to store. "
+            "Fix EMBED_DIMENSIONS and recreate the Atlas index.", len(vec), _EMBED_DIMENSIONS
+        )
+        return None
+    return vec
 
 
 def _skill_blob(doc: dict) -> str:
@@ -219,11 +250,16 @@ def upsert_skill(doc: dict) -> dict:
     return _get_store().upsert("skills", "slug", doc)
 
 
-def backfill_skill_embeddings() -> int:
-    """Compute + store embeddings for any skills missing one. Returns count updated."""
+def backfill_skill_embeddings(force: bool = False) -> int:
+    """Compute + store embeddings for skills missing one. Returns count updated.
+
+    Pass force=True after changing EMBED_MODEL/EMBED_DIMENSIONS: existing vectors
+    belong to the old model's space and must all be recomputed, not just the
+    missing ones.
+    """
     n = 0
     for s in list_skills():
-        if not s.get("embedding"):
+        if force or not s.get("embedding"):
             emb = _embed_text(_skill_blob(s))
             if emb:
                 _get_store().update("skills", {"slug": s["slug"]}, {"embedding": emb})
