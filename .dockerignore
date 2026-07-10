@@ -17,3 +17,7 @@ terminals
 erica-bot-service-account.json
 hackathon-user_accessKeys.csv
 hackathon-user_credentials.csv
+*-bot.json
+*service-account*.json
+*-key.json
+gcp-credentials*.json
