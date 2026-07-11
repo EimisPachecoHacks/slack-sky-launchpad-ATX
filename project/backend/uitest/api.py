@@ -374,7 +374,7 @@ async def fix(payload: dict) -> dict:
 
     Body: {"bug": {"workflow","error"|"signal","console_errors","target_url","summary"},
            "apply": bool (optional; default env APPLY_FIX)}.
-    Runs the gemini-2.5-pro fix agent → opens a GitLab MR (or dry-run) → records the
+    Runs the Gemma 3 fix agent → opens a GitLab MR (or dry-run) → records the
     solution on the app's latest failed run and saves a learned skill. If apply is set,
     also writes the patch + redeploys locally (re-verify by re-running the self-test).
     """

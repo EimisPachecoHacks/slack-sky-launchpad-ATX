@@ -19,7 +19,7 @@ Design constraints:
   - Works FULLY OFFLINE with NO external libraries (pure-python token-overlap
     cosine fallback).
   - Optional embedding path is imported LAZILY in try/except: only used when
-    GEMINI_API_KEY is set and an embedding SDK is importable. Any failure
+    the embedding endpoint (skydb._embed_text) is reachable. Any failure
     silently falls back to the offline path.
   - stdlib only on the import path; Python 3.11; modern type hints.
 """

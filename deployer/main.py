@@ -41,9 +41,9 @@ from .deploy_events import record_event
 
 
 def _narrate(phase: str, text: str) -> None:
-    """Print a loop event and, if the Gemini Live narration bus is reachable, stream it."""
+    """Print a loop event and, if the narration bus is reachable, stream it."""
     print(f"  [{phase}] {text}")
-    try:  # the web backend ships the Gemini Live bus; degrade silently from the CLI
+    try:  # the web backend ships the narration bus; degrade silently from the CLI
         from backend.narration import narrate as _live_narrate
 
         _live_narrate(phase, text)
@@ -62,12 +62,12 @@ def _repair_failure(
     """Self-improving repair step.
 
     On a failed terraform run: collect rich failure context (incl. cloud logs),
-    ask the Antigravity managed agent to diagnose + fix the HCL AND author a new
+    ask the Gemma 3 repair agent to diagnose + fix the HCL AND author a new
     reusable SKILL.md, persist that skill, and return the corrected files. Falls
     back to the legacy regex auto-fixer if the agent is unavailable.
 
-    Returns (files, changes, agent_env_id) — `agent_env_id` carries the hosted
-    agent's stateful-memory environment id across retries.
+    Returns (files, changes, agent_env_id) — `agent_env_id` is threaded across
+    retries so callers can correlate attempts on the same deployment.
     """
     result = DeploymentResult(False, output)
     first_msg = result.errors[0].get("message", "deployment error") if result.errors else "deployment error"
@@ -255,7 +255,7 @@ def deploy_with_retry(
     """Deploy infrastructure with automatic error analysis and retry."""
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     workspace = prepare_workspace(provider, run_id)
-    agent_env_id = None  # carries the Antigravity agent's stateful memory across retries
+    agent_env_id = None  # threaded across retries to correlate repair attempts
 
     for attempt in range(1, max_retries + 1):
         print(f"\n  Attempt {attempt}/{max_retries}")

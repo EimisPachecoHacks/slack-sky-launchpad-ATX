@@ -1,5 +1,5 @@
 """
-Response Parser for Claude / Duo architecture JSON responses
+Response Parser for Gemma 3 architecture JSON responses
 Extracts JSON structure and markdown reasoning from hybrid responses
 """
 
@@ -10,10 +10,10 @@ from typing import Dict, Any, Optional, Tuple
 
 def extract_json_from_response(response: str) -> Optional[Dict[str, Any]]:
     """
-    Extract JSON block from Claude's response
+    Extract JSON block from the model's response
 
     Args:
-        response: Raw response from Claude containing JSON and markdown
+        response: Raw model response containing JSON and markdown
 
     Returns:
         Parsed JSON dict or None if not found
@@ -48,7 +48,7 @@ def extract_markdown_reasoning(response: str) -> str:
     Extract markdown reasoning from response (everything after JSON block)
 
     Args:
-        response: Raw response from Claude
+        response: Raw model response
 
     Returns:
         Markdown reasoning text
@@ -60,12 +60,12 @@ def extract_markdown_reasoning(response: str) -> str:
     return reasoning.strip()
 
 
-def parse_claude_architecture_response(response: str) -> Tuple[Optional[Dict], str]:
+def parse_architecture_response(response: str) -> Tuple[Optional[Dict], str]:
     """
-    Parse Claude's hybrid response into JSON structure and markdown reasoning
+    Parse the model's hybrid response into JSON structure and markdown reasoning
 
     Args:
-        response: Raw response from the model (e.g. Duo / Claude)
+        response: Raw model response
 
     Returns:
         Tuple of (architecture_json, markdown_reasoning)
@@ -78,10 +78,10 @@ def parse_claude_architecture_response(response: str) -> Tuple[Optional[Dict], s
 
 def transform_to_ui_format(architecture_json: Dict[str, Any], provider: str) -> Dict[str, Any]:
     """
-    Transform Claude's JSON to Skyrchitect UI format
+    Transform the architecture JSON to Sky Launchpad UI format
 
     Args:
-        architecture_json: Parsed architecture JSON from Claude
+        architecture_json: Parsed architecture JSON
         provider: Cloud provider (aws, azure, gcp)
 
     Returns:

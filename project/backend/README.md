@@ -122,8 +122,6 @@ backend/
 │   └── architecture_agent.py # Strands Agent wrapper
 ├── models/
 │   └── schemas.py           # Pydantic models
-├── tools/
-│   └── cloud_tools.py       # Custom AI tools
 ├── requirements.txt
 └── README.md
 ```

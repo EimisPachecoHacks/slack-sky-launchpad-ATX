@@ -1,0 +1,24 @@
+Sky Launchpad — live proof on AMD Instinct MI300X
+Captured: Sat Jul 11 09:45:12 UTC 2026 UTC   host: rocm-7-2-4-gpu-mi300x1-192gb-devcloud-atl1
+========================================================
+
+### GPU (rocm-smi) ###
+GPU[0]		: Card Series: 		AMD Instinct MI300X VF
+GPU[0]		: Card Model: 		0x74b5
+GPU[0]		: Card Vendor: 		Advanced Micro Devices, Inc. [AMD/ATI]
+GPU[0]		: Card SKU: 		M3000100
+
+### Both models resident on ONE GPU (ollama ps) ###
+NAME          ID              SIZE      PROCESSOR    CONTEXT    UNTIL              
+gemma3:12b    f4031aab637d    9.4 GB    100% GPU     131072     4 minutes from now    
+
+### Ollama sees the GPU via ROCm ###
+time=2026-07-11T09:33:18.244Z level=INFO source=types.go:32 msg="inference compute" id=0 filter_id=0 library=ROCm compute=gfx942 name=ROCm0 description="AMD Instinct MI300X VF" libdirs=ollama,rocm_v7_2 driver=0.0 pci_id=0000:83:00.0 type=discrete total="191.7 GiB" available="191.4 GiB"
+
+### Backend health — provider is AMD, model is Gemma 3 ###
+{"status":"healthy","version":"1.0.0","agent_ready":true,"llm_connected":true,"llm_provider":"amd","model_id":"gemma3:12b"}
+
+### Self-improving loop: skills learned from failures (served by the live API) ###
+count: 2
+ - ui-clicking-generate-architecture-gives-no | Clicking Generate Architecture gives no visible loading feedback, so t
+ - gcp-deployment-fix | Cloud Run Admin API has not been enabled on project demo-1

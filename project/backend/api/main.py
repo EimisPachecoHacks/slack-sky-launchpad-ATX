@@ -40,7 +40,7 @@ from backend.agents.image_analysis_agent import get_image_analysis_agent
 
 # Import utilities
 from backend.utils.response_parser import (
-    parse_claude_architecture_response,
+    parse_architecture_response,
     transform_to_ui_format
 )
 from backend.utils.image_processor import ImageProcessor
@@ -103,8 +103,7 @@ except Exception as e:
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
-    logger.info("🚀 Starting Skyrchitect AI Backend...")
-    logger.info(f"   Anthropic Model: {os.getenv('ANTHROPIC_MODEL', 'claude-opus-4-6')}")
+    logger.info("🚀 Starting Sky Launchpad AI Backend...")
 
     try:
         # Initialize agent
@@ -134,7 +133,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Sky Launchpad AI Backend - Secured",
-    description="AI-powered cloud architecture design and optimization API using Anthropic Claude",
+    description="AI-powered cloud architecture design and optimization API using Gemma 3 on AMD ROCm",
     version="1.0.0",
     lifespan=lifespan,
     # Disable docs in production
@@ -209,7 +208,7 @@ async def file_validation_error_handler(request: Request, exc: FileValidationErr
 
 
 # ── Sky Launchpad: observability (Pydantic Logfire) ───────────────────────────
-# Auto-instruments FastAPI + httpx so every request and every Gemini/MiniMax
+# Auto-instruments FastAPI + httpx so every request and every Gemma 3 / embedding
 # call is traced. Ships to the Logfire UI when LOGFIRE_TOKEN is set; otherwise
 # instruments locally without erroring.
 try:
@@ -220,15 +219,15 @@ except Exception as _obs_exc:  # never block startup on observability
 
 
 # ── Sky Launchpad: self-improvement loop surface ──────────────────────────────
-# Real-time Gemini Live narration of the deploy / learn-on-failure loop.
+# Real-time text narration of the deploy / learn-on-failure loop over a WebSocket.
 try:
     from backend.narration import router as live_router
     app.include_router(live_router)
-    logger.info("🎙️  Gemini Live narration router mounted at /api/live/*")
-except Exception as _live_exc:  # never block startup on the optional voice layer
-    logger.warning(f"Gemini Live router not mounted: {_live_exc}")
+    logger.info("📡 Narration router mounted at /api/live/*")
+except Exception as _live_exc:  # never block startup on the optional narration layer
+    logger.warning(f"Narration router not mounted: {_live_exc}")
 
-# Autonomous UI self-test (Gemini Computer Use + Playwright).
+# Autonomous UI self-test (Playwright-driven).
 try:
     from backend.uitest.api import router as uitest_router
     app.include_router(uitest_router)
@@ -385,7 +384,7 @@ Requirements:
         logger.info(f"{'='*80}\n")
 
         # Parse hybrid response (JSON + markdown)
-        architecture_json, markdown_reasoning = parse_claude_architecture_response(str(response))
+        architecture_json, markdown_reasoning = parse_architecture_response(str(response))
 
         if not architecture_json:
             resp_str = str(response)

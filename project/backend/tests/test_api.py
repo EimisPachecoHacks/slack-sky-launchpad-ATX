@@ -34,7 +34,7 @@ class TestArchitectureGeneration:
         self, client, sample_architecture_request, mock_architecture_response
     ):
         """Test successful architecture generation"""
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = mock_architecture_response
 
             response = client.post("/api/architecture/generate", json=sample_architecture_request)
@@ -67,7 +67,7 @@ class TestArchitectureGeneration:
 
     def test_generate_architecture_agent_error(self, client, sample_architecture_request):
         """Test architecture generation when agent fails"""
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.side_effect = Exception("API Error")
 
             response = client.post("/api/architecture/generate", json=sample_architecture_request)
@@ -141,7 +141,7 @@ class TestArchitectureOperations:
             ]
         }
 
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = "Optimization recommendations"
 
             response = client.post("/api/architecture/optimize", json=request_data)
@@ -163,7 +163,7 @@ class TestArchitectureOperations:
             "requirements": "High availability"
         }
 
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = "Validation results"
 
             response = client.post("/api/architecture/validate", json=request_data)
@@ -171,7 +171,7 @@ class TestArchitectureOperations:
 
     def test_compare_cloud_services(self, client):
         """Test cloud service comparison"""
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = "Service comparison"
 
             response = client.get("/api/cloud/compare/ec2")
@@ -191,7 +191,7 @@ class TestChatEndpoint:
             "context": None
         }
 
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = "A VPC is a Virtual Private Cloud..."
 
             response = client.post("/api/chat", json=request_data)
@@ -207,7 +207,7 @@ class TestChatEndpoint:
             "context": "I have an EC2 instance and RDS database"
         }
 
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = "You can optimize by..."
 
             response = client.post("/api/chat", json=request_data)
@@ -274,7 +274,7 @@ class TestDeployment:
             }
         }
 
-        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_claude") as mock_call:
+        with patch("backend.agents.architecture_agent.ArchitectureAgent._call_duo") as mock_call:
             mock_call.return_value = "Deployment plan"
 
             response = client.post("/api/deploy", json=request_data)
