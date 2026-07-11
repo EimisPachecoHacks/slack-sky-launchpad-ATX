@@ -20,7 +20,7 @@ const UseCaseForm: React.FC<UseCaseFormProps> = ({ provider, onSubmit, isGenerat
 
   const loadingSteps = [
     { icon: Brain, message: 'Analyzing your requirements...', color: 'text-blue-400' },
-    { icon: Sparkles, message: 'Consulting with GitLab Duo AI...', color: 'text-purple-400' },
+    { icon: Sparkles, message: 'Reasoning with Gemma 4 on the AMD MI300X...', color: 'text-purple-400' },
     { icon: Cpu, message: 'Designing optimal architecture...', color: 'text-green-400' },
     { icon: DollarSign, message: 'Calculating costs and alternatives...', color: 'text-yellow-400' },
     { icon: CheckCircle2, message: 'Finalizing recommendations...', color: 'text-emerald-400' }
