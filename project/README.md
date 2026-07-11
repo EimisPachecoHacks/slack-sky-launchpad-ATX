@@ -1,8 +1,8 @@
 # Skyrchitect — companion application (`project/`)
 
-**React + FastAPI** UI for **architecture design**, **Terraform code generation**, and **real cloud deployment** — powered by **Qwen on Qwen Cloud** (text + diagram vision), with an optional GitLab Duo surface.
+**React + FastAPI** UI for **architecture design**, **Terraform code generation**, and **real cloud deployment** — powered by **Qwen on Qwen Cloud** (text + diagram vision).
 
-See the **[repository root README](../README.md)** for the full story (GitLab Duo flow, skills, Cloud Run deployment, and repo layout).
+See the **[repository root README](../README.md)** for the full story (Qwen models, Alibaba Cloud deploys, the self-improving loop, and repo layout).
 
 ## What this folder contains
 

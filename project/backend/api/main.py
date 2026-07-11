@@ -68,7 +68,7 @@ from backend.middleware.file_validation import (
 # Import FastAPI dependencies
 from fastapi import UploadFile, File
 
-# GitLab Duo Agent Platform integration
+# GitLab integration (optional git host for MRs)
 import re
 from backend.gitlab_client import GitLabClient
 from backend.skills_loader import get_skills_context, get_skills_summary
@@ -113,11 +113,11 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Failed to initialize agent: {e}")
         logger.warning("   Agent will be initialized on first request")
 
-    # Initialize GitLab Duo Agent Platform integration
+    # GitLab integration (optional git host for MRs)
     gitlab_token = os.getenv("GITLAB_TOKEN", "")
     gitlab_project = os.getenv("GITLAB_PROJECT_PATH", "")
     if gitlab_token and gitlab_project:
-        logger.info(f"🔗 GitLab Duo Agent Platform: {gitlab_project}")
+        logger.info(f"🔗 GitLab: {gitlab_project}")
         skills = get_skills_summary()
         loaded = [s["name"] for s in skills if s["loaded"]]
         logger.info(f"📚 Skills loaded: {', '.join(loaded)}")
@@ -409,7 +409,6 @@ Requirements:
             # =============================================================
             # DUO AGENT 1: Requirements Analyzer
             # Creates a GitLab issue to track this architecture request
-            # (mirrors: flows/skyrchitect-iac-generator.yaml → requirements_analyzer)
             # =============================================================
             logger.info(f"\n{'─'*60}")
             logger.info(f"🤖 DUO AGENT 1: Requirements Analyzer")
@@ -1308,7 +1307,6 @@ async def deploy_architecture(
             # =============================================================
             # DUO AGENT 3: Code Committer
             # Saves deployment-validated IaC to GitLab via branch + commit + MR
-            # (mirrors: flows/skyrchitect-iac-generator.yaml → code_committer)
             # =============================================================
             gitlab_token = os.getenv("GITLAB_TOKEN", "")
             gitlab_project = os.getenv("GITLAB_PROJECT_PATH", "")
@@ -1462,7 +1460,7 @@ async def create_gitlab_issue(request: dict):
 
 ---
 _Created by Skyrchitect — GitLab Duo Agent Platform._
-_This issue triggers the `skyrchitect-iac-generator` Duo Flow._
+_Created by Sky Launchpad._
 
 /label ~infrastructure ~skyrchitect
 """
@@ -1490,24 +1488,15 @@ _This issue triggers the `skyrchitect-iac-generator` Duo Flow._
 
 
 @app.get("/api/gitlab/status")
-async def gitlab_duo_status():
+async def gitlab_status():
     """
-    Check GitLab Duo Agent Platform integration status.
-    Returns info about connected project, loaded skills, and flow definition.
+    Check GitLab integration status (the optional git host for MRs).
+    Returns connection info and the loaded skills used by generation.
     """
     gitlab_token = os.getenv("GITLAB_TOKEN", "")
     gitlab_project = os.getenv("GITLAB_PROJECT_PATH", "")
 
     skills = get_skills_summary()
-    flow_path = os.path.join(
-        os.path.dirname(__file__), '..', '..', '..', 'flows', 'skyrchitect-iac-generator.yaml'
-    )
-    flow_exists = os.path.exists(flow_path)
-
-    agent_path = os.path.join(
-        os.path.dirname(__file__), '..', '..', '..', 'agents', 'skyrchitect-chat-agent.md'
-    )
-    agent_exists = os.path.exists(agent_path)
 
     connected = False
     project_info = {}
@@ -1529,15 +1518,6 @@ async def gitlab_duo_status():
         "gitlab_configured": bool(gitlab_token and gitlab_project),
         "gitlab_connected": connected,
         "project": project_info,
-        "duo_flow": {
-            "name": "skyrchitect-iac-generator",
-            "exists": flow_exists,
-            "agents": ["requirements_analyzer", "iac_generator", "code_committer"],
-        },
-        "chat_agent": {
-            "name": "Skyrchitect",
-            "exists": agent_exists,
-        },
         "skills": skills,
     }
 

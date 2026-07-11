@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     STORAGE_BACKEND: str = Field(default="local", description="Storage backend (local/s3)")
     STORAGE_PATH: str = Field(default="./uploads", description="Local storage path")
 
-    # GitLab Duo Agent Platform
+    # GitLab (optional git host for MRs)
     GITLAB_TOKEN: str = Field(default="", description="GitLab PAT with api scope")
     GITLAB_PROJECT_PATH: str = Field(default="", description="GitLab project path (namespace/project)")
     GITLAB_URL: str = Field(default="https://gitlab.com", description="GitLab instance URL")

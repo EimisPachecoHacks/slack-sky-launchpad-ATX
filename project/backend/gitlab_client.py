@@ -1,12 +1,12 @@
 """
-GitLab Duo Agent Platform — API Client
+GitLab — API Client (git host for MRs)
 
-Mirrors the three-agent pipeline defined in flows/skyrchitect-iac-generator.yaml:
+Commits validated Terraform and opens a merge request via the GitLab REST API:
   1. Requirements Analyzer  → create_issue (captures structured requirements)
   2. IaC Generator          → (handled by Qwen + Skills context)
   3. Code Committer         → create_commit + create_merge_request + add_issue_note
 
-Uses the same GitLab REST API endpoints that the Duo Flow agents use internally
+Uses the GitLab REST API to commit validated Terraform and open merge requests
 (create_commit, create_merge_request, create_issue_note, get_issue, etc.).
 """
 
@@ -53,7 +53,7 @@ class GitLabClient:
         description: str,
         labels: str = "infrastructure,skyrchitect",
     ) -> dict:
-        """Create a GitLab issue (triggers Duo Flow via issue event)."""
+        """Create a GitLab issue for the infrastructure request."""
         data = {
             "title": title,
             "description": description,
@@ -85,7 +85,7 @@ class GitLabClient:
         actions: list[dict],
         start_branch: str = "main",
     ) -> dict:
-        """Create a commit with file actions (same API the Duo agent uses)."""
+        """Create a commit with file actions via the GitLab REST API."""
         data = {
             "branch": branch,
             "start_branch": start_branch,
@@ -156,7 +156,7 @@ class GitLabClient:
             f"Infrastructure deployed and verified on {provider.upper()}.\n\n"
             f"Validated outputs:\n{json.dumps(deployment_outputs, indent=2)}\n\n"
             "Generated and validated by Skyrchitect deploy-first pipeline.\n"
-            "Built on the GitLab Duo Agent Platform."
+            "Built with Sky Launchpad."
         )
         if issue_iid:
             commit_msg += f"\n\nCloses #{issue_iid}"
@@ -191,7 +191,7 @@ class GitLabClient:
                 f"- **Merge Request:** {mr_url}\n"
                 f"- **Status:** Deployment VERIFIED\n\n"
                 f"_Automated by Skyrchitect deploy-first pipeline — "
-                f"GitLab Duo Agent Platform._"
+                f"Sky Launchpad._"
             )
             self.add_issue_note(issue_iid, note)
 
@@ -253,7 +253,7 @@ class GitLabClient:
 
 ---
 *Generated and validated by Skyrchitect deploy-first pipeline.*
-*Built on the [GitLab Duo Agent Platform](https://docs.gitlab.com/ee/user/duo_workflow/).*{issue_ref}
+*Built with Sky Launchpad.*{issue_ref}
 """
 
     def _post(self, endpoint: str, data: dict) -> dict:

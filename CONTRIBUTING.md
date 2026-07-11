@@ -29,7 +29,7 @@ Agent Skills are the primary extension point. Each skill teaches the agent speci
 
 3. Include practical examples with code blocks that the agent can use directly.
 
-4. Test the skill by starting a new GitLab Duo Chat session and using `/my-new-skill` or asking a question that matches the skill description.
+4. Test the skill by running a deploy whose failure matches the skill description, and confirm it is retrieved on the next run.
 
 ### Skill Writing Guidelines
 
