@@ -830,7 +830,23 @@ Every block must be syntactically complete with all braces closed."""
 
     except Exception as e:
         logger.error(f"❌ Error generating code via Duo: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Code generation runs through GitLab Duo (GraphQL Chat API, with a
+        # glab-CLI fallback). When neither is reachable — no GITLAB_TOKEN, or the
+        # glab binary isn't installed — the raw subprocess/stderr text is
+        # meaningless to the user. Translate it into a clear message; the full
+        # error stays in the logs above.
+        raw = str(e)
+        low = raw.lower()
+        if any(k in low for k in ("glab", "duo", "gitlab", "no such file")):
+            detail = (
+                "Code generation is unavailable: GitLab Duo could not be reached "
+                "(the Duo Chat API and the glab CLI fallback both failed). Check "
+                "GITLAB_TOKEN / Duo access, or install the glab CLI. Architecture "
+                "design is unaffected — it runs on Gemma 4."
+            )
+        else:
+            detail = f"Code generation failed: {raw}"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @app.post(

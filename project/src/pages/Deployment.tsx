@@ -6,7 +6,7 @@ import DeploymentForm from '../components/deployment/DeploymentForm';
 import Particles from '../components/ui/Particles';
 import Card from '../components/ui/Card';
 import { Architecture, DeploymentConfig } from '../types';
-import { Loader, CheckCircle, GitBranch } from 'lucide-react';
+import { Loader, CheckCircle, GitBranch, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
 import { env } from '../config/env';
 import LiveNarrationToggle from '../components/LiveNarrationToggle';
@@ -106,7 +106,7 @@ const Deployment: React.FC = () => {
             <LiveNarrationToggle />
           </div>
 
-          {!isDeploying && !deploymentComplete ? (
+          {!isDeploying && !deploymentComplete && !error ? (
             <DeploymentForm architecture={architecture} onDeploy={handleDeploy} />
           ) : (
             <Card className="p-8 max-w-3xl mx-auto">
@@ -119,6 +119,14 @@ const Deployment: React.FC = () => {
                       {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
                     </div>
                     <p className="text-gray-400 mt-2">Terraform is provisioning your infrastructure...</p>
+                  </div>
+                ) : error ? (
+                  <div className="flex flex-col items-center">
+                    <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+                    <h2 className="text-2xl font-bold text-red-400">Deployment Failed</h2>
+                    <p className="text-gray-300 mt-2">
+                      The deployment did not complete. See the error and logs below.
+                    </p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center">
@@ -218,7 +226,17 @@ const Deployment: React.FC = () => {
               {error && (
                 <div className="mt-6 bg-red-900/20 border border-red-500/30 rounded-lg p-4">
                   <h3 className="font-bold text-red-400 mb-2">Deployment Failed</h3>
-                  <p className="text-sm text-gray-300">{error}</p>
+                  <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">{error}</p>
+                  <button
+                    onClick={() => {
+                      setError(null);
+                      setDeploymentLogs([]);
+                      setDeploymentComplete(false);
+                    }}
+                    className="mt-4 inline-flex items-center px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-md text-red-300 text-sm hover:bg-red-500/30 transition-colors"
+                  >
+                    Try Again
+                  </button>
                 </div>
               )}
             </Card>
