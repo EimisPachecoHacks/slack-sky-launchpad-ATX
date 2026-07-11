@@ -167,7 +167,16 @@ def vision_chat(
 
     image_base64: base64-encoded image bytes (no data: prefix).
     image_format: e.g. 'png', 'jpeg'.
+
+    Ollama's OpenAI-compatible endpoint ingests the image but returns EMPTY
+    content for multimodal requests (finish_reason=length, 0 chars) — verified on
+    gemma4:31b. Its NATIVE /api/chat with an `images:[base64]` field works. So on
+    the AMD/Ollama path we use the native API; Fireworks keeps the OpenAI shape.
     """
+    model = model or _resolve("LLM_VISION_MODEL")
+    if _provider() == "amd":
+        return _ollama_vision(model, image_base64, prompt, temperature, max_tokens, kind)
+
     fmt = "jpeg" if image_format.lower() in ("jpg", "jpeg") else image_format.lower()
     messages = [{
         "role": "user",
@@ -176,7 +185,35 @@ def vision_chat(
             {"type": "text", "text": prompt},
         ],
     }]
-    return _post_chat(model or _resolve("LLM_VISION_MODEL"), messages, temperature, max_tokens, kind)
+    return _post_chat(model, messages, temperature, max_tokens, kind)
+
+
+def _ollama_vision(model: str, image_base64: str, prompt: str,
+                   temperature: float, max_tokens: int, kind: str) -> str:
+    """Vision via Ollama's native /api/chat (images:[base64]). Returns text."""
+    import httpx
+    import time as _time
+
+    # base is the OpenAI URL (…/v1); the native API sits at the same host, no /v1.
+    base = _resolve("LLM_BASE_URL").rstrip("/")
+    native = base[:-3] if base.endswith("/v1") else base
+    payload = {
+        "model": model,
+        "stream": False,
+        "messages": [{"role": "user", "content": prompt, "images": [image_base64]}],
+        "options": {"temperature": temperature, "num_predict": max_tokens},
+    }
+    logger.info(f"[amd] {model}: {kind} (native /api/chat)")
+    _t0 = _time.monotonic()
+    try:
+        resp = httpx.post(f"{native}/api/chat", json=payload, timeout=_TIMEOUT)
+        resp.raise_for_status()
+        text = resp.json()["message"]["content"]
+    except Exception as exc:
+        _record(model, kind, (_time.monotonic() - _t0) * 1000, False, str(exc))
+        raise
+    _record(model, kind, (_time.monotonic() - _t0) * 1000, True, "")
+    return text
 
 
 def transcribe(audio_bytes: bytes, mime_type: str = "audio/webm", kind: str = "transcribe") -> str:
