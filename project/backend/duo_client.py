@@ -221,10 +221,17 @@ class DuoCliClient:
                 error_snippet = self._extract_error(raw)
                 if error_snippet:
                     logger.error(f"[DuoClient] ❌ CLI ERROR: {error_snippet}")
-                if not raw:
-                    stderr_snippet = (proc.stderr or b"").decode("utf-8", errors="replace")[:500] if isinstance(proc.stderr, bytes) else (proc.stderr or "")[:500]
-                    logger.error(f"[DuoClient] No output, stderr: {stderr_snippet}")
-                    raise RuntimeError(f"glab duo cli failed (code {proc.returncode}): {error_snippet or stderr_snippet}")
+                stderr_snippet = (proc.stderr or b"").decode("utf-8", errors="replace")[:500] if isinstance(proc.stderr, bytes) else (proc.stderr or "")[:500]
+                # Always raise on a non-zero exit. The command uses `2>&1`, so a
+                # "glab: No such file" / "command not found" message is written
+                # to the output file — previously this only raised when the file
+                # was empty, so that error text was returned AS the generated
+                # code. Raising lets the API surface a clean "Duo unavailable".
+                logger.error(f"[DuoClient] glab exited {proc.returncode}: {(raw or stderr_snippet)[:500]}")
+                raise RuntimeError(
+                    f"glab duo cli failed (code {proc.returncode}): "
+                    f"{error_snippet or (raw or '').strip()[:500] or stderr_snippet}"
+                )
 
             response_text = self._extract_cli_response(raw)
             logger.info(f"[DuoClient] Response length: {len(response_text)} chars")
