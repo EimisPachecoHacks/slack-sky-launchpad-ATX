@@ -244,45 +244,33 @@ export const useRecoveryMode = () => {
   const [showRecoveryPrompt, setShowRecoveryPrompt] = useState(false);
   const { setCurrentArchitecture } = useArchitectureStore();
 
-  // Check for recovery data on mount
+  // Offer recovery at most ONCE per browser-tab session. The old logic removed
+  // its session marker on every unmount and re-showed on every remount/reload,
+  // so the modal reappeared endlessly (and on each page the tester navigated
+  // to). A sessionStorage guard makes it fire once per tab, then stay quiet
+  // until the tab is closed — regardless of remounts, reloads, or navigation.
   useEffect(() => {
-    const checkForRecoveryData = () => {
-      try {
-        const autoSaveData = localStorage.getItem('skyrchitect-autosave');
-        const lastSession = localStorage.getItem('skyrchitect-last-session');
-        
-        if (autoSaveData) {
-          const data = JSON.parse(autoSaveData);
-          const saveTime = new Date(data.timestamp).getTime();
-          const now = Date.now();
-          const timeDiff = now - saveTime;
-          
-          // If auto-save is recent (less than 1 hour) and no clean shutdown
-          if (timeDiff < 3600000 && !lastSession) {
-            setRecoveryData(data.architecture);
-            setShowRecoveryPrompt(true);
-          }
+    const PROMPTED_KEY = 'skyrchitect-recovery-prompted';
+    if (sessionStorage.getItem(PROMPTED_KEY)) return;
+
+    try {
+      const autoSaveData = localStorage.getItem('skyrchitect-autosave');
+      if (autoSaveData) {
+        const data = JSON.parse(autoSaveData);
+        const saveTime = new Date(data.timestamp).getTime();
+        // Only offer to restore a recent (< 1 hour) auto-save.
+        if (Date.now() - saveTime < 3600000 && data.architecture) {
+          setRecoveryData(data.architecture);
+          setShowRecoveryPrompt(true);
         }
-      } catch (error) {
-        console.error('[Recovery] Failed to check for recovery data:', error);
       }
-    };
-
-    checkForRecoveryData();
-
-    // Mark clean session start
-    localStorage.setItem('skyrchitect-last-session', new Date().toISOString());
-
-    // Clean shutdown marker
-    const handleCleanShutdown = () => {
-      localStorage.setItem('skyrchitect-clean-shutdown', 'true');
-    };
-
-    window.addEventListener('beforeunload', handleCleanShutdown);
-    return () => {
-      window.removeEventListener('beforeunload', handleCleanShutdown);
-      localStorage.removeItem('skyrchitect-last-session');
-    };
+    } catch (error) {
+      console.error('[Recovery] Failed to check for recovery data:', error);
+    } finally {
+      // Mark prompted for this tab session even if nothing was shown, so a
+      // background auto-save written moments later can't trigger a late prompt.
+      sessionStorage.setItem(PROMPTED_KEY, 'true');
+    }
   }, []);
 
   const recoverArchitecture = useCallback(() => {

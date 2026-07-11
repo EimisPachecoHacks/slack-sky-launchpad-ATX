@@ -16,6 +16,9 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import Architecture from './pages/Architecture';
 import Deployment from './pages/Deployment';
+import DeployedApps from './pages/DeployedApps';
+import Learning from './pages/Learning';
+import SelfTest from './pages/SelfTest';
 import ImageAnalysis from './pages/ImageAnalysis';
 import Dashboard from './pages/Dashboard';
 import Projects from './pages/Projects';
@@ -131,6 +134,9 @@ function App() {
             <Route path="/architecture/:id" element={<Architecture />} />
             <Route path="/image-analysis" element={<ImageAnalysis />} />
             <Route path="/deployment" element={<Deployment />} />
+            <Route path="/apps" element={<DeployedApps />} />
+            <Route path="/learning" element={<Learning />} />
+            <Route path="/self-test" element={<SelfTest />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Brain, User, Settings, LogOut, FolderPlus, BarChart3 } from 'lucide-react';
+import { Brain, User, Settings, LogOut, FolderPlus, BarChart3, Boxes, GraduationCap, MonitorCheck } from 'lucide-react';
 import Button from '../ui/Button';
 import ThemeToggle from '../ui/ThemeToggle';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,11 +11,14 @@ const Header: React.FC = () => {
   
   // Check if we're in the app (authenticated areas)
   const isInApp = isAuthenticated && (
-    location.pathname.startsWith('/architecture') || 
+    location.pathname.startsWith('/architecture') ||
     location.pathname.startsWith('/deployment') ||
     location.pathname.startsWith('/dashboard') ||
     location.pathname.startsWith('/projects') ||
-    location.pathname.startsWith('/profile')
+    location.pathname.startsWith('/profile') ||
+    location.pathname.startsWith('/apps') ||
+    location.pathname.startsWith('/learning') ||
+    location.pathname.startsWith('/self-test')
   );
 
   const publicNavItems = [
@@ -31,6 +34,9 @@ const Header: React.FC = () => {
     { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
     { path: '/projects', label: 'Projects', icon: FolderPlus },
     { path: '/architecture', label: 'Quick Start', icon: Brain },
+    { path: '/apps', label: 'Deployed Apps', icon: Boxes },
+    { path: '/learning', label: 'How It Learned', icon: GraduationCap },
+    { path: '/self-test', label: 'UI Self-Test', icon: MonitorCheck },
   ];
 
   const handleSignOut = () => {

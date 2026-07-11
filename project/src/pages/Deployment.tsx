@@ -8,19 +8,7 @@ import Card from '../components/ui/Card';
 import { Architecture, DeploymentConfig } from '../types';
 import { Loader, CheckCircle, GitBranch, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
-import { env } from '../config/env';
 import LiveNarrationToggle from '../components/LiveNarrationToggle';
-import LearningPanel from '../components/learning/LearningPanel';
-import SelfTestPanel from '../components/uitest/SelfTestPanel';
-import AppsDashboard from '../components/apps/AppsDashboard';
-
-// The self-test / apps / learning panels talk to the same backend as the rest
-// of the app (the AMD MI300X droplet, VITE_API_URL). VITE_UITEST_API_URL can
-// still override for split topologies; `||` (not `??`) so a blank value also
-// falls back to the app backend instead of proxying to a stale same-origin host.
-const UITEST_API: string =
-  (import.meta as any).env?.VITE_UITEST_API_URL || env.apiUrl;
-const UITEST_WS: string = UITEST_API.replace(/^http/, 'ws');
 
 const Deployment: React.FC = () => {
   const location = useLocation();
@@ -241,18 +229,6 @@ const Deployment: React.FC = () => {
               )}
             </Card>
           )}
-
-          <div className="mt-10">
-            <LearningPanel apiBase={UITEST_API} />
-          </div>
-
-          <div className="mt-10">
-            <AppsDashboard apiBase={UITEST_API} />
-          </div>
-
-          <div className="mt-10">
-            <SelfTestPanel apiBase={UITEST_API} wsBase={UITEST_WS} />
-          </div>
         </div>
       </main>
       
