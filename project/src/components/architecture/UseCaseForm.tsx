@@ -220,7 +220,7 @@ const UseCaseForm: React.FC<UseCaseFormProps> = ({ provider, onSubmit, isGenerat
                 {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
               </div>
               <p className="text-text-secondary text-sm max-w-md">
-                GitLab Duo is analyzing your requirements and designing the optimal cloud architecture.
+                Gemma 4 on the AMD MI300X is analyzing your requirements and designing the optimal cloud architecture.
               </p>
             </div>
 
