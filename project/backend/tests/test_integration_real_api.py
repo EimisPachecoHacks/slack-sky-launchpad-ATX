@@ -1,5 +1,5 @@
 """
-Integration tests against a REAL Gemma 4 endpoint (AMD/Ollama)
+Integration tests against a REAL Qwen endpoint (Qwen Cloud)
 These tests require a reachable LLM endpoint (LLM_BASE_URL).
 """
 
@@ -21,7 +21,7 @@ def skip_if_no_api_key():
     """Skip tests if no valid API key is configured"""
     import httpx
     try:
-        httpx.get(settings.LLM_BASE_URL or "http://localhost:11434/v1", timeout=2)
+        httpx.get(settings.LLM_BASE_URL or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", timeout=2)
     except Exception:
         pytest.skip("Skipping: no reachable LLM endpoint (LLM_BASE_URL)")
 

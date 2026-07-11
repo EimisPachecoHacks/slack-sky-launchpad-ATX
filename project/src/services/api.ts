@@ -1,6 +1,6 @@
 /**
  * API Service for Skyrchitect AI Backend
- * Connects React frontend to FastAPI backend (Gemma 4 on AMD ROCm)
+ * Connects React frontend to FastAPI backend (Qwen on Qwen Cloud)
  */
 
 import { env } from '../config/env';

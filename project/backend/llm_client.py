@@ -1,20 +1,25 @@
-"""OpenAI-compatible client for Gemma 4 on the AMD MI300X.
+"""OpenAI-compatible client for Qwen models on Qwen Cloud (Alibaba Model Studio).
 
-Everything the app touches speaks the OpenAI wire format and is served by Ollama
-on the AMD ROCm GPU, so a single client covers every capability:
+Everything the app touches speaks the OpenAI wire format and is served by Qwen
+Cloud's compatible endpoint, so a single client covers every capability:
 
-  chat(...)        : text generation        -> /chat/completions
-  vision_chat(...) : image analysis         -> Gemma 4 is a VLM (Ollama native API)
-  transcribe(...)  : speech-to-text         -> /audio/transcriptions (Whisper on GPU)
-  embed(...)       : skill-retrieval vectors-> /embeddings
+  chat(...)        : text generation / reasoning -> qwen3.7-max
+  vision_chat(...) : image analysis (VLM)        -> qwen3.7-plus (text + vision)
+  transcribe(...)  : speech-to-text              -> Qwen-ASR (DashScope)
+  embed(...)       : skill-retrieval vectors      -> text-embedding-v4 (1024-d)
 
-Embeddings use exactly ONE model on the GPU. Vectors from different models are
-not comparable, so there is no fallback embedder: when the endpoint is
-unreachable, embed() returns None and skydb.find_similar_skills degrades to
-lexical cosine rather than corrupting the index.
+All of these hit the same OpenAI-compatible base URL with the same
+DASHSCOPE_API_KEY, so switching models is just a model-name change.
 
-Speech-to-text points at our own Whisper shim on the GPU (services/whisper_server.py),
-which is why LLM_AUDIO_BASE_URL is a separate port from LLM_BASE_URL.
+Embeddings use exactly ONE model. Vectors from different models are not
+comparable, so there is no fallback embedder: when the endpoint is unreachable
+embed() returns None and skydb.find_similar_skills degrades to lexical cosine
+rather than corrupting the index.
+
+Endpoint note (from the Qwen Cloud quickstart): the API-key prefix must match
+the base URL. Pay-as-you-go keys (sk-...) use dashscope-intl...; Token-Plan keys
+(sk-sp-...) use token-plan.ap-southeast-1...; mixing them returns 401. Set
+LLM_BASE_URL to the matching URL if you use a Token-Plan key.
 
 Config (see backend/config.py):
   LLM_BASE_URL, LLM_MODEL, LLM_VISION_MODEL, LLM_AUDIO_BASE_URL, LLM_TRANSCRIBE_MODEL,
@@ -26,15 +31,15 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Ollama on the MI300X. gemma4:31b (Google Gemma 4, 31B dense, 256K context) is
-# multimodal, and Ollama's OpenAI-compatible endpoint accepts base64 `data:`
-# image URLs (remote http image URLs it does not).
-OLLAMA_BASE_URL = "http://localhost:11434/v1"
+# Qwen Cloud (Alibaba Cloud Model Studio) OpenAI-compatible endpoint. The
+# international, pay-as-you-go base URL; override LLM_BASE_URL for Token-Plan
+# (token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1).
+QWEN_BASE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 
 _DEFAULTS = {
-    "LLM_BASE_URL": OLLAMA_BASE_URL,
-    "LLM_MODEL": "gemma4:31b",
-    "LLM_VISION_MODEL": "gemma4:31b",
+    "LLM_BASE_URL": QWEN_BASE_URL,
+    "LLM_MODEL": "qwen3.7-max",      # text + reasoning, the agent brain
+    "LLM_VISION_MODEL": "qwen3.7-plus",  # text + vision (diagrams, computer-use)
 }
 
 _TIMEOUT = 120.0
@@ -54,18 +59,18 @@ def _cfg(name: str, default: str = "") -> str:
 
 
 def _resolve(name: str) -> str:
-    """Explicit setting wins; otherwise the AMD/Ollama default."""
+    """Explicit setting wins; otherwise the Qwen Cloud default."""
     return _cfg(name) or _DEFAULTS.get(name, "")
 
 
 def _api_key() -> str:
-    # Ollama does not authenticate; an explicit LLM_API_KEY is honoured if set.
-    return _cfg("LLM_API_KEY") or "EMPTY"
+    # Qwen Cloud authenticates with a DashScope API key.
+    return _cfg("DASHSCOPE_API_KEY") or _cfg("LLM_API_KEY") or "EMPTY"
 
 
 def _provider() -> str:
-    """The inference backend. Always AMD (Gemma 4 on ROCm via Ollama)."""
-    return "amd"
+    """The inference backend. Always Qwen Cloud (Alibaba Model Studio)."""
+    return "qwen"
 
 
 def _record(model: str, kind: str, duration_ms: float, ok: bool, error: str) -> None:
@@ -140,56 +145,42 @@ def vision_chat(
     """Analyze an image with a VLM and return the model's text response.
 
     image_base64: base64-encoded image bytes (no data: prefix).
-    image_format: kept for signature compatibility; Ollama infers it.
+    image_format: e.g. "png"/"jpeg"; used to build the data: URI.
 
-    Ollama's OpenAI-compatible endpoint ingests the image but returns EMPTY
-    content for multimodal requests (finish_reason=length, 0 chars) — verified on
-    gemma4:31b. Its NATIVE /api/chat with an `images:[base64]` field works, so we
-    use that.
+    Qwen's OpenAI-compatible endpoint takes the standard multimodal message
+    shape (a content list with a text part and an image_url data: URI), so this
+    is a normal /chat/completions call — no provider-specific path needed.
     """
     model = model or _resolve("LLM_VISION_MODEL")
-    return _ollama_vision(model, image_base64, prompt, temperature, max_tokens, kind)
-
-
-def _ollama_vision(model: str, image_base64: str, prompt: str,
-                   temperature: float, max_tokens: int, kind: str) -> str:
-    """Vision via Ollama's native /api/chat (images:[base64]). Returns text."""
-    import httpx
-    import time as _time
-
-    # base is the OpenAI URL (…/v1); the native API sits at the same host, no /v1.
-    base = _resolve("LLM_BASE_URL").rstrip("/")
-    native = base[:-3] if base.endswith("/v1") else base
-    payload = {
-        "model": model,
-        "stream": False,
-        "messages": [{"role": "user", "content": prompt, "images": [image_base64]}],
-        "options": {"temperature": temperature, "num_predict": max_tokens},
-    }
-    logger.info(f"[amd] {model}: {kind} (native /api/chat)")
-    _t0 = _time.monotonic()
-    try:
-        resp = httpx.post(f"{native}/api/chat", json=payload, timeout=_TIMEOUT)
-        resp.raise_for_status()
-        text = resp.json()["message"]["content"]
-    except Exception as exc:
-        _record(model, kind, (_time.monotonic() - _t0) * 1000, False, str(exc))
-        raise
-    _record(model, kind, (_time.monotonic() - _t0) * 1000, True, "")
-    return text
+    fmt = (image_format or "png").lower().lstrip(".")
+    if fmt == "jpg":
+        fmt = "jpeg"
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/{fmt};base64,{image_base64}"},
+                },
+            ],
+        }
+    ]
+    return _post_chat(model, messages, temperature, max_tokens, kind)
 
 
 def transcribe(audio_bytes: bytes, mime_type: str = "audio/webm", kind: str = "transcribe") -> str:
-    """Transcribe audio to text via Whisper on the GPU.
+    """Transcribe audio to text via Qwen-ASR on Qwen Cloud.
 
-    Points at our own Whisper shim (services/whisper_server.py), which runs on a
-    separate port from the LLM — hence LLM_AUDIO_BASE_URL.
+    Uses the OpenAI-compatible audio transcription route on the same DashScope
+    endpoint (LLM_AUDIO_BASE_URL defaults to the LLM base URL).
     """
     import httpx
     import time as _time
 
-    base_url = _cfg("LLM_AUDIO_BASE_URL", "http://localhost:8100/v1").rstrip("/")
-    model = _cfg("LLM_TRANSCRIBE_MODEL", "openai/whisper-large-v3")
+    base_url = (_cfg("LLM_AUDIO_BASE_URL") or _resolve("LLM_BASE_URL")).rstrip("/")
+    model = _cfg("LLM_TRANSCRIBE_MODEL", "qwen3-asr-flash")
 
     logger.info(f"[audio] {model}: transcribing {len(audio_bytes)} bytes")
     _t0 = _time.monotonic()
@@ -219,14 +210,14 @@ def embed(text: str) -> list[float] | None:
     if not text:
         return None
 
-    base_url = _cfg("EMBED_BASE_URL", "http://localhost:11434/v1").rstrip("/")
-    model = _cfg("EMBED_MODEL", "mxbai-embed-large")
-    key = _cfg("EMBED_API_KEY") or _cfg("LLM_API_KEY") or "EMPTY"
+    base_url = (_cfg("EMBED_BASE_URL") or _resolve("LLM_BASE_URL")).rstrip("/")
+    model = _cfg("EMBED_MODEL", "text-embedding-v4")
+    key = _cfg("EMBED_API_KEY") or _api_key()
 
     payload = {"model": model, "input": text[:8000]}
-    # `dimensions` only means anything for Matryoshka models served by a layer that
-    # forwards it. bge-large rejects it; Ollama's OpenAI shim ignores it. Off by
-    # default — our models emit their native 1024-d, which is what Atlas expects.
+    # text-embedding-v4 is a Qwen3-Embedding (Matryoshka) model that honours a
+    # `dimensions` request, so we pin it to the Atlas index width (1024) when
+    # EMBED_SEND_DIMENSIONS is on.
     if str(_cfg("EMBED_SEND_DIMENSIONS", "")).lower() in ("1", "true", "yes"):
         payload["dimensions"] = int(_cfg("EMBED_DIMENSIONS", "1024"))
 

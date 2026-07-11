@@ -1,7 +1,7 @@
 """Self-improving repair core: diagnose a failed deployment and author a skill.
 
 When a cloud deployment FAILS this module hands the rich failure context (from
-``log_collector``) to **Gemma 4** on the AMD MI300X (see ``backend/llm_client.py``).
+``log_collector``) to **Qwen** (qwen3.7-max) on Qwen Cloud (see ``backend/llm_client.py``).
 The model
 returns:
 
@@ -12,7 +12,7 @@ returns:
 the same deployment. It no longer refers to a hosted environment: repair is a
 single-shot LLM call against an open model, not a managed agent with its own
 sandbox. We trade agentic doc-browsing and code execution for a fully open
-stack that runs on our own AMD silicon.
+stack that runs on Qwen Cloud.
 """
 
 from __future__ import annotations
@@ -73,12 +73,12 @@ def diagnose_and_author(
 
 
 # ---------------------------------------------------------------------------
-# Repair path: Gemma 4 on the AMD GPU
+# Repair path: Qwen (qwen3.7-max) on Qwen Cloud
 # ---------------------------------------------------------------------------
 
 
 def _run_llm(prompt: str) -> str:
-    """Send the repair prompt to Gemma 4 and return the raw reply text.
+    """Send the repair prompt to Qwen (qwen3.7-max) and return the raw reply text.
 
     Imported lazily so the deployer stays usable as a standalone CLI (matching
     how ``deployer/main.py`` reaches into ``backend``).

@@ -17,9 +17,10 @@ services:
       retries: 3
       start_period: 5s
 
-  # Backend service (example configuration).
-  # The canonical GPU stack is docker/docker-compose.amd.yml — this is a
-  # lightweight local variant that points at a reachable AMD inference endpoint.
+  # Backend service. Qwen Cloud is a hosted API, so the backend needs no GPU —
+  # it just needs DASHSCOPE_API_KEY to reach Qwen models. This same image is
+  # what deploys to Alibaba Cloud (ECS / Simple Application Server) for the
+  # hackathon's proof-of-deployment.
   backend:
     image: python:3.11-slim
     working_dir: /app
@@ -28,10 +29,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - LLM_PROVIDER=amd
-      - LLM_BASE_URL=${LLM_BASE_URL:-http://localhost:11434/v1}
-      - LLM_MODEL=${LLM_MODEL:-gemma4:31b}
-      - EMBED_MODEL=${EMBED_MODEL:-mxbai-embed-large}
+      - LLM_PROVIDER=qwen
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+      - LLM_MODEL=${LLM_MODEL:-qwen3.7-max}
+      - LLM_VISION_MODEL=${LLM_VISION_MODEL:-qwen3.7-plus}
+      - EMBED_MODEL=${EMBED_MODEL:-text-embedding-v4}
     command: sh -c "pip install -r requirements.txt && uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload"
     restart: unless-stopped
     healthcheck:

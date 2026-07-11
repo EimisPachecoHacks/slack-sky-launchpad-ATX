@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 # Set test environment variables BEFORE importing the app
-os.environ["LLM_PROVIDER"] = "amd"
+os.environ["LLM_PROVIDER"] = "qwen"
 os.environ["API_ENVIRONMENT"] = "development"
 os.environ["CORS_ORIGINS"] = "http://localhost:3000"
 os.environ["RATE_LIMIT_ENABLED"] = "false"  # Disable rate limiting in tests

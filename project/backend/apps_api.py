@@ -3,7 +3,7 @@
 Exposes an :class:`fastapi.APIRouter` (``router``) under ``/api/apps`` that the
 orchestrator (``backend/api/main.py``) mounts. Powers the "Apps" dashboard:
 listing tracked apps with a derived status, generating end-to-end UI test
-workflows via Gemma 4, and drilling into a single app's cases + run history.
+workflows via Qwen, and drilling into a single app's cases + run history.
 
 Design notes
 ------------
@@ -130,7 +130,7 @@ def _sample_payload() -> dict:
         {
             "app_id": "sample-passing",
             "name": "Checkout Service (demo)",
-            "provider": "gcp",
+            "provider": "alicloud",
             "environment": "production",
             "url": "https://checkout-demo.example.app",
             "alive": True,
@@ -149,7 +149,7 @@ def _sample_payload() -> dict:
         {
             "app_id": "sample-failing",
             "name": "Deploy Portal (demo)",
-            "provider": "gcp",
+            "provider": "alicloud",
             "environment": "staging",
             "url": "https://deploy-portal-demo.example.app",
             "alive": True,
@@ -160,7 +160,7 @@ def _sample_payload() -> dict:
             "latest_run": {
                 "status": "failed",
                 "summary": "Deploy workflow failed at the readiness check.",
-                "error": "Cloud Run service returned 502 on /api/deploy",
+                "error": "ECS service returned 502 on /api/deploy",
                 "solution": "Increased container memory to 512Mi and added a readiness probe",
                 "mr_url": "https://gitlab.com/sky-launchpad/deploy-portal/-/merge_requests/12",
             },
@@ -281,7 +281,7 @@ async def list_apps_dashboard() -> dict:
 
 @router.post("/{app_id}/generate-tests")
 async def generate_tests(app_id: str) -> dict:
-    """Propose 4 end-to-end UI test workflows for an app via Gemma 4.
+    """Propose 4 end-to-end UI test workflows for an app via Qwen.
 
     Falls back to 2 generic cases on any LLM/parse failure. Ensures the app is
     tracked in skydb (e.g. when it originated as a sample) before storing cases.
@@ -319,7 +319,7 @@ async def generate_tests(app_id: str) -> dict:
         except Exception as exc:
             logger.warning("upsert_app failed for %s: %s", app_id, exc)
 
-    # Ask Gemma 4 for concise workflows.
+    # Ask Qwen for concise workflows.
     proposed: Optional[list] = None
     chat = _llm_chat()
     if chat:
@@ -354,7 +354,7 @@ async def generate_tests(app_id: str) -> dict:
                 if cleaned:
                     proposed = cleaned[:4]
         except Exception as exc:
-            logger.warning("Gemma 4 test generation failed for %s: %s", app_id, exc)
+            logger.warning("Qwen test generation failed for %s: %s", app_id, exc)
 
     if not proposed:
         proposed = _generic_cases()

@@ -62,7 +62,7 @@ def _repair_failure(
     """Self-improving repair step.
 
     On a failed terraform run: collect rich failure context (incl. cloud logs),
-    ask the Gemma 4 repair agent to diagnose + fix the HCL AND author a new
+    ask the Qwen repair agent to diagnose + fix the HCL AND author a new
     reusable SKILL.md, persist that skill, and return the corrected files. Falls
     back to the legacy regex auto-fixer if the agent is unavailable.
 
@@ -82,8 +82,8 @@ def _repair_failure(
         ctx = {"provider": provider, "terraform_errors": result.errors, "summary": output[:1000]}
         print(f"  (failure-context collection degraded: {exc})")
 
-    _narrate("diagnose", "Handing the logs to the Gemma 4 repair agent to diagnose...")
-    record_event("diagnose", "Gemma 4 repair agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
+    _narrate("diagnose", "Handing the logs to the Qwen repair agent to diagnose...")
+    record_event("diagnose", "Qwen repair agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
     try:
         from .repair_agent import diagnose_and_author
 
@@ -114,7 +114,7 @@ def _repair_failure(
             record_event("retry", "Applying fix and retrying deploy", provider=provider, run_id=run_id)
             return files, changes, agent_env_id
     except Exception as exc:
-        print(f"  (Gemma 4 repair unavailable, using legacy auto-fixer: {exc})")
+        print(f"  (Qwen repair unavailable, using legacy auto-fixer: {exc})")
 
     # Fallback: deterministic regex auto-fixer.
     files, changes = analyze_and_fix(files, result.errors)

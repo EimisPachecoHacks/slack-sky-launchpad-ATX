@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""(Re)embed every skill with the AMD-served embedding model.
+"""(Re)embed every skill with the Qwen Cloud embedding model.
 
-The skill embeddings are produced by `mxbai-embed-large` (1024-d) served by
-Ollama on the AMD GPU. If you ever change EMBED_MODEL, the old vectors belong to
+The skill embeddings are produced by `text-embedding-v4` (1024-d) on Qwen Cloud
+(Alibaba Model Studio). If you ever change EMBED_MODEL, the old vectors belong to
 a different space and every stored vector must be recomputed — not just the
 missing ones — so this runs with force=True.
 

@@ -20,7 +20,7 @@ const UseCaseForm: React.FC<UseCaseFormProps> = ({ provider, onSubmit, isGenerat
 
   const loadingSteps = [
     { icon: Brain, message: 'Analyzing your requirements...', color: 'text-blue-400' },
-    { icon: Sparkles, message: 'Reasoning with Gemma 4 on the AMD MI300X...', color: 'text-purple-400' },
+    { icon: Sparkles, message: 'Reasoning with Qwen on Qwen Cloud...', color: 'text-purple-400' },
     { icon: Cpu, message: 'Designing optimal architecture...', color: 'text-green-400' },
     { icon: DollarSign, message: 'Calculating costs and alternatives...', color: 'text-yellow-400' },
     { icon: CheckCircle2, message: 'Finalizing recommendations...', color: 'text-emerald-400' }
@@ -220,7 +220,7 @@ const UseCaseForm: React.FC<UseCaseFormProps> = ({ provider, onSubmit, isGenerat
                 {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
               </div>
               <p className="text-text-secondary text-sm max-w-md">
-                Gemma 4 on the AMD MI300X is analyzing your requirements and designing the optimal cloud architecture.
+                Qwen on Qwen Cloud is analyzing your requirements and designing the optimal cloud architecture.
               </p>
             </div>
 

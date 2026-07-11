@@ -188,20 +188,19 @@ def backend_info() -> dict:
 # ---------------------------------------------------------------------------
 # Skills
 # ---------------------------------------------------------------------------
-_EMBED_MODEL = os.getenv("EMBED_MODEL", "mxbai-embed-large")
-_EMBED_BASE_URL = os.getenv("EMBED_BASE_URL", "http://localhost:11434/v1")
+_EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-v4")
+_EMBED_BASE_URL = os.getenv("EMBED_BASE_URL") or os.getenv("LLM_BASE_URL") \
+    or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
 # Expected output width. Must match the Atlas index's numDimensions. This is an
 # assertion about the model, NOT a request parameter — see _SEND_DIMENSIONS.
 _EMBED_DIMENSIONS = int(os.getenv("EMBED_DIMENSIONS", "1024"))
-# A `dimensions` request field is only meaningful for Matryoshka models, and only
-# when the serving layer forwards it. Non-Matryoshka models (bge-large) reject it
-# outright, and Ollama's OpenAI shim does not honour it. Leave off: every model we
-# ship emits its native width, which is the 1024 the Atlas index expects.
-_SEND_DIMENSIONS = os.getenv("EMBED_SEND_DIMENSIONS", "").lower() in ("1", "true", "yes")
+# text-embedding-v4 (Qwen3-Embedding, Matryoshka) honours a `dimensions` request,
+# so pin it to the Atlas index width (1024). On by default for the Qwen embedder.
+_SEND_DIMENSIONS = os.getenv("EMBED_SEND_DIMENSIONS", "true").lower() in ("1", "true", "yes")
 
 
 def _embed_text(text: str):
-    """Canonical skill embedding, served on the AMD GPU. None on any failure.
+    """Canonical skill embedding via Qwen Cloud (text-embedding-v4). None on any failure.
 
     This is the ONLY embedder in the system. Vectors from different models are
     not comparable, so there is deliberately no cross-provider fallback: when
@@ -211,7 +210,7 @@ def _embed_text(text: str):
     """
     if not text:
         return None
-    key = os.getenv("EMBED_API_KEY") or os.getenv("LLM_API_KEY") or "EMPTY"
+    key = os.getenv("EMBED_API_KEY") or os.getenv("DASHSCOPE_API_KEY") or os.getenv("LLM_API_KEY") or "EMPTY"
     payload = {"model": _EMBED_MODEL, "input": text[:8000]}
     if _SEND_DIMENSIONS:
         payload["dimensions"] = _EMBED_DIMENSIONS

@@ -4,7 +4,7 @@ Given a bug captured by the Playwright UI test runner, this module:
 
 1. Investigates: heuristically picks a handful of likely-relevant frontend
    source files (keyword overlap with the error/workflow), reads them.
-2. Asks Gemma 4 to produce a structured fix as STRICT JSON
+2. Asks Qwen to produce a structured fix as STRICT JSON
    (root_cause, solution, files, mr_title, mr_body).
 3. Optionally writes the proposed files to disk (guarded against path escapes).
 4. Optionally opens a GitLab merge request with the changed files.
@@ -13,7 +13,7 @@ Design notes:
 - ``diagnose_and_fix`` never raises. On any failure it returns a dict with an
   ``error`` field plus whatever was gathered so far.
 - The model call goes through ``backend.llm_client``, so it runs on whichever
-  backend serves (Gemma 4 on the AMD GPU).
+  backend serves (Qwen on Qwen Cloud).
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ SOURCE_EXTENSIONS = (".tsx", ".ts", ".jsx", ".js")
 # Directories we never want to walk into.
 SKIP_DIRS = {"node_modules", "dist", "build", ".git", "__pycache__", "coverage"}
 
-# Records which inference backend produced the answer (always "amd").
+# Records which inference backend produced the answer (always "qwen").
 # Exposed so callers/tests can introspect which path ran.
 LAST_BACKEND_USED: str = "none"
 
@@ -277,7 +277,7 @@ def _extract_json(text: str) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Model call: Gemma 4 via the unified OpenAI-compatible client
+# Model call: Qwen via the unified OpenAI-compatible client
 # ---------------------------------------------------------------------------
 
 

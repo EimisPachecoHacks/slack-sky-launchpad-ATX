@@ -133,7 +133,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Sky Launchpad AI Backend - Secured",
-    description="AI-powered cloud architecture design and optimization API using Gemma 4 on AMD ROCm",
+    description="AI-powered cloud architecture design and optimization API using Qwen models on Qwen Cloud",
     version="1.0.0",
     lifespan=lifespan,
     # Disable docs in production
@@ -208,7 +208,7 @@ async def file_validation_error_handler(request: Request, exc: FileValidationErr
 
 
 # ── Sky Launchpad: observability (Pydantic Logfire) ───────────────────────────
-# Auto-instruments FastAPI + httpx so every request and every Gemma 4 / embedding
+# Auto-instruments FastAPI + httpx so every request and every Qwen / embedding
 # call is traced. Ships to the Logfire UI when LOGFIRE_TOKEN is set; otherwise
 # instruments locally without erroring.
 try:
@@ -842,7 +842,7 @@ Every block must be syntactically complete with all braces closed."""
                 "Code generation is unavailable: GitLab Duo could not be reached "
                 "(the Duo Chat API and the glab CLI fallback both failed). Check "
                 "GITLAB_TOKEN / Duo access, or install the glab CLI. Architecture "
-                "design is unaffected — it runs on Gemma 4."
+                "design is unaffected — it runs on Qwen."
             )
         else:
             detail = f"Code generation failed: {raw}"
@@ -1540,7 +1540,7 @@ async def transcribe_voice(
     auth_context: dict = Security(optional_authentication)
 ):
     """
-    Transcribe uploaded audio to text using Whisper on the AMD GPU.
+    Transcribe uploaded audio to text using Qwen-ASR on Qwen Cloud.
 
     **Authentication**: Optional
     **Rate Limit**: Yes
@@ -1552,7 +1552,7 @@ async def transcribe_voice(
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="Empty audio upload")
 
-        logger.info(f"🎙️  Transcribing {len(audio_bytes)} bytes via Whisper...")
+        logger.info(f"🎙️  Transcribing {len(audio_bytes)} bytes via Qwen-ASR...")
         text = transcribe(audio_bytes, file.content_type or "audio/webm")
         logger.info("✅ Transcription complete")
 

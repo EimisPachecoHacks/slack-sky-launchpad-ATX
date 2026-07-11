@@ -17,7 +17,7 @@ const SelfTest: React.FC = () => {
             UI Self-Test
           </h1>
           <p className="text-text-secondary text-center mb-8">
-            Playwright drives the live app; Gemma 4 diagnoses and fixes UI bugs.
+            Playwright drives the live app; Qwen diagnoses and fixes UI bugs.
           </p>
           <SelfTestPanel apiBase={OPS_API} wsBase={OPS_WS} />
         </div>

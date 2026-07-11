@@ -14,7 +14,7 @@ class TestConfigSettings:
         from backend.config import settings
 
         # Settings should be loaded from .env file
-        assert settings.LLM_PROVIDER == "amd"
+        assert settings.LLM_PROVIDER == "qwen"
         assert settings.API_ENVIRONMENT == "development"
 
     def test_config_defaults(self):
@@ -33,9 +33,9 @@ class TestConfigSettings:
         from backend.config import Settings
 
         # Valid provider should work, and be normalized to lowercase
-        with patch.dict("os.environ", {"LLM_PROVIDER": "AMD"}, clear=False):
+        with patch.dict("os.environ", {"LLM_PROVIDER": "QWEN"}, clear=False):
             settings = Settings()
-            assert settings.LLM_PROVIDER == "amd"
+            assert settings.LLM_PROVIDER == "qwen"
 
         # Unknown provider is rejected
         with patch.dict("os.environ", {"LLM_PROVIDER": "openai"}, clear=False):
@@ -80,11 +80,11 @@ class TestConfigSettings:
         assert len(exts) > 0
 
     def test_config_model_defaults_resolve(self):
-        """Blank LLM_MODEL falls back to the provider's default — a Gemma 4 id either way"""
+        """Blank LLM_MODEL falls back to the provider's default — a Qwen id either way"""
         from backend.llm_client import _resolve
 
         model = _resolve("LLM_MODEL")
-        assert "gemma" in model.lower(), f"default is not a Gemma model: {model}"
+        assert "qwen" in model.lower(), f"default is not a Qwen model: {model}"
         assert any(char.isdigit() for char in model)
 
     def test_embed_dimensions_match_index(self):
@@ -92,13 +92,13 @@ class TestConfigSettings:
         from backend.config import settings
 
         assert settings.EMBED_DIMENSIONS == 1024
-        assert settings.EMBED_MODEL == "mxbai-embed-large"
+        assert settings.EMBED_MODEL == "text-embedding-v4"
 
-    def test_dimensions_not_sent_by_default(self):
-        """`dimensions` is unhonoured by Ollama and rejected by bge-large: never send it by default"""
+    def test_dimensions_sent_by_default(self):
+        """text-embedding-v4 (Matryoshka) honours `dimensions`, so pin it by default"""
         from backend.config import settings
 
-        assert settings.EMBED_SEND_DIMENSIONS is False
+        assert settings.EMBED_SEND_DIMENSIONS is True
 
     def test_config_values_are_correct_types(self):
         """Test that config values are properly typed"""
@@ -161,10 +161,10 @@ class TestConfigValidation:
         """Test config with only required fields"""
         from backend.config import Settings
 
-        with patch.dict("os.environ", {"LLM_PROVIDER": "amd"}, clear=True):
+        with patch.dict("os.environ", {"LLM_PROVIDER": "qwen"}, clear=True):
             settings = Settings()
-            # Defaults to the AMD GPU, and leaves the model to the AMD default
-            assert settings.LLM_PROVIDER == "amd"
+            # Defaults to Qwen Cloud, and leaves the model to the Qwen default
+            assert settings.LLM_PROVIDER == "qwen"
             assert settings.LLM_MODEL == ""
 
 

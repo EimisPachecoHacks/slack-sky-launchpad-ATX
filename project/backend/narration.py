@@ -5,7 +5,7 @@ phase happens, the deploy loop pushes a short narration event onto an in-process
 pub/sub bus. A WebSocket endpoint subscribes to that bus and streams the text to
 the browser so the user watches the loop think out loud:
 
-    "Deployment failed: Compute API disabled. Handing the logs to the Gemma 4
+    "Deployment failed: Compute API disabled. Handing the logs to the Qwen
      repair agent... root cause found... writing a new skill... retrying..."
 
 ------------------------------------------------------------------------------
@@ -13,7 +13,7 @@ Audio
 ------------------------------------------------------------------------------
 Narration is text-only: each frame carries ``audio: false`` and the browser
 speaks it aloud with ``window.speechSynthesis``. So you still HEAR the loop
-narrate ("deploy failed… Gemma 4 is diagnosing… authored a skill… retrying"),
+narrate ("deploy failed… Qwen is diagnosing… authored a skill… retrying"),
 spoken by the browser's built-in voice — no server-side audio streaming needed.
 
 ------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ The orchestrator / deploy loop only needs the convenience helper::
 
     narrate("deploy",  "Deploying infrastructure to GCP...")
     narrate("failure", "Deployment failed: Compute Engine API is disabled.")
-    narrate("diagnose","Handing the logs to the Gemma 4 repair agent...")
+    narrate("diagnose","Handing the logs to the Qwen repair agent...")
     narrate("learned", "Authored a new reusable skill from this failure.")
     narrate("retry",   "Retrying deployment...")
     narrate("success", "Deployment succeeded.")

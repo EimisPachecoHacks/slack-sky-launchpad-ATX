@@ -463,7 +463,7 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
             UI Self-Test
           </h2>
           <p className="text-sm text-gray-400">
-            Playwright drives the live app; Gemma 4 diagnoses and fixes UI bugs.
+            Playwright drives the live app; Qwen diagnoses and fixes UI bugs.
           </p>
         </div>
         {/* Health badge */}

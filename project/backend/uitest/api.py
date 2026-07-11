@@ -286,7 +286,7 @@ async def _handle_run(stream_ws: WebSocket, workflow: str, target_url: str) -> N
         #
         # The autonomous vision-action driver was retired with the move to a
         # fully open stack: no OpenAI-compatible provider serves a
-        # computer-use-tuned model, and Gemma 4 is not grounded for pixel-level
+        # computer-use-tuned model, and Qwen is not grounded for pixel-level
         # click targeting. Bug *discovery* is now the operator's job (drive the
         # app with ui_tester/playwright_client.py); bug *repair* is still
         # autonomous via POST /api/uitest/fix.
@@ -374,7 +374,7 @@ async def fix(payload: dict) -> dict:
 
     Body: {"bug": {"workflow","error"|"signal","console_errors","target_url","summary"},
            "apply": bool (optional; default env APPLY_FIX)}.
-    Runs the Gemma 4 fix agent → opens a GitLab MR (or dry-run) → records the
+    Runs the Qwen fix agent → opens a GitLab MR (or dry-run) → records the
     solution on the app's latest failed run and saves a learned skill. If apply is set,
     also writes the patch + redeploys locally (re-verify by re-running the self-test).
     """

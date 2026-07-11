@@ -8,10 +8,10 @@ interface VoiceInputProps {
 }
 
 /**
- * Voice input powered by Whisper (openai/whisper-large-v3) on the AMD GPU.
+ * Voice input powered by Qwen-ASR on Qwen Cloud.
  *
  * Records mic audio in the browser, then POSTs it to the backend
- * `/api/voice/transcribe` endpoint, which transcribes it with Whisper.
+ * `/api/voice/transcribe` endpoint, which transcribes it with Qwen-ASR.
  */
 const VoiceInput: React.FC<VoiceInputProps> = ({
   onTranscript,

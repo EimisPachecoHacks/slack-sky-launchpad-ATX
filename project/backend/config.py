@@ -10,34 +10,32 @@ class Settings(BaseSettings):
     """Application settings with validation"""
 
     # ---------------------------------------------------------------------
-    # Inference — Gemma 4 on the AMD MI300X, served by Ollama (OpenAI wire format).
-    # Everything below defaults to the local GPU; blank fields take llm_client's
-    # AMD defaults. See backend/llm_client.py.
+    # Inference — Qwen models on Qwen Cloud (Alibaba Cloud Model Studio), via the
+    # OpenAI-compatible endpoint. Blank fields take llm_client's Qwen defaults
+    # (qwen3.7-max / qwen3.7-plus). See backend/llm_client.py.
     # ---------------------------------------------------------------------
-    LLM_PROVIDER: str = Field(default="amd", description="Inference backend (amd)")
-    LLM_BASE_URL: str = Field(default="", description="OpenAI-compatible base URL (blank = AMD default)")
-    LLM_API_KEY: str = Field(default="", description="Bearer token (Ollama needs none)")
-    LLM_MODEL: str = Field(default="", description="Text-generation model id (blank = gemma4:31b)")
-    LLM_VISION_MODEL: str = Field(default="", description="VLM for diagram analysis (blank = gemma4:31b)")
+    LLM_PROVIDER: str = Field(default="qwen", description="Inference backend (qwen)")
+    DASHSCOPE_API_KEY: str = Field(default="", description="Qwen Cloud / DashScope API key")
+    LLM_BASE_URL: str = Field(default="", description="OpenAI-compatible base URL (blank = Qwen Cloud default)")
+    LLM_API_KEY: str = Field(default="", description="Bearer token; falls back to DASHSCOPE_API_KEY")
+    LLM_MODEL: str = Field(default="", description="Text-generation model id (blank = qwen3.7-max)")
+    LLM_VISION_MODEL: str = Field(default="", description="VLM for diagram analysis (blank = qwen3.7-plus)")
 
-    # Speech-to-text runs on our own GPU shim (services/whisper_server.py), which
-    # lives on a different port than the LLM — hence a separate base URL.
-    LLM_AUDIO_BASE_URL: str = Field(
-        default="http://localhost:8100/v1",
-        description="OpenAI-compatible audio base URL (Whisper)",
-    )
-    LLM_TRANSCRIBE_MODEL: str = Field(default="openai/whisper-large-v3", description="Speech-to-text model id")
+    # Speech-to-text (Qwen-ASR) runs on the same Qwen Cloud endpoint; blank base
+    # URL falls back to LLM_BASE_URL in llm_client.
+    LLM_AUDIO_BASE_URL: str = Field(default="", description="Audio base URL (blank = LLM base URL)")
+    LLM_TRANSCRIBE_MODEL: str = Field(default="qwen3-asr-flash", description="Speech-to-text model id")
 
     # Embeddings are NOT provider-switchable: vectors from different models are
-    # not comparable, so one model owns the Atlas index. Served on the AMD GPU.
-    EMBED_BASE_URL: str = Field(default="http://localhost:11434/v1", description="OpenAI-compatible embeddings URL")
-    EMBED_API_KEY: str = Field(default="", description="Embeddings bearer token; falls back to LLM_API_KEY")
-    EMBED_MODEL: str = Field(default="mxbai-embed-large", description="Canonical skill-retrieval embedder (1024-d)")
+    # not comparable, so one model owns the Atlas index. Blank base URL falls
+    # back to LLM_BASE_URL (same Qwen Cloud endpoint).
+    EMBED_BASE_URL: str = Field(default="", description="Embeddings base URL (blank = LLM base URL)")
+    EMBED_API_KEY: str = Field(default="", description="Embeddings bearer token; falls back to DASHSCOPE_API_KEY")
+    EMBED_MODEL: str = Field(default="text-embedding-v4", description="Canonical skill-retrieval embedder (1024-d)")
     EMBED_DIMENSIONS: int = Field(default=1024, description="Must match the Atlas index numDimensions")
-    # `dimensions` is only honoured by Matryoshka models behind a serving layer that
-    # forwards it. bge-large rejects it; Ollama ignores it. Off by default: our models
-    # emit their native 1024-d width, which is what the Atlas index expects.
-    EMBED_SEND_DIMENSIONS: bool = Field(default=False, description="Send `dimensions` in embedding requests")
+    # text-embedding-v4 (Qwen3-Embedding, Matryoshka) honours a `dimensions`
+    # request, so we pin it to the Atlas index width (1024).
+    EMBED_SEND_DIMENSIONS: bool = Field(default=True, description="Send `dimensions` in embedding requests")
 
     # API Configuration
     API_ENVIRONMENT: str = Field(default="development", description="Environment (development/production)")
@@ -99,8 +97,8 @@ class Settings(BaseSettings):
 
     @validator("LLM_PROVIDER")
     def validate_llm_provider(cls, v: str) -> str:
-        if v.strip().lower() != "amd":
-            raise ValueError(f"Invalid LLM_PROVIDER: {v}. Only 'amd' is supported.")
+        if v.strip().lower() != "qwen":
+            raise ValueError(f"Invalid LLM_PROVIDER: {v}. Only 'qwen' is supported.")
         return v.strip().lower()
 
     @validator("RATE_LIMIT_PER_MINUTE")
@@ -152,11 +150,11 @@ try:
 except Exception as e:
     print(f"❌ Configuration Error: {e}")
     print("\n🔧 Please check your .env file and ensure all required variables are set.")
-    print("\nKey environment variables (all default to the local AMD GPU):")
-    print("  - LLM_BASE_URL   (default: http://localhost:11434/v1 — Ollama)")
-    print("  - LLM_MODEL / LLM_VISION_MODEL (blank = gemma4:31b)")
-    print("  - EMBED_BASE_URL (default: http://localhost:11434/v1)")
-    print("  - EMBED_MODEL (default: mxbai-embed-large), EMBED_DIMENSIONS (default: 1024)")
+    print("\nKey environment variables (Qwen Cloud / Alibaba Model Studio):")
+    print("  - DASHSCOPE_API_KEY  (required — your Qwen Cloud API key)")
+    print("  - LLM_BASE_URL   (blank = https://dashscope-intl.aliyuncs.com/compatible-mode/v1)")
+    print("  - LLM_MODEL / LLM_VISION_MODEL (blank = qwen3.7-max / qwen3.7-plus)")
+    print("  - EMBED_MODEL (default: text-embedding-v4), EMBED_DIMENSIONS (default: 1024)")
     print("  - API_ENVIRONMENT (default: development)")
     print("  - CORS_ORIGINS (default: http://localhost:5173,http://localhost:3000)")
     print("  - RATE_LIMIT_PER_MINUTE (default: 10)")
@@ -194,9 +192,11 @@ def validate_configuration():
     print("\n✅ Configuration validated successfully")
     print(f"   Environment: {settings.API_ENVIRONMENT}")
     print(f"   Inference Provider: {settings.LLM_PROVIDER}")
+    print(f"   Endpoint: {_resolve('LLM_BASE_URL')}")
+    print(f"   API key set: {'yes' if (settings.DASHSCOPE_API_KEY or settings.LLM_API_KEY) else 'NO — set DASHSCOPE_API_KEY'}")
     print(f"   Text Model: {_resolve('LLM_MODEL')}")
     print(f"   Vision Model: {_resolve('LLM_VISION_MODEL')}")
-    print(f"   Embeddings: {settings.EMBED_MODEL} ({settings.EMBED_DIMENSIONS}-d) @ {settings.EMBED_BASE_URL}")
+    print(f"   Embeddings: {settings.EMBED_MODEL} ({settings.EMBED_DIMENSIONS}-d)")
     print(f"   CORS Origins: {len(settings.get_cors_origins())} origin(s)")
     print(f"   Rate Limiting: {'Enabled' if settings.RATE_LIMIT_ENABLED else 'Disabled'}")
     if settings.RATE_LIMIT_ENABLED:
