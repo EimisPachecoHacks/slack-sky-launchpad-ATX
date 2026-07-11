@@ -65,6 +65,9 @@ class _MongoStore:
     def inc(self, coll, filt, field, amount=1):
         self._db[coll].update_one(filt, {"$inc": {field: amount}})
 
+    def delete(self, coll, filt):
+        return self._db[coll].delete_many(filt).deleted_count
+
     @staticmethod
     def _strip(d):
         if d and "_id" in d:
@@ -136,6 +139,12 @@ class _LocalStore:
             if all(r.get(k) == v for k, v in filt.items()):
                 rows[i][field] = int(r.get(field, 0)) + amount
         self._save(coll, rows)
+
+    def delete(self, coll, filt):
+        rows = self._load(coll)
+        kept = [r for r in rows if not all(r.get(k) == v for k, v in filt.items())]
+        self._save(coll, kept)
+        return len(rows) - len(kept)
 
 
 _store = None
@@ -370,6 +379,19 @@ def get_app(app_id: str) -> Optional[dict]:
 
 def set_app_health(app_id: str, alive: bool, status: str = "") -> None:
     _get_store().update("apps", {"app_id": app_id}, {"alive": alive, "health_status": status, "last_seen": _now()})
+
+
+def delete_app(app_id: str) -> dict:
+    """Remove an app and everything tracked for it (test cases + runs).
+
+    Returns a small summary of how many records were removed per collection.
+    """
+    store = _get_store()
+    return {
+        "apps": store.delete("apps", {"app_id": app_id}),
+        "test_cases": store.delete("test_cases", {"app_id": app_id}),
+        "test_runs": store.delete("test_runs", {"app_id": app_id}),
+    }
 
 
 # ---------------------------------------------------------------------------

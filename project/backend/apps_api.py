@@ -22,7 +22,7 @@ import logging
 import re
 from typing import Any, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -407,3 +407,64 @@ async def get_app_detail(app_id: str) -> dict:
         runs = []
 
     return {"app": app, "test_cases": cases, "test_runs": runs}
+
+
+@router.delete("/{app_id}")
+async def destroy_app(app_id: str) -> dict:
+    """Destroy a deployed app: tear down its infrastructure (best-effort) and
+    remove it — plus its test cases and run history — from the dashboard.
+
+    This is irreversible. Sample apps (the placeholder cards shown when nothing
+    is tracked yet) cannot be destroyed. If the app was deployed with a stored
+    Terraform workspace, that workspace is destroyed first; otherwise only the
+    tracking records are removed (the deploy pipeline already tears down the
+    ephemeral test infrastructure it creates).
+    """
+    if app_id.startswith("sample-"):
+        raise HTTPException(status_code=400, detail="Sample apps are placeholders and cannot be destroyed.")
+
+    skydb = _skydb()
+    if not skydb:
+        raise HTTPException(status_code=503, detail="App store unavailable — cannot destroy the app.")
+
+    try:
+        app = skydb.get_app(app_id)
+    except Exception as exc:
+        logger.warning("destroy_app: get_app failed for %s: %s", app_id, exc)
+        app = None
+
+    if not app:
+        raise HTTPException(status_code=404, detail=f"No tracked app with id '{app_id}'.")
+
+    # Best-effort real teardown when a Terraform workspace was persisted for the
+    # app. The current deploy pipeline destroys its ephemeral infra immediately,
+    # so this is normally absent — guarded so it never blocks deregistration.
+    infra_destroyed = False
+    infra_note = "No live Terraform state was tracked for this app; removed tracking only."
+    workspace = app.get("workspace") or app.get("workspace_path")
+    if workspace:
+        try:
+            from pathlib import Path
+            from deployer.deployment_engine import terraform_destroy
+            ok, output = terraform_destroy(Path(workspace))
+            infra_destroyed = bool(ok)
+            infra_note = "Terraform destroy succeeded." if ok else f"Terraform destroy failed: {output[-300:]}"
+        except Exception as exc:
+            logger.warning("destroy_app: terraform destroy failed for %s: %s", app_id, exc)
+            infra_note = f"Terraform destroy could not run: {exc}"
+
+    try:
+        removed = skydb.delete_app(app_id)
+    except Exception as exc:
+        logger.error("destroy_app: delete_app failed for %s: %s", app_id, exc)
+        raise HTTPException(status_code=500, detail=f"Failed to remove app records: {exc}")
+
+    logger.info("🗑️  Destroyed app %s (%s); removed %s", app_id, app.get("name", ""), removed)
+    return {
+        "destroyed": True,
+        "app_id": app_id,
+        "name": app.get("name", app_id),
+        "infra_destroyed": infra_destroyed,
+        "infra_note": infra_note,
+        "removed": removed,
+    }
