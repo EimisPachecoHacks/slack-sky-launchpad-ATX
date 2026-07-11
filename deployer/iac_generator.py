@@ -333,3 +333,170 @@ output "subnet_id" {
         "outputs.tf": outputs_tf,
         "README.md": readme_md,
     }
+
+
+def generate_alicloud_terraform(
+    region: str = "ap-southeast-1",
+    environment: str = "dev",
+    name_prefix: str = "skyrchitect",
+    architecture: str = "minimal-test",
+) -> dict[str, str]:
+    """Generate a minimal but real Alibaba Cloud (alicloud) Terraform config.
+
+    Mirrors the GCP/AWS generators: an OSS bucket + VPC + VSwitch + security
+    group — enough to prove an end-to-end apply on Alibaba Cloud. Credentials
+    (RAM AccessKey) are passed as -var at apply time by the deployment engine.
+    """
+
+    providers_tf = """\
+terraform {
+  required_version = ">= 1.5.0"
+
+  required_providers {
+    alicloud = {
+      source  = "aliyun/alicloud"
+      version = "~> 1.220"
+    }
+  }
+}
+
+provider "alicloud" {
+  access_key = var.access_key
+  secret_key = var.secret_key
+  region     = var.region
+}
+"""
+
+    variables_tf = f"""\
+variable "access_key" {{
+  description = "Alibaba Cloud RAM AccessKey ID"
+  type        = string
+  sensitive   = true
+}}
+
+variable "secret_key" {{
+  description = "Alibaba Cloud RAM AccessKey Secret"
+  type        = string
+  sensitive   = true
+}}
+
+variable "region" {{
+  description = "Alibaba Cloud region"
+  type        = string
+  default     = "{region}"
+}}
+
+variable "environment" {{
+  description = "Environment name"
+  type        = string
+  default     = "{environment}"
+}}
+
+variable "name_prefix" {{
+  description = "Prefix for created resource names (OSS names are globally unique)"
+  type        = string
+  default     = "{name_prefix}"
+}}
+"""
+
+    main_tf = """\
+locals {
+  tags = {
+    environment = var.environment
+    managed_by  = "skyrchitect"
+  }
+}
+
+# Pick a zone in the region that can host a VSwitch.
+data "alicloud_zones" "default" {
+  available_resource_creation = "VSwitch"
+}
+
+# OSS bucket (analogue of GCS/S3). Names are GLOBALLY unique, so suffix with a
+# short random hash — this is exactly the failure the learned-skill library
+# pre-empts (alicloud-unique-oss-bucket-name).
+resource "random_id" "suffix" {
+  byte_length = 3
+}
+
+resource "alicloud_oss_bucket" "main" {
+  bucket        = "${var.name_prefix}-${var.environment}-${random_id.suffix.hex}"
+  storage_class = "Standard"
+
+  tags = local.tags
+
+  versioning {
+    status = "Enabled"
+  }
+
+  lifecycle {
+    ignore_changes = [lifecycle_rule]
+  }
+}
+
+resource "alicloud_vpc" "main" {
+  vpc_name   = "${var.name_prefix}-vpc-${var.environment}"
+  cidr_block = "172.16.0.0/16"
+  tags       = local.tags
+}
+
+resource "alicloud_vswitch" "main" {
+  vswitch_name = "${var.name_prefix}-vsw-${var.environment}"
+  vpc_id       = alicloud_vpc.main.id
+  cidr_block   = "172.16.0.0/24"
+  zone_id      = data.alicloud_zones.default.zones.0.id
+  tags         = local.tags
+}
+
+# Deny-all-by-default security group (no ingress rules added).
+resource "alicloud_security_group" "main" {
+  name   = "${var.name_prefix}-sg-${var.environment}"
+  vpc_id = alicloud_vpc.main.id
+  tags   = local.tags
+}
+"""
+
+    outputs_tf = """\
+output "bucket_name" {
+  description = "Created OSS bucket name"
+  value       = alicloud_oss_bucket.main.bucket
+}
+
+output "vpc_id" {
+  description = "Created VPC id"
+  value       = alicloud_vpc.main.id
+}
+
+output "vswitch_id" {
+  description = "Created VSwitch id"
+  value       = alicloud_vswitch.main.id
+}
+
+output "security_group_id" {
+  description = "Created security group id"
+  value       = alicloud_security_group.main.id
+}
+"""
+
+    readme_md = f"""\
+# Skyrchitect Alibaba Cloud Deployment — {architecture}
+
+**Auto-generated and deployment-validated by Skyrchitect.**
+
+## Resources Created
+- OSS Bucket with versioning (globally-unique name)
+- VPC (172.16.0.0/16)
+- VSwitch (172.16.0.0/24) in an available zone
+- Deny-all default security group
+
+## Region: `{region}`
+## Environment: `{environment}`
+"""
+
+    return {
+        "providers.tf": providers_tf,
+        "variables.tf": variables_tf,
+        "main.tf": main_tf,
+        "outputs.tf": outputs_tf,
+        "README.md": readme_md,
+    }

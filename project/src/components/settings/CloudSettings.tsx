@@ -41,6 +41,11 @@ const CloudSettings: React.FC = () => {
     region: 'us-central1',
   });
 
+  const [alicloudForm, setAlicloudForm] = useState({
+    accountName: '',
+    region: 'ap-southeast-1',
+  });
+
   // Load saved credentials from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem('cloudCredentials');
@@ -125,6 +130,10 @@ const CloudSettings: React.FC = () => {
           serviceAccountEmail: gcpForm.serviceAccountEmail,
           region: gcpForm.region,
         } as GCPCredentials),
+        ...(selectedProvider === 'alicloud' && {
+          accountName: alicloudForm.accountName,
+          region: alicloudForm.region,
+        }),
       } as ProviderCredentials;
 
       const updated = [...savedCredentials, newCredential];
@@ -166,6 +175,10 @@ const CloudSettings: React.FC = () => {
       serviceAccountEmail: '',
       region: 'us-central1',
     });
+    setAlicloudForm({
+      accountName: '',
+      region: 'ap-southeast-1',
+    });
   };
 
   const handleDeleteCredential = (id: string) => {
@@ -188,6 +201,7 @@ const CloudSettings: React.FC = () => {
       case 'aws': return 'from-orange-500 to-yellow-500';
       case 'azure': return 'from-blue-500 to-blue-700';
       case 'gcp': return 'from-green-500 to-teal-500';
+      case 'alicloud': return 'from-orange-400 to-red-500';
     }
   };
 
@@ -196,6 +210,7 @@ const CloudSettings: React.FC = () => {
       case 'aws': return 'Amazon Web Services';
       case 'azure': return 'Microsoft Azure';
       case 'gcp': return 'Google Cloud Platform';
+      case 'alicloud': return 'Alibaba Cloud';
     }
   };
 
@@ -299,8 +314,8 @@ const CloudSettings: React.FC = () => {
         {showForm && !selectedProvider && (
           <div className="mt-8">
             <h2 className="text-2xl font-bold mb-6 text-center">Select Cloud Provider</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-5xl mx-auto">
-              {(['aws', 'azure', 'gcp'] as CloudProvider[]).map((provider) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+              {(['aws', 'azure', 'gcp', 'alicloud'] as CloudProvider[]).map((provider) => (
                 <div
                   key={provider}
                   className={`${provider}-game-home`}
@@ -716,6 +731,128 @@ const CloudSettings: React.FC = () => {
                   <Button
                     onClick={handleSaveCredentials}
                     disabled={!gcpForm.accountId || (!credentialFile && !serverCredsExist['gcp']) || validating}
+                    icon={validating ? undefined : <Check className="w-5 h-5" />}
+                  >
+                    {validating ? 'Validating...' : 'Save Configuration'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowForm(false);
+                      setSelectedProvider(null);
+                      resetForms();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Alibaba Cloud Form */}
+        {showForm && selectedProvider === 'alicloud' && (
+          <div className="mt-8">
+            <Card variant="glass" className="p-8">
+              <h2 className="text-2xl font-bold mb-6">Configure Alibaba Cloud Account</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Account Name (Optional)</label>
+                  <input
+                    type="text"
+                    value={alicloudForm.accountName}
+                    onChange={(e) => setAlicloudForm({ ...alicloudForm, accountName: e.target.value })}
+                    className="w-full px-4 py-2 bg-black/20 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
+                    placeholder="e.g., Production Alibaba Cloud"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Default Region *</label>
+                  <select
+                    value={alicloudForm.region}
+                    onChange={(e) => setAlicloudForm({ ...alicloudForm, region: e.target.value })}
+                    className="w-full px-4 py-2 bg-black/20 border border-gray-700 rounded-lg focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="ap-southeast-1">Singapore (ap-southeast-1)</option>
+                    <option value="ap-southeast-5">Jakarta (ap-southeast-5)</option>
+                    <option value="us-west-1">US West (us-west-1)</option>
+                    <option value="eu-central-1">Frankfurt (eu-central-1)</option>
+                    <option value="cn-hangzhou">China Hangzhou (cn-hangzhou)</option>
+                  </select>
+                </div>
+
+                <div className="mt-6">
+                  <label className="block text-sm font-medium mb-2">
+                    <FileKey className="w-4 h-4 inline mr-1" />
+                    RAM AccessKey JSON File {serverCredsExist['alicloud'] ? '(already stored on server)' : '*'}
+                  </label>
+                  {serverCredsExist['alicloud'] && !credentialFile && (
+                    <div className="flex items-center space-x-2 mb-3 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                      <Check className="w-4 h-4 text-green-400" />
+                      <span className="text-sm text-green-400">Credentials already stored securely on server. Upload new file to replace.</span>
+                    </div>
+                  )}
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                      credentialFile
+                        ? 'border-green-500 bg-green-500/10'
+                        : serverCredsExist['alicloud']
+                        ? 'border-green-700 hover:border-blue-500 hover:bg-blue-500/5'
+                        : 'border-gray-700 hover:border-blue-500 hover:bg-blue-500/5'
+                    }`}
+                    onClick={() => document.getElementById('alicloud-cred-file')?.click()}
+                  >
+                    {credentialFile ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <Check className="w-5 h-5 text-green-400" />
+                        <span className="text-green-400 font-medium">{credentialFile.name}</span>
+                      </div>
+                    ) : (
+                      <div>
+                        <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400">Click to upload your RAM AccessKey JSON</p>
+                        <p className="text-xs text-gray-500 mt-1">{`{ "access_key_id": "...", "access_key_secret": "...", "region": "ap-southeast-1" }`}</p>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="alicloud-cred-file"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setCredentialFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+                </div>
+
+                {uploadStatus && (
+                  <div className={`mt-3 text-sm ${uploadStatus.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>
+                    {uploadStatus}
+                  </div>
+                )}
+
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4 mt-6">
+                  <h4 className="font-bold mb-2 text-orange-400">Setup Instructions:</h4>
+                  <ol className="text-sm space-y-2 text-text-secondary">
+                    <li>1. Log in to the Alibaba Cloud Console</li>
+                    <li>2. Go to RAM → Users → create a user with programmatic access</li>
+                    <li>3. Grant it ECS / VPC / OSS permissions (e.g. AliyunECSFullAccess, AliyunVPCFullAccess, AliyunOSSFullAccess)</li>
+                    <li>4. Create an AccessKey for that user</li>
+                    <li>5. Save it as JSON with access_key_id / access_key_secret / region</li>
+                    <li>6. Upload the JSON file above</li>
+                  </ol>
+                </div>
+
+                <div className="flex space-x-4 mt-6">
+                  <Button
+                    onClick={handleSaveCredentials}
+                    disabled={(!credentialFile && !serverCredsExist['alicloud']) || validating}
                     icon={validating ? undefined : <Check className="w-5 h-5" />}
                   >
                     {validating ? 'Validating...' : 'Save Configuration'}

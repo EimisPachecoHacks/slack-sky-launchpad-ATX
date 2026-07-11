@@ -1191,8 +1191,8 @@ async def deploy_architecture(
         endpoint = ""
 
         try:
-            from deployer.credential_manager import credential_exists, load_credential, write_gcp_credential_file, get_aws_keys
-            from deployer.iac_generator import generate_gcp_terraform, generate_aws_terraform
+            from deployer.credential_manager import credential_exists, load_credential, write_gcp_credential_file, get_aws_keys, get_alicloud_keys
+            from deployer.iac_generator import generate_gcp_terraform, generate_aws_terraform, generate_alicloud_terraform
             from deployer.deployment_engine import (
                 prepare_workspace, write_terraform_files,
                 terraform_init, terraform_plan, terraform_apply,
@@ -1216,6 +1216,8 @@ async def deploy_architecture(
                         project_id = _json.loads(raw).get("project_id", "")
                         logger.info(f"   Auto-detected GCP project_id from credentials: {project_id}")
                 files = generate_gcp_terraform(project_id=project_id, region=region, environment=environment)
+            elif provider == "alicloud":
+                files = generate_alicloud_terraform(region=region, environment=environment)
             else:
                 files = generate_aws_terraform(account_id=config.get("accountId", ""), region=region, environment=environment)
 
@@ -1238,6 +1240,14 @@ async def deploy_architecture(
                         f"-var=region={region}",
                         f"-var=environment={environment}",
                         f"-var=credentials_file={cred_path}",
+                    ]
+                elif provider == "alicloud":
+                    key_id, secret = get_alicloud_keys()
+                    var_args = [
+                        f"-var=region={region}",
+                        f"-var=environment={environment}",
+                        f"-var=access_key={key_id}",
+                        f"-var=secret_key={secret}",
                     ]
                 elif provider == "aws":
                     key_id, secret = get_aws_keys()

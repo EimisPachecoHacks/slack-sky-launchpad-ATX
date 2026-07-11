@@ -2,7 +2,7 @@
 import type { User, Session } from '@supabase/supabase-js';
 
 // Core Types
-export type CloudProvider = 'aws' | 'azure' | 'gcp';
+export type CloudProvider = 'aws' | 'azure' | 'gcp' | 'alicloud';
 export type ResourceType = 'compute' | 'storage' | 'database' | 'network' | 'security' | 'serverless' | 'analytics' | 'ml' | 'container';
 export type ConnectionType = 'HTTP/HTTPS' | 'TCP/IP' | 'Message Queue' | 'Event' | 'Database' | 'API' | 'WebSocket';
 type OptimizationPreference = 'cost' | 'performance' | 'balanced';

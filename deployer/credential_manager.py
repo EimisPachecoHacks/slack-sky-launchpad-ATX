@@ -72,6 +72,12 @@ def parse_credential(provider: str, raw: str) -> dict:
             "client_email": data.get("client_email", ""),
             "type": data.get("type", ""),
         }
+    elif provider == "alicloud":
+        data = json.loads(raw.lstrip("\ufeff"))
+        return {
+            "access_key_id": data.get("access_key_id", data.get("AccessKeyId", "")),
+            "region": data.get("region", "ap-southeast-1"),
+        }
     elif provider == "aws":
         clean = raw.lstrip("\ufeff")
         if clean.strip().startswith("{"):
@@ -101,6 +107,21 @@ def parse_credential(provider: str, raw: str) -> dict:
         return {"raw_format": "unknown", "needs_access_keys": True}
 
     return {}
+
+
+def get_alicloud_keys() -> tuple:
+    """Get Alibaba Cloud RAM AccessKey id + secret from stored credentials.
+
+    Expects JSON: {"access_key_id": "...", "access_key_secret": "...",
+    "region": "ap-southeast-1"}. Also accepts the console's AccessKeyId /
+    AccessKeySecret capitalisation.
+    """
+    data = json.loads(load_credential("alicloud").lstrip("﻿"))
+    key_id = data.get("access_key_id") or data.get("AccessKeyId", "")
+    secret = data.get("access_key_secret") or data.get("AccessKeySecret", "")
+    if key_id and secret:
+        return key_id, secret
+    raise ValueError("Could not extract Alibaba Cloud AccessKey from stored credentials")
 
 
 def get_aws_keys() -> tuple:

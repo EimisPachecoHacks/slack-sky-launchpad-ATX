@@ -33,13 +33,20 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       icon: <Server className="w-10 h-10 text-green-500" />,
       description: 'Google Cloud Platform',
       color: 'from-green-500 to-teal-500'
+    },
+    {
+      id: 'alicloud',
+      name: 'Alibaba Cloud',
+      icon: <Cloud className="w-10 h-10 text-orange-400" />,
+      description: 'Alibaba Cloud (alicloud)',
+      color: 'from-orange-400 to-red-500'
     }
   ];
 
   return (
     <div className="py-8">
       <h2 className="text-2xl font-bold mb-6 text-center">Select Cloud Provider</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-5xl mx-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
         {providers.map((provider) => (
           <div
             key={provider.id}

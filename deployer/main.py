@@ -17,6 +17,7 @@ from pathlib import Path
 from .config import MAX_DEPLOY_RETRIES, SUPPORTED_PROVIDERS
 from .credential_manager import (
     credential_exists,
+    get_alicloud_keys,
     get_aws_keys,
     load_credential,
     parse_credential,
@@ -34,7 +35,7 @@ from .deployment_engine import (
 )
 from .deployment_validator import DeploymentResult, analyze_and_fix
 from .gitlab_saver import GitLabSaver
-from .iac_generator import generate_aws_terraform, generate_gcp_terraform
+from .iac_generator import generate_alicloud_terraform, generate_aws_terraform, generate_gcp_terraform
 from .log_collector import collect_failure_context
 from .skill_library import save_skill
 from .deploy_events import record_event
@@ -193,6 +194,14 @@ def get_deployment_config(provider: str, cred_info: dict) -> dict:
             "environment": environment,
         }
 
+    elif provider == "alicloud":
+        region = input("  Region [ap-southeast-1]: ").strip() or "ap-southeast-1"
+        environment = input("  Environment [dev]: ").strip() or "dev"
+        return {
+            "region": region,
+            "environment": environment,
+        }
+
     elif provider == "aws":
         account_id = cred_info.get("account_id", "")
         if account_id:
@@ -235,6 +244,11 @@ def generate_code(provider: str, config: dict) -> dict[str, str]:
     if provider == "gcp":
         return generate_gcp_terraform(
             project_id=config["project_id"],
+            region=config["region"],
+            environment=config["environment"],
+        )
+    elif provider == "alicloud":
+        return generate_alicloud_terraform(
             region=config["region"],
             environment=config["environment"],
         )
@@ -356,6 +370,14 @@ def _build_var_args(provider: str, config: dict, workspace: Path) -> list[str]:
             f"-var=region={config['region']}",
             f"-var=environment={config['environment']}",
             f"-var=credentials_file={cred_path}",
+        ])
+    elif provider == "alicloud":
+        key_id, secret_key = get_alicloud_keys()
+        args.extend([
+            f"-var=region={config['region']}",
+            f"-var=environment={config['environment']}",
+            f"-var=access_key={key_id}",
+            f"-var=secret_key={secret_key}",
         ])
     elif provider == "aws":
         key_id, secret_key = get_aws_keys()
