@@ -8,10 +8,10 @@ interface VoiceInputProps {
 }
 
 /**
- * Voice input powered by Google Gemini (gemini-3.1-flash-live-preview).
+ * Voice input powered by Whisper (openai/whisper-large-v3) on the AMD GPU.
  *
  * Records mic audio in the browser, then POSTs it to the backend
- * `/api/voice/transcribe` endpoint, which transcribes it with Gemini.
+ * `/api/voice/transcribe` endpoint, which transcribes it with Whisper.
  * (Replaces the previous ElevenLabs Scribe integration.)
  */
 const VoiceInput: React.FC<VoiceInputProps> = ({

@@ -1,6 +1,6 @@
 /**
  * API Service for Skyrchitect AI Backend
- * Connects React frontend to FastAPI backend (Anthropic default: Claude Opus 4.6)
+ * Connects React frontend to FastAPI backend (Gemma 4 on AMD ROCm)
  */
 
 import { env } from '../config/env';

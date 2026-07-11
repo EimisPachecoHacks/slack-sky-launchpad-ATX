@@ -17,6 +17,7 @@ Both approaches ensure the hackathon requirement of using GitLab Duo is met.
 import json
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 import time
@@ -26,7 +27,11 @@ import requests as _requests
 
 logger = logging.getLogger(__name__)
 
-_GLAB_PATH = os.getenv("GLAB_PATH", "/opt/homebrew/bin/glab")
+# Resolve the glab binary portably: explicit GLAB_PATH wins, otherwise auto-detect
+# on PATH (works on the Linux droplet), and only then fall back to the macOS
+# Homebrew default. Hardcoding /opt/homebrew/bin/glab broke the CLI fallback on
+# Linux hosts where glab lives at /usr/bin/glab or /home/linuxbrew/.linuxbrew/bin.
+_GLAB_PATH = os.getenv("GLAB_PATH") or shutil.which("glab") or "/opt/homebrew/bin/glab"
 _GITLAB_TOKEN = os.getenv("GITLAB_TOKEN", "")
 _GITLAB_BASE_URL = os.getenv("GITLAB_BASE_URL", "https://gitlab.com")
 _GITLAB_USER_ID = os.getenv("GITLAB_USER_ID", "")

@@ -8,7 +8,7 @@ import { Volume2, VolumeX, Loader2 } from 'lucide-react';
  * self-improvement loop in real time.
  *
  * When enabled it opens a WebSocket to `${apiBase}/api/live/narrate` and:
- *   - plays binary PCM audio chunks streamed from the Gemini Live API
+ *   - speaks narration via the browser's SpeechSynthesis (server sends text only)
  *     (decoded via the Web Audio API), and
  *   - falls back to `window.speechSynthesis.speak()` for text-only frames
  *     (when the backend could not produce audio).
@@ -21,7 +21,7 @@ interface LiveNarrationToggleProps {
   apiBase?: string;
 }
 
-// Gemini Live streams 16-bit PCM mono at 24kHz. Used to decode raw audio frames.
+// Legacy PCM decoder (inert): the server now streams text only, spoken via SpeechSynthesis.
 const PCM_SAMPLE_RATE = 24000;
 
 interface NarrationFrame {
@@ -145,7 +145,7 @@ const LiveNarrationToggle: React.FC<LiveNarrationToggleProps> = ({ apiBase = '' 
 
     ws.onmessage = (ev: MessageEvent) => {
       if (ev.data instanceof ArrayBuffer) {
-        // Binary audio frame from Gemini Live.
+        // Binary audio frame (legacy path; server no longer sends these).
         playPcmChunk(ev.data);
         return;
       }

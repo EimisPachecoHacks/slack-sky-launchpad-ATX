@@ -463,7 +463,7 @@ const SelfTestPanel: React.FC<SelfTestPanelProps> = ({
             UI Self-Test
           </h2>
           <p className="text-sm text-gray-400">
-            Gemini Computer Use drives the live app like a real user.
+            Playwright drives the live app; Gemma 4 diagnoses and fixes UI bugs.
           </p>
         </div>
         {/* Health badge */}
