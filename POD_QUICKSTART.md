@@ -44,17 +44,17 @@ Confirm in the output:
 
 ---
 
-## 2. Serve Gemma 3 + embeddings (uses the preinstalled vLLM)
+## 2. Serve Gemma 4 + embeddings (uses the preinstalled vLLM)
 
 Your image already has vLLM 0.16.0, so serve straight from it. **Two processes,
 two ports.** Run each in its own Jupyter terminal tab (they stay in the
 foreground and stream logs).
 
-**Terminal A — generation + vision (Gemma 3):**
+**Terminal A — generation + vision (Gemma 4):**
 ```bash
-vllm serve google/gemma-3-12b-it \
+vllm serve google/gemma-4-31b-it \
   --host 0.0.0.0 --port 8000 \
-  --served-model-name gemma3
+  --served-model-name gemma4
 # First run downloads ~24 GB of weights. Wait for: "Application startup complete".
 ```
 
@@ -66,18 +66,18 @@ vllm serve BAAI/bge-large-en-v1.5 \
   --served-model-name bge-large
 ```
 
-> **If a vLLM command errors** (Gemma 3 gating, ROCm multimodal quirks, or embed
+> **If a vLLM command errors** (Gemma 4 gating, ROCm multimodal quirks, or embed
 > task unsupported), fall back to Ollama — it's the most forgiving path on ROCm:
 > ```bash
 > curl -fsSL https://ollama.com/install.sh | sh
 > curl -fsSL https://ollama.com/download/ollama-linux-amd64-rocm.tar.zst | tar -x --zstd -C /usr
 > OLLAMA_HOST=0.0.0.0:11434 ollama serve &      # then, in another terminal:
-> ollama pull gemma3:12b && ollama pull mxbai-embed-large
+> ollama pull gemma4:31b && ollama pull mxbai-embed-large
 > ```
 > Ollama serves both models on **one** port (`11434`), so set both base URLs to
-> `http://localhost:11434/v1` and use models `gemma3:12b` / `mxbai-embed-large`.
+> `http://localhost:11434/v1` and use models `gemma4:31b` / `mxbai-embed-large`.
 
-**Gated-model note:** `google/gemma-3-12b-it` on Hugging Face requires accepting
+**Gated-model note:** `google/gemma-4-31b-it` on Hugging Face requires accepting
 the Gemma license. Either accept it once on huggingface.co and
 `export HF_TOKEN=hf_...` before `vllm serve`, **or** use the Ollama path above,
 which pulls Gemma from Ollama's registry with no token.
@@ -111,8 +111,8 @@ curl localhost:8100/health                # {"gpu": true, "hip": "..."} = AMD bu
 # vLLM path (from §2):
 export LLM_PROVIDER=amd
 export LLM_BASE_URL=http://localhost:8000/v1
-export LLM_MODEL=gemma3
-export LLM_VISION_MODEL=gemma3
+export LLM_MODEL=gemma4
+export LLM_VISION_MODEL=gemma4
 export EMBED_BASE_URL=http://localhost:8001/v1
 export EMBED_MODEL=bge-large
 export EMBED_DIMENSIONS=1024
@@ -126,7 +126,7 @@ cd project && uvicorn backend.api.main:app --host 0.0.0.0 --port 8080
 ```
 
 > Using the **Ollama** fallback instead? Set both base URLs to
-> `http://localhost:11434/v1`, `LLM_MODEL=gemma3:12b`, `EMBED_MODEL=mxbai-embed-large`.
+> `http://localhost:11434/v1`, `LLM_MODEL=gemma4:31b`, `EMBED_MODEL=mxbai-embed-large`.
 
 ---
 
@@ -150,8 +150,8 @@ Skip if `MONGODB_URI` is unset (retrieval then uses the local JSON store).
 
 ## 6. The demo (this is the submission)
 
-1. Show `rocm-smi` — Gemma 3 + embedder resident on one MI300X.
-2. In the UI, describe an infra need → Gemma 3 returns architecture + Terraform.
+1. Show `rocm-smi` — Gemma 4 + embedder resident on one MI300X.
+2. In the UI, describe an infra need → Gemma 4 returns architecture + Terraform.
 3. `terraform apply` **fails** on a disabled GCP API.
 4. Watch the narration: `failure → diagnose → learned → retry`.
 5. `skills/learned/gcp-enable-compute-api/SKILL.md` gets authored.
@@ -198,7 +198,7 @@ Paste the failing command's output back into our chat. The most likely snags:
 | Symptom | Cause | Fix |
 |---|---|---|
 | `ollama ps` / `rocm-smi` shows CPU | ROCm runtime didn't load | Restart the process; verify §1 showed `gfx942` |
-| Gemma 3 vision returns garbage | vLLM multimodal on ROCm is fragile | Use Ollama for vision, or demo diagram upload last |
+| Gemma 4 vision returns garbage | vLLM multimodal on ROCm is fragile | Use Ollama for vision, or demo diagram upload last |
 | `500` on voice transcribe | `ffmpeg` missing | `apt-get install -y ffmpeg` |
 | `$vectorSearch` returns nothing | Atlas index missing/wrong dims | Recreate index at 1024-d, rerun §5 |
 | Gemma download 401/403 | gated model, no token | `export HF_TOKEN=...` or use Ollama |

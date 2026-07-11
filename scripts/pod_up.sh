@@ -8,7 +8,7 @@
 # docker/docker-compose.amd.yml instead.
 #
 # Everything below runs on the MI300X:
-#   ollama          :11434  gemma3:12b (chat + vision) and mxbai-embed-large (1024-d)
+#   ollama          :11434  gemma4:31b (chat + vision) and mxbai-embed-large (1024-d)
 #   whisper_server  :8100   openai/whisper-large-v3
 #   backend         :8080   FastAPI
 #
@@ -24,7 +24,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_DIR="${REPO_ROOT}/.pod-logs"
 mkdir -p "$LOG_DIR"
 
-LLM_MODEL="${LLM_MODEL:-gemma3:12b}"
+LLM_MODEL="${LLM_MODEL:-gemma4:31b}"
 EMBED_MODEL="${EMBED_MODEL:-mxbai-embed-large}"
 WHISPER_MODEL="${WHISPER_MODEL:-openai/whisper-large-v3}"
 

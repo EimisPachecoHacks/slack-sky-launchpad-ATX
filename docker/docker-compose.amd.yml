@@ -9,7 +9,7 @@
 # vector index stays valid across them.
 #
 # AMD silicon is load-bearing for BOTH halves of the self-improving loop:
-#   ollama  -> gemma3:12b generates architectures, repairs failed Terraform, and
+#   ollama  -> gemma4:31b generates architectures, repairs failed Terraform, and
 #              reads architecture diagrams (it is natively multimodal)
 #           -> mxbai-embed-large (1024-d) embeds learned skills so Atlas Vector
 #              Search can retrieve the right past failure
@@ -57,7 +57,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      "ollama pull gemma3:12b && ollama pull mxbai-embed-large && echo 'models ready'"
+      "ollama pull gemma4:31b && ollama pull mxbai-embed-large && echo 'models ready'"
     restart: "no"
 
   whisper:
@@ -101,8 +101,8 @@ services:
     environment:
       LLM_PROVIDER: amd
       LLM_BASE_URL: http://ollama:11434/v1
-      LLM_MODEL: gemma3:12b
-      LLM_VISION_MODEL: gemma3:12b
+      LLM_MODEL: gemma4:31b
+      LLM_VISION_MODEL: gemma4:31b
       EMBED_BASE_URL: http://ollama:11434/v1
       EMBED_MODEL: mxbai-embed-large
       EMBED_DIMENSIONS: "1024"

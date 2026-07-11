@@ -38,8 +38,9 @@ logger = logging.getLogger(__name__)
 FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference/v1"
 FIREWORKS_AUDIO_BASE_URL = "https://audio-prod.us-virginia-1.direct.fireworks.ai/v1"
 
-# Ollama on the MI300X. gemma3:12b is multimodal, and Ollama's OpenAI-compatible
-# endpoint accepts base64 `data:` image URLs (remote http image URLs it does not).
+# Ollama on the MI300X. gemma4:31b (Google Gemma 4, 31B dense, 256K context) is
+# multimodal, and Ollama's OpenAI-compatible endpoint accepts base64 `data:`
+# image URLs (remote http image URLs it does not).
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
 # Per-provider defaults, overridden by any explicit LLM_*/EMBED_* setting.
@@ -51,8 +52,8 @@ _PROVIDER_DEFAULTS = {
     },
     "amd": {
         "LLM_BASE_URL": OLLAMA_BASE_URL,
-        "LLM_MODEL": "gemma3:12b",
-        "LLM_VISION_MODEL": "gemma3:12b",
+        "LLM_MODEL": "gemma4:31b",
+        "LLM_VISION_MODEL": "gemma4:31b",
     },
 }
 

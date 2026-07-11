@@ -28,9 +28,9 @@ AMD silicon is load-bearing for **both halves** of the self-improving loop, not 
 
 | Role | Model | Where |
 |---|---|---|
-| Architecture generation | Gemma 3 (`gemma3:12b`) | Ollama on ROCm (MI300X) |
-| Failure repair + skill authoring | Gemma 3 | Ollama on ROCm (MI300X) |
-| Diagram vision (natively multimodal) | Gemma 3 | Ollama on ROCm (MI300X) |
+| Architecture generation | Gemma 4 (`gemma4:31b`) | Ollama on ROCm (MI300X) |
+| Failure repair + skill authoring | Gemma 4 | Ollama on ROCm (MI300X) |
+| Diagram vision (natively multimodal) | Gemma 4 | Ollama on ROCm (MI300X) |
 | Skill-retrieval embeddings | mxbai-embed-large (1024-d) | Ollama on ROCm (MI300X) |
 | Speech-to-text | openai/whisper-large-v3 | PyTorch-ROCm (MI300X) |
 
@@ -40,7 +40,7 @@ from vector search to lexical cosine. Semantic recall of past failures exists
 *because* of the GPU.
 
 ### Creativity / originality — ✅ STRONG
-The self-improving loop: failure → Gemma 3 repair → auto-authored `SKILL.md` →
+The self-improving loop: failure → Gemma 4 repair → auto-authored `SKILL.md` →
 embedded on the MI300X → vector-retrieved to pre-empt recurrence. No human edits a skill.
 
 ### Completeness — ◑ PARTIAL
@@ -64,7 +64,7 @@ Our inference stack is open-weight and self-hosted regardless. We distinguish
 
 | Component | License | Note |
 |---|---|---|
-| Gemma 3 (`gemma3:12b`) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) | **Open weights, not OSI.** Gemma *code* is Apache 2.0; the *weights* are not. Gated on Hugging Face — pulling via Ollama's registry avoids the token. |
+| Gemma 4 (`gemma4:31b`) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) | **Open weights, not OSI.** Gemma *code* is Apache 2.0; the *weights* are not. Gated on Hugging Face — pulling via Ollama's registry avoids the token. |
 | mxbai-embed-large-v1 | Apache 2.0 | Fully OSI, not gated. |
 | openai/whisper-large-v3 | Apache 2.0 | Fully OSI, not gated. |
 | Ollama | MIT | Serving runtime; bundles its own ROCm build. |
@@ -121,13 +121,13 @@ the credit.
    Confirm `rocminfo` reports `gfx942` and `ollama ps` shows `PROCESSOR = GPU`.
 4. **Create the Atlas vector index** (`numDimensions: 1024`, `path: "embedding"`,
    `similarity: cosine`), then run `python3 scripts/migrate_vector_index.py`.
-5. **Record the demo:** fail a deploy on a disabled GCP API → Gemma 3 authors
+5. **Record the demo:** fail a deploy on a disabled GCP API → Gemma 4 authors
    `gcp-enable-compute-api` → re-run the same requirement → the failure never occurs.
 6. **Fill the DEVPOST placeholders** — repo URL, screenshots, demo video.
 
 ## 8. Known risks
 
-- **Gemma 3 vision via Ollama** is the least-proven path. Text generation is
+- **Gemma 4 vision via Ollama** is the least-proven path. Text generation is
   well-trodden; multimodal on ROCm has sharp edges. Test diagram upload early — the
   loop does not depend on it.
 - **`ffmpeg` must be present** on the pod, or browser `audio/webm;codecs=opus` will not

@@ -1,6 +1,6 @@
 # Sky Launchpad
 
-**Infrastructure that learns from its own failures.** Turn **natural language** or **uploaded diagrams** into **multi-cloud Terraform**, **deploy for real**, then **save proven code to GitLab** — powered end to end by **Gemma 3 running on an AMD Instinct MI300X**.
+**Infrastructure that learns from its own failures.** Turn **natural language** or **uploaded diagrams** into **multi-cloud Terraform**, **deploy for real**, then **save proven code to GitLab** — powered end to end by **Gemma 4 running on an AMD Instinct MI300X**.
 
 - **Primary UX:** Web app under [`project/`](project/) (Vite + FastAPI): architecture → code → **real `terraform apply`** (AWS/GCP) → GitLab MR on success (**deploy-first, validate-then-save**).
 - **GitLab-native assets:** Custom **flow**, **chat agent**, **skills**, **chat rules**, and **MR review** instructions live in this repo for Duo-driven workflows inside GitLab.
@@ -11,9 +11,9 @@ Everything runs on AMD silicon, and **AMD is load-bearing for both halves of the
 
 | Role | Model | Where |
 |---|---|---|
-| Architecture generation | **Gemma 3** (`gemma3:12b`) | Ollama on ROCm (MI300X) |
-| Failure repair + skill authoring | **Gemma 3** | Ollama on ROCm (MI300X) |
-| Diagram vision (Gemma 3 is natively multimodal) | **Gemma 3** | Ollama on ROCm (MI300X) |
+| Architecture generation | **Gemma 4** (`gemma4:31b`) | Ollama on ROCm (MI300X) |
+| Failure repair + skill authoring | **Gemma 4** | Ollama on ROCm (MI300X) |
+| Diagram vision (Gemma 4 is natively multimodal) | **Gemma 4** | Ollama on ROCm (MI300X) |
 | Skill-retrieval embeddings | **mxbai-embed-large** (1024-d) | Ollama on ROCm (MI300X) |
 | Speech-to-text | **openai/whisper-large-v3** | PyTorch-ROCm (MI300X) |
 
@@ -26,7 +26,7 @@ No hosted inference: every token and every vector is computed on the MI300X. One
 When a deployment **fails**, Sky Launchpad doesn't just patch and forget. It **learns**:
 
 1. **[`deployer/log_collector.py`](deployer/log_collector.py)** gathers the Terraform error **plus real GCP Cloud Logging** entries.
-2. **[`deployer/repair_agent.py`](deployer/repair_agent.py)** hands that context to **Gemma 3**, which diagnoses the root cause, fixes the HCL, and **authors a new generalized `SKILL.md`**. Its persona is declared in [`deployer/AGENTS.md`](deployer/AGENTS.md).
+2. **[`deployer/repair_agent.py`](deployer/repair_agent.py)** hands that context to **Gemma 4**, which diagnoses the root cause, fixes the HCL, and **authors a new generalized `SKILL.md`**. Its persona is declared in [`deployer/AGENTS.md`](deployer/AGENTS.md).
 3. **[`deployer/skill_library.py`](deployer/skill_library.py)** persists the lesson to **both** a versioned `skills/learned/<slug>/SKILL.md` **and** a retrieval index, embedding it on the MI300X.
 4. **Transfer:** the next deployment retrieves matching learned skills by vector similarity and injects them into generation — so the **same failure never happens twice**.
 5. **[`project/backend/narration.py`](project/backend/narration.py)** streams a live text narration of the loop over a WebSocket (the browser speaks it aloud).
@@ -40,7 +40,7 @@ AMD gives you two different environments, and they need different launch paths.
 **On the free hackathon pod** (`notebooks.amd.com/hackathon`) — a managed JupyterLab container. You are root *inside a container*, so `docker run` is unavailable. Everything installs as a plain process:
 
 ```bash
-bash scripts/pod_up.sh          # Ollama (ROCm) + Gemma 3 + embeddings + Whisper
+bash scripts/pod_up.sh          # Ollama (ROCm) + Gemma 4 + embeddings + Whisper
 bash scripts/pod_up.sh --check  # just probe the environment, install nothing
 bash scripts/pod_down.sh        # stop the GPU clock (8h per rolling 24h)
 ```
@@ -84,8 +84,8 @@ flowchart TB
     A[Describe requirements or upload diagram]
   end
   subgraph gpu["AMD MI300X (ROCm)"]
-    B["Gemma 3 — architecture reasoning + diagram vision"]
-    R["Gemma 3 — diagnose failure, repair HCL, author SKILL.md"]
+    B["Gemma 4 — architecture reasoning + diagram vision"]
+    R["Gemma 4 — diagnose failure, repair HCL, author SKILL.md"]
     V["mxbai-embed-large — embed + retrieve skills"]
   end
   subgraph run["Runtime"]
@@ -101,8 +101,8 @@ flowchart TB
   R -->|"retry with fix"| C
 ```
 
-1. User selects **AWS, GCP, or Azure** (UI) and enters requirements **or** uploads an architecture image (**Gemma 3** reads the diagram directly — it is natively multimodal, so vision and structured output happen in one call).
-2. **Gemma 3 on the MI300X** produces architecture JSON, informed by **`AGENTS.md`**, **`skills/`**, and any **learned skills** retrieved by vector similarity. Terraform itself is rendered by [`deployer/iac_generator.py`](deployer/iac_generator.py) (templating, no LLM).
+1. User selects **AWS, GCP, or Azure** (UI) and enters requirements **or** uploads an architecture image (**Gemma 4** reads the diagram directly — it is natively multimodal, so vision and structured output happen in one call).
+2. **Gemma 4 on the MI300X** produces architecture JSON, informed by **`AGENTS.md`**, **`skills/`**, and any **learned skills** retrieved by vector similarity. Terraform itself is rendered by [`deployer/iac_generator.py`](deployer/iac_generator.py) (templating, no LLM).
 3. **FastAPI** runs **`terraform init/plan/apply`** against the user’s cloud using encrypted stored credentials (`deployer/` module at repo root).
 4. On **success**, validated files are committed and a **merge request** is opened via the **GitLab REST API**. On **failure**, the repair loop runs and the lesson is embedded back into step 2.
 
@@ -171,9 +171,9 @@ Set **`VITE_API_URL`** at **Docker build time** to your Cloud Run HTTPS URL so t
 | Hackathon platform | **GitLab Duo** (flows, agents, skills, chat rules) |
 | Companion backend | **FastAPI**, **Terraform** CLI, **GitLab REST** |
 | Companion frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind** |
-| Inference (GPU) | **Gemma 3** + **mxbai-embed-large** on **Ollama / ROCm / AMD MI300X** |
+| Inference (GPU) | **Gemma 4** + **mxbai-embed-large** on **Ollama / ROCm / AMD MI300X** |
 | Inference (managed fallback) | **Fireworks AI** (AMD-hosted) |
-| Vision (diagrams) | **Gemma 3** (natively multimodal) |
+| Vision (diagrams) | **Gemma 4** (natively multimodal) |
 | Skill retrieval | **MongoDB Atlas Vector Search** (1024-d, cosine) |
 | App hosting (fallback) | **Google Cloud Run**, **Artifact Registry**, **Cloud Build** |
 | Voice | **Whisper** (input) + browser SpeechSynthesis (output) |
@@ -186,7 +186,7 @@ thing and Gemma is the case that matters:
 
 | Component | License | Notes |
 |---|---|---|
-| **Gemma 3** (`gemma3:12b`) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) | **Open weights, not OSI.** The Gemma *code* is Apache 2.0; the *weights* are not. Gated on Hugging Face — pulling via Ollama's registry avoids the token. Commercial use permitted, subject to the prohibited-use policy. |
+| **Gemma 4** (`gemma4:31b`) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) | **Open weights, not OSI.** The Gemma *code* is Apache 2.0; the *weights* are not. Gated on Hugging Face — pulling via Ollama's registry avoids the token. Commercial use permitted, subject to the prohibited-use policy. |
 | **mxbai-embed-large-v1** | Apache 2.0 | Fully OSI. Natively 1024-d. |
 | **openai/whisper-large-v3** | Apache 2.0 | Fully OSI, not gated. |
 | **Ollama** | MIT | Serving runtime, bundles its own ROCm build. |

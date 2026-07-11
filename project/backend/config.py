@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # ---------------------------------------------------------------------
     # Inference — every backend speaks the OpenAI wire format (see llm_client.py)
     # ---------------------------------------------------------------------
-    # LLM_PROVIDER picks the defaults: "amd" (Gemma 3 on a ROCm MI300X, served by
+    # LLM_PROVIDER picks the defaults: "amd" (Gemma 4 on a ROCm MI300X, served by
     # Ollama or vLLM) or "fireworks" (managed, also AMD-hosted, needs a paid key).
     # Any explicit LLM_* below wins.
     LLM_PROVIDER: str = Field(default="amd", description="Inference backend: amd | fireworks")

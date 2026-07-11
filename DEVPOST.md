@@ -1,6 +1,6 @@
 # Sky Launchpad
 
-**Infrastructure that learns from its own failures — Gemma 3 and its own memory, running on an AMD Instinct MI300X.**
+**Infrastructure that learns from its own failures — Gemma 4 and its own memory, running on an AMD Instinct MI300X.**
 
 *Submitted to the AMD Developer Hackathon: ACT II — Unicorn Track (🦄)*
 
@@ -23,8 +23,8 @@ Sky Launchpad turns natural language or an uploaded architecture diagram into mu
 The interesting part is what happens when it **fails**:
 
 1. **Collect** — `deployer/log_collector.py` gathers the Terraform error *plus real GCP Cloud Logging* entries, and the exact HCL lines around each error.
-2. **Diagnose** — `deployer/repair_agent.py` hands that context to **Gemma 3**, which finds the root cause and rewrites the broken HCL.
-3. **Author** — the same Gemma 3 call writes a **new, generalized `SKILL.md`** — not "fix line 42", but "enable `compute.googleapis.com` before creating compute resources, and depend on it."
+2. **Diagnose** — `deployer/repair_agent.py` hands that context to **Gemma 4**, which finds the root cause and rewrites the broken HCL.
+3. **Author** — the same Gemma 4 call writes a **new, generalized `SKILL.md`** — not "fix line 42", but "enable `compute.googleapis.com` before creating compute resources, and depend on it."
 4. **Remember** — the skill is embedded by **mxbai-embed-large on the MI300X** and indexed in MongoDB Atlas Vector Search.
 5. **Transfer** — the *next* deployment retrieves matching skills by vector similarity and injects them into generation.
 
@@ -38,13 +38,13 @@ Run a deploy that fails on a disabled API, watch it repair itself and write `gcp
 
 | Role | Model | Where |
 |---|---|---|
-| Architecture generation | **Gemma 3** (`gemma3:12b`) | Ollama on ROCm (MI300X) |
-| Failure repair + skill authoring | **Gemma 3** | Ollama on ROCm (MI300X) |
-| Diagram vision — Gemma 3 is natively multimodal | **Gemma 3** | Ollama on ROCm (MI300X) |
+| Architecture generation | **Gemma 4** (`gemma4:31b`) | Ollama on ROCm (MI300X) |
+| Failure repair + skill authoring | **Gemma 4** | Ollama on ROCm (MI300X) |
+| Diagram vision — Gemma 4 is natively multimodal | **Gemma 4** | Ollama on ROCm (MI300X) |
 | Skill-retrieval embeddings | **mxbai-embed-large** (1024-d) | Ollama on ROCm (MI300X) |
 | Speech-to-text | **openai/whisper-large-v3** | PyTorch-ROCm (MI300X) |
 
-The MI300X's 192 GB of VRAM lets Gemma 3, the embedder, and Whisper sit resident on **one GPU simultaneously** — generation, retrieval, and speech, same card, no swapping. `rocm-smi` shows all of them. **No hosted inference anywhere in the loop** — every token and every vector is computed on the MI300X. (The loop still talks to MongoDB Atlas, GCP Cloud Logging, and the GitLab API; those are storage and telemetry, not intelligence.)
+The MI300X's 192 GB of VRAM lets Gemma 4, the embedder, and Whisper sit resident on **one GPU simultaneously** — generation, retrieval, and speech, same card, no swapping. `rocm-smi` shows all of them. **No hosted inference anywhere in the loop** — every token and every vector is computed on the MI300X. (The loop still talks to MongoDB Atlas, GCP Cloud Logging, and the GitLab API; those are storage and telemetry, not intelligence.)
 
 Here's the proof that AMD is load-bearing rather than decorative: **embeddings have exactly one model, and no fallback.** Vectors from different models aren't comparable, so a "just use a hosted embedder when the GPU is down" fallback would silently poison the vector index with a foreign coordinate space — the exact class of bug we found and fixed in the original code, which was writing `gemini-embedding-001` vectors from one path and `text-embedding-004` vectors from another into the same retrieval system. So when the embedding endpoint is unreachable, `skydb.find_similar_skills` **degrades to lexical matching** instead. Semantic recall of past failures exists *because* of the AMD GPU. Turn it off and the system measurably forgets how to remember.
 
@@ -54,11 +54,11 @@ The demo needs **no hosted inference at all** — not Fireworks, not anyone. `LL
 
 ## Best use of Gemma
 
-**One open model, three jobs.** Gemma 3 is the architect, the repairer, and the eyes:
+**One open model, three jobs.** Gemma 4 is the architect, the repairer, and the eyes:
 
 - **Architect** — generates the architecture JSON and the Terraform.
 - **Repairer** — reads Cloud Logging output, rewrites failed HCL, and authors the reusable skill. This is the self-improvement engine, and it's Gemma.
-- **Eyes** — Gemma 3 is natively multimodal, so an uploaded architecture diagram goes straight to the *same model* that generates architectures. We deleted the separate vision provider entirely. The model that draws can also read.
+- **Eyes** — Gemma 4 is natively multimodal, so an uploaded architecture diagram goes straight to the *same model* that generates architectures. We deleted the separate vision provider entirely. The model that draws can also read.
 
 Open weights under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms), running on our own hardware, with the repair loop's knowledge accumulating in a plain `skills/` directory we own.
 
@@ -67,7 +67,7 @@ Open weights under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms), 
 Everything the app touches speaks the **OpenAI wire format**, which collapsed four bespoke SDK integrations into one client:
 
 - **`project/backend/llm_client.py`** — `chat`, `vision_chat`, `transcribe`, `embed`. Provider selected by config, with per-provider defaults.
-- **`scripts/pod_up.sh`** — the free hackathon pod is a *managed JupyterLab container* with no `docker run`, so the stack installs as plain processes: Ollama's ROCm build, `gemma3:12b`, `mxbai-embed-large`, and our Whisper shim.
+- **`scripts/pod_up.sh`** — the free hackathon pod is a *managed JupyterLab container* with no `docker run`, so the stack installs as plain processes: Ollama's ROCm build, `gemma4:31b`, `mxbai-embed-large`, and our Whisper shim.
 - **`docker/docker-compose.amd.yml`** — for an AMD Developer Cloud droplet (real Docker host): `ollama` + `whisper` with ROCm device passthrough (`/dev/kfd`, `/dev/dri`, `video`/`render` groups, `--ipc=host`), plus a CPU-only `backend`. Same models as the pod, so the vector index stays valid across both.
 - **`services/whisper_server.py`** — `openai/whisper-large-v3` behind an OpenAI-compatible `/v1/audio/transcriptions`, on the GPU.
 - **`skydb/`** — MongoDB Atlas Vector Search with a graceful local-JSON fallback.
@@ -80,11 +80,11 @@ The whole submission is containerized: `docker compose -f docker/docker-compose.
 
 **A stale absolute path.** The learned-skill index stored an absolute path into a *different* repo directory. Every retrieval returned an empty skill body — the loop was "learning" and then reading nothing back. Resolving content from the slug instead of a stored path took `content_len` from `0` to `1333` on the first test.
 
-**Knowing what to cut.** Going all-in on an open stack meant losing two things with no open equivalent. We dropped server-side streaming TTS (the browser's `speechSynthesis` speaks the narration instead — that fallback was already implemented). And we retired the Computer-Use browser agent: no OpenAI-compatible provider serves a computer-use-tuned model, and Gemma 3 isn't grounded for pixel-level click targeting. Pretending otherwise would have shipped a demo that only works on stage. The endpoint now says so plainly instead of throwing an opaque error.
+**Knowing what to cut.** Going all-in on an open stack meant losing two things with no open equivalent. We dropped server-side streaming TTS (the browser's `speechSynthesis` speaks the narration instead — that fallback was already implemented). And we retired the Computer-Use browser agent: no OpenAI-compatible provider serves a computer-use-tuned model, and Gemma 4 isn't grounded for pixel-level click targeting. Pretending otherwise would have shipped a demo that only works on stage. The endpoint now says so plainly instead of throwing an opaque error.
 
 ## Accomplishments that we're proud of
 
-- **The loop closes on our own hardware.** Failure → Gemma 3 repair → auto-authored skill → embedded on the MI300X → vector-retrieved to pre-empt recurrence. No hosted agent platform anywhere in the path.
+- **The loop closes on our own hardware.** Failure → Gemma 4 repair → auto-authored skill → embedded on the MI300X → vector-retrieved to pre-empt recurrence. No hosted agent platform anywhere in the path.
 - **Turning the GPU off changes the behavior.** Vector retrieval degrades to lexical. That is the difference between *using* AMD and *depending* on it.
 - **Two real bugs found and fixed** during the port, both in the retrieval path the entire product premise rests on.
 - **One model, three roles.** We removed providers instead of adding them.
@@ -98,7 +98,7 @@ And an OpenAI-compatible wire format is a superpower. Ollama on ROCm exposes the
 ## What's next for Sky Launchpad
 
 - **Cross-project skill transfer** — a shared skill library, so one team's 2am lesson pre-empts another team's failure.
-- **Fine-tune Gemma 3 on accumulated skills** — the corpus of learned failures is exactly the dataset for a Terraform-repair LoRA, trained on the same MI300X that serves it.
+- **Fine-tune Gemma 4 on accumulated skills** — the corpus of learned failures is exactly the dataset for a Terraform-repair LoRA, trained on the same MI300X that serves it.
 - **Grounded UI agent** — revisit autonomous browser QA once an open VLM with reliable pixel grounding lands.
 
 ## Product / market potential
@@ -111,7 +111,7 @@ Sky Launchpad turns each failure into a durable, machine-readable asset that mak
 
 - **AMD Instinct MI300X** + **ROCm** (AMD Developer Cloud)
 - **Ollama (ROCm build)** — OpenAI-compatible serving for both generation and embeddings
-- **Gemma 3** (Google DeepMind, open weights, Gemma Terms of Use) — generation, repair, vision
+- **Gemma 4** (Google DeepMind, open weights, Gemma Terms of Use) — generation, repair, vision
 - **mxbai-embed-large** (1024-d, Apache 2.0) — skill-retrieval embeddings
 - **openai/whisper-large-v3** (Apache 2.0) on PyTorch-ROCm — self-hosted speech-to-text
 - **Fireworks AI** — optional managed AMD-hosted escape hatch (unused in the demo)
@@ -128,9 +128,9 @@ Full model-and-framework licensing table, including the open-weights-vs-OSI dist
 
 ### Screenshots
 
-`[Screenshot: rocm-smi + `ollama ps` showing gemma3:12b and mxbai-embed-large resident on one MI300X, PROCESSOR=GPU]`
+`[Screenshot: rocm-smi + `ollama ps` showing gemma4:31b and mxbai-embed-large resident on one MI300X, PROCESSOR=GPU]`
 
-`[Screenshot: a deploy failing, Gemma 3 diagnosing, and skills/learned/gcp-enable-compute-api/SKILL.md appearing]`
+`[Screenshot: a deploy failing, Gemma 4 diagnosing, and skills/learned/gcp-enable-compute-api/SKILL.md appearing]`
 
 `[Screenshot: the same requirement re-run — the learned skill is retrieved and the failure never occurs]`
 
