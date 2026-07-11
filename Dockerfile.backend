@@ -3,8 +3,17 @@
 # so no nginx is needed — uvicorn serves /api/uitest/* WS directly.
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 \
+RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 curl unzip \
     && rm -rf /var/lib/apt/lists/*
+
+# Terraform — the deploy loop shells out to `terraform init/plan/apply`, so the
+# binary must be on PATH inside the container (not just on the build host).
+ARG TERRAFORM_VERSION=1.7.5
+RUN curl -fsSL -o /tmp/terraform.zip \
+      "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+    && unzip -q /tmp/terraform.zip -d /usr/local/bin \
+    && rm /tmp/terraform.zip \
+    && terraform version
 
 WORKDIR /app
 
