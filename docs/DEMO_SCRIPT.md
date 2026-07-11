@@ -88,7 +88,7 @@ Use this script to record the hackathon submission demo video.
 
 > "Skyrchitect turns GitLab issues into production-ready GCP Terraform -- with security,
 > cost optimization, and best practices built in. It's built entirely on the GitLab Duo
-> Agent Platform with Gemma 3 on an AMD MI300X, five Agent Skills, and automated Terraform
+> Agent Platform with Gemma 4 on an AMD MI300X, five Agent Skills, and automated Terraform
 > review instructions.
 >
 > From issue to infrastructure, in minutes instead of hours."
@@ -120,7 +120,7 @@ From there, the user moves to code generation. Again, GitLab Duo handles this. T
 
 Then comes deployment. The user selects their cloud account — credentials they previously uploaded and stored securely — picks a region, and hits deploy. The backend runs a real Terraform workflow: init, plan, and apply against the actual cloud provider. If it fails, the system automatically analyzes the error logs, adjusts the code, and retries. Once deployment succeeds, the validated Terraform code is saved to GitLab. A dedicated Code Committer agent creates a branch, commits the files, and opens a Merge Request — all automatically. This is the deploy-first, validate-then-save philosophy. Code only reaches your repository after it has been proven to work.
 
-Now the second flow. Instead of describing requirements, the user uploads an architecture diagram — a screenshot, a whiteboard photo, anything visual. Gemma 3 is natively multimodal, so a single call on the MI300X does both jobs at once: it reads the image and returns the architectural analysis — identifying services, estimating costs, and structuring everything into the same format as the first flow. The same open model that designs architectures also reads them. From that point, the experience is identical: diagram review, code generation, deployment, and GitLab commit.
+Now the second flow. Instead of describing requirements, the user uploads an architecture diagram — a screenshot, a whiteboard photo, anything visual. Gemma 4 is natively multimodal, so a single call on the MI300X does both jobs at once: it reads the image and returns the architectural analysis — identifying services, estimating costs, and structuring everything into the same format as the first flow. The same open model that designs architectures also reads them. From that point, the experience is identical: diagram review, code generation, deployment, and GitLab commit.
 
 The core intelligence flows through the GitLab Duo Agent Platform — every architecture analysis, every line of generated Terraform, every code commit is orchestrated by Duo. The system creates GitLab issues to track each request, generates merge requests for validated code, and logs every step for full traceability.
 

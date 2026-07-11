@@ -1,7 +1,6 @@
 """OpenAI-compatible Whisper endpoint, served on the AMD MI300X.
 
-Replaces the hosted Fireworks Whisper API so speech-to-text also runs on our own
-AMD silicon. Exposes exactly the route `backend.llm_client.transcribe` calls:
+Speech-to-text runs on our own AMD silicon (no hosted API). Exposes exactly the route `backend.llm_client.transcribe` calls:
 
     POST /v1/audio/transcriptions      (multipart: file, model, response_format)
     ->  {"text": "..."}

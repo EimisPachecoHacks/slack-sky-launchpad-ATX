@@ -1,11 +1,11 @@
 """
 AI Agent for Cloud Architecture Recommendations
 
-Routes all text-based AI requests (architecture JSON + markdown) through Gemma 3
+Routes all text-based AI requests (architecture JSON + markdown) through Gemma 4
 (see backend/llm_client.py), served either by vLLM on an AMD ROCm GPU or by the
-Fireworks AI managed API.
+the AMD MI300X (Ollama).
 
-Image/vision analysis lives in image_analysis_agent.py (Gemma 3 as a VLM).
+Image/vision analysis lives in image_analysis_agent.py (Gemma 4 as a VLM).
 """
 
 import logging
@@ -67,7 +67,7 @@ After the JSON block, provide markdown with:
 
 
 class ArchitectureAgent:
-    """AI Agent for cloud architecture design, powered by Gemma 3."""
+    """AI Agent for cloud architecture design, powered by Gemma 4."""
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
         self.model = model or llm_client._resolve("LLM_MODEL")

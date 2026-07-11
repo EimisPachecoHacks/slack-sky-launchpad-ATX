@@ -1,5 +1,5 @@
 """
-Response Parser for Gemma 3 architecture JSON responses
+Response Parser for Gemma 4 architecture JSON responses
 Extracts JSON structure and markdown reasoning from hybrid responses
 """
 

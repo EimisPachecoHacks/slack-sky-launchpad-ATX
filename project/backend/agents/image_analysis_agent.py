@@ -1,11 +1,11 @@
 """
-Image Analysis Agent for Sky Launchpad — Gemma 3 (multimodal)
+Image Analysis Agent for Sky Launchpad — Gemma 4 (multimodal)
 
-A single Gemma 3 call looks at the uploaded cloud-architecture diagram and
+A single Gemma 4 call looks at the uploaded cloud-architecture diagram and
 returns the full structured analysis as JSON: detected components, categories,
 cost estimates, connections, and recommendations.
 
-Gemma 3 is natively multimodal, so vision extraction and architectural analysis
+Gemma 4 is natively multimodal, so vision extraction and architectural analysis
 happen in one step — the same open model that generates architectures also
 reads them.
 """
@@ -53,7 +53,7 @@ IMPORTANT:
 
 
 class ImageAnalysisAgent:
-    """Multimodal agent: Gemma 3 analyzes a diagram image and returns structured JSON."""
+    """Multimodal agent: Gemma 4 analyzes a diagram image and returns structured JSON."""
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
         self.model = model or llm_client._resolve("LLM_VISION_MODEL")

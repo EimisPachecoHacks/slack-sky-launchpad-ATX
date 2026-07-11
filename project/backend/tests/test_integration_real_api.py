@@ -1,6 +1,6 @@
 """
-Integration tests with REAL Anthropic API calls
-WARNING: These tests consume API credits!
+Integration tests against a REAL Gemma 4 endpoint (AMD/Ollama)
+These tests require a reachable LLM endpoint (LLM_BASE_URL).
 """
 
 import pytest
@@ -19,9 +19,11 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 def skip_if_no_api_key():
     """Skip tests if no valid API key is configured"""
-    key = settings.LLM_API_KEY or settings.FIREWORKS_API_KEY
-    if not key or key == "fw-test-key-12345":
-        pytest.skip("Skipping: No valid Fireworks API key configured")
+    import httpx
+    try:
+        httpx.get(settings.LLM_BASE_URL or "http://localhost:11434/v1", timeout=2)
+    except Exception:
+        pytest.skip("Skipping: no reachable LLM endpoint (LLM_BASE_URL)")
 
 
 class TestRealArchitectureGeneration:

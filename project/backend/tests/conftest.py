@@ -7,8 +7,7 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
 # Set test environment variables BEFORE importing the app
-os.environ["LLM_PROVIDER"] = "fireworks"
-os.environ["FIREWORKS_API_KEY"] = "fw-test-key-12345"
+os.environ["LLM_PROVIDER"] = "amd"
 os.environ["API_ENVIRONMENT"] = "development"
 os.environ["CORS_ORIGINS"] = "http://localhost:3000"
 os.environ["RATE_LIMIT_ENABLED"] = "false"  # Disable rate limiting in tests
@@ -32,11 +31,9 @@ async def async_client():
 
 
 @pytest.fixture
-def mock_anthropic_response():
-    """Mock Anthropic API response"""
-    mock_response = Mock()
-    mock_response.content = [Mock(text="Mock AI response")]
-    return mock_response
+def mock_llm_response():
+    """Canned model text used by the LLM mock."""
+    return "Mock AI response"
 
 
 @pytest.fixture
@@ -139,26 +136,10 @@ def sample_code_generation_request():
 
 
 @pytest.fixture
-def mock_anthropic_client(mock_anthropic_response):
-    """Mock Anthropic client"""
-    with patch("anthropic.Anthropic") as mock_client:
-        mock_instance = Mock()
-        mock_instance.messages.create = Mock(return_value=mock_anthropic_response)
-        mock_client.return_value = mock_instance
-        yield mock_client
-
-
-@pytest.fixture
-def mock_anthropic_client_async():
-    """Mock Anthropic async client"""
-    mock_response = AsyncMock()
-    mock_response.content = [Mock(text="Mock async response")]
-
-    with patch("anthropic.AsyncAnthropic") as mock_client:
-        mock_instance = AsyncMock()
-        mock_instance.messages.create = AsyncMock(return_value=mock_response)
-        mock_client.return_value = mock_instance
-        yield mock_client
+def mock_llm(mock_llm_response):
+    """Mock the LLM client so tests never hit a real model."""
+    with patch("backend.llm_client.chat", return_value=mock_llm_response) as m:
+        yield m
 
 
 @pytest.fixture

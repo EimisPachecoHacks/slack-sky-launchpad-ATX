@@ -1,33 +1,24 @@
-"""Unified OpenAI-compatible LLM client for Sky Launchpad.
+"""OpenAI-compatible client for Gemma 4 on the AMD MI300X.
 
-Every model this app touches now speaks the OpenAI wire format, so a single
-client fronts two interchangeable backends selected by LLM_PROVIDER:
+Everything the app touches speaks the OpenAI wire format and is served by Ollama
+on the AMD ROCm GPU, so a single client covers every capability:
 
-  amd       : Ollama (or vLLM) serving Gemma 3 on an AMD ROCm GPU (MI300X).
-              Ollama is the default because the hackathon pod is a managed
-              JupyterLab container where `docker run` is unavailable, and
-              Ollama installs as a plain process with a bundled ROCm runtime.
-  fireworks : Fireworks AI managed API (also AMD-hosted), an optional fallback
-
-Capabilities:
   chat(...)        : text generation        -> /chat/completions
-  vision_chat(...) : image analysis         -> /chat/completions (Gemma 3 is a VLM)
-  transcribe(...)  : speech-to-text         -> /audio/transcriptions (Whisper)
+  vision_chat(...) : image analysis         -> Gemma 4 is a VLM (Ollama native API)
+  transcribe(...)  : speech-to-text         -> /audio/transcriptions (Whisper on GPU)
   embed(...)       : skill-retrieval vectors-> /embeddings
 
-Embeddings are deliberately NOT provider-switchable. Vectors from different
-models are not comparable, so mixing providers would silently corrupt the
-Atlas index. One 1024-d embedder, served on the AMD GPU, owns the index; when
-it is unreachable, embed() returns None and skydb.find_similar_skills degrades
-to lexical cosine.
+Embeddings use exactly ONE model on the GPU. Vectors from different models are
+not comparable, so there is no fallback embedder: when the endpoint is
+unreachable, embed() returns None and skydb.find_similar_skills degrades to
+lexical cosine rather than corrupting the index.
 
 Speech-to-text points at our own Whisper shim on the GPU (services/whisper_server.py),
-which is why LLM_AUDIO_BASE_URL is separate from LLM_BASE_URL.
+which is why LLM_AUDIO_BASE_URL is a separate port from LLM_BASE_URL.
 
 Config (see backend/config.py):
-  LLM_PROVIDER, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL, LLM_VISION_MODEL,
-  LLM_AUDIO_BASE_URL, LLM_TRANSCRIBE_MODEL,
-  EMBED_BASE_URL, EMBED_API_KEY, EMBED_MODEL, EMBED_DIMENSIONS, EMBED_SEND_DIMENSIONS
+  LLM_BASE_URL, LLM_MODEL, LLM_VISION_MODEL, LLM_AUDIO_BASE_URL, LLM_TRANSCRIBE_MODEL,
+  EMBED_BASE_URL, EMBED_MODEL, EMBED_DIMENSIONS, EMBED_SEND_DIMENSIONS
 """
 
 import logging
@@ -35,26 +26,15 @@ import os
 
 logger = logging.getLogger(__name__)
 
-FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference/v1"
-FIREWORKS_AUDIO_BASE_URL = "https://audio-prod.us-virginia-1.direct.fireworks.ai/v1"
-
 # Ollama on the MI300X. gemma4:31b (Google Gemma 4, 31B dense, 256K context) is
 # multimodal, and Ollama's OpenAI-compatible endpoint accepts base64 `data:`
 # image URLs (remote http image URLs it does not).
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 
-# Per-provider defaults, overridden by any explicit LLM_*/EMBED_* setting.
-_PROVIDER_DEFAULTS = {
-    "fireworks": {
-        "LLM_BASE_URL": FIREWORKS_BASE_URL,
-        "LLM_MODEL": "accounts/fireworks/models/gemma-3-27b-it",
-        "LLM_VISION_MODEL": "accounts/fireworks/models/gemma-3-27b-it",
-    },
-    "amd": {
-        "LLM_BASE_URL": OLLAMA_BASE_URL,
-        "LLM_MODEL": "gemma4:31b",
-        "LLM_VISION_MODEL": "gemma4:31b",
-    },
+_DEFAULTS = {
+    "LLM_BASE_URL": OLLAMA_BASE_URL,
+    "LLM_MODEL": "gemma4:31b",
+    "LLM_VISION_MODEL": "gemma4:31b",
 }
 
 _TIMEOUT = 120.0
@@ -73,25 +53,19 @@ def _cfg(name: str, default: str = "") -> str:
     return (getattr(s, name, "") if s else "") or os.getenv(name, "") or default
 
 
-def _provider() -> str:
-    p = _cfg("LLM_PROVIDER", "fireworks").strip().lower()
-    return p if p in _PROVIDER_DEFAULTS else "fireworks"
-
-
 def _resolve(name: str) -> str:
-    """Explicit setting wins; otherwise fall back to the provider's default."""
-    return _cfg(name) or _PROVIDER_DEFAULTS[_provider()].get(name, "")
+    """Explicit setting wins; otherwise the AMD/Ollama default."""
+    return _cfg(name) or _DEFAULTS.get(name, "")
 
 
 def _api_key() -> str:
-    key = _cfg("LLM_API_KEY") or _cfg("FIREWORKS_API_KEY")
-    if key:
-        return key
-    if _provider() == "amd":
-        return "EMPTY"  # vLLM does not authenticate by default
-    raise RuntimeError(
-        "LLM_API_KEY (or FIREWORKS_API_KEY) is not set — cannot call Fireworks."
-    )
+    # Ollama does not authenticate; an explicit LLM_API_KEY is honoured if set.
+    return _cfg("LLM_API_KEY") or "EMPTY"
+
+
+def _provider() -> str:
+    """The inference backend. Always AMD (Gemma 4 on ROCm via Ollama)."""
+    return "amd"
 
 
 def _record(model: str, kind: str, duration_ms: float, ok: bool, error: str) -> None:
@@ -166,26 +140,15 @@ def vision_chat(
     """Analyze an image with a VLM and return the model's text response.
 
     image_base64: base64-encoded image bytes (no data: prefix).
-    image_format: e.g. 'png', 'jpeg'.
+    image_format: kept for signature compatibility; Ollama infers it.
 
     Ollama's OpenAI-compatible endpoint ingests the image but returns EMPTY
     content for multimodal requests (finish_reason=length, 0 chars) — verified on
-    gemma4:31b. Its NATIVE /api/chat with an `images:[base64]` field works. So on
-    the AMD/Ollama path we use the native API; Fireworks keeps the OpenAI shape.
+    gemma4:31b. Its NATIVE /api/chat with an `images:[base64]` field works, so we
+    use that.
     """
     model = model or _resolve("LLM_VISION_MODEL")
-    if _provider() == "amd":
-        return _ollama_vision(model, image_base64, prompt, temperature, max_tokens, kind)
-
-    fmt = "jpeg" if image_format.lower() in ("jpg", "jpeg") else image_format.lower()
-    messages = [{
-        "role": "user",
-        "content": [
-            {"type": "image_url", "image_url": {"url": f"data:image/{fmt};base64,{image_base64}"}},
-            {"type": "text", "text": prompt},
-        ],
-    }]
-    return _post_chat(model, messages, temperature, max_tokens, kind)
+    return _ollama_vision(model, image_base64, prompt, temperature, max_tokens, kind)
 
 
 def _ollama_vision(model: str, image_base64: str, prompt: str,
@@ -217,11 +180,10 @@ def _ollama_vision(model: str, image_base64: str, prompt: str,
 
 
 def transcribe(audio_bytes: bytes, mime_type: str = "audio/webm", kind: str = "transcribe") -> str:
-    """Transcribe audio to text via Whisper.
+    """Transcribe audio to text via Whisper on the GPU.
 
-    Points at our own Whisper shim on the GPU by default (services/whisper_server.py).
-    Fireworks serves audio from a different origin than /chat/completions, which is
-    why this base URL is configured separately either way.
+    Points at our own Whisper shim (services/whisper_server.py), which runs on a
+    separate port from the LLM — hence LLM_AUDIO_BASE_URL.
     """
     import httpx
     import time as _time

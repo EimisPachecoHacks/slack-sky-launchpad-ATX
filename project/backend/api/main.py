@@ -133,7 +133,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Sky Launchpad AI Backend - Secured",
-    description="AI-powered cloud architecture design and optimization API using Gemma 3 on AMD ROCm",
+    description="AI-powered cloud architecture design and optimization API using Gemma 4 on AMD ROCm",
     version="1.0.0",
     lifespan=lifespan,
     # Disable docs in production
@@ -208,7 +208,7 @@ async def file_validation_error_handler(request: Request, exc: FileValidationErr
 
 
 # ── Sky Launchpad: observability (Pydantic Logfire) ───────────────────────────
-# Auto-instruments FastAPI + httpx so every request and every Gemma 3 / embedding
+# Auto-instruments FastAPI + httpx so every request and every Gemma 4 / embedding
 # call is traced. Ships to the Logfire UI when LOGFIRE_TOKEN is set; otherwise
 # instruments locally without erroring.
 try:
@@ -1524,7 +1524,7 @@ async def transcribe_voice(
     auth_context: dict = Security(optional_authentication)
 ):
     """
-    Transcribe uploaded audio to text using Whisper via the Fireworks audio API.
+    Transcribe uploaded audio to text using Whisper on the AMD GPU.
 
     **Authentication**: Optional
     **Rate Limit**: Yes

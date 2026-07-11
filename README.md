@@ -17,7 +17,7 @@ Everything runs on AMD silicon, and **AMD is load-bearing for both halves of the
 | Skill-retrieval embeddings | **mxbai-embed-large** (1024-d) | Ollama on ROCm (MI300X) |
 | Speech-to-text | **openai/whisper-large-v3** | PyTorch-ROCm (MI300X) |
 
-No hosted inference: every token and every vector is computed on the MI300X. One open model in three roles, plus our own Whisper, on a single GPU. Everything speaks the OpenAI wire format ([`project/backend/llm_client.py`](project/backend/llm_client.py)), so `LLM_PROVIDER=fireworks` swaps to a managed AMD-hosted API with zero code change — used only where there is no GPU (Cloud Run).
+No hosted inference: every token and every vector is computed on the MI300X. One open model in three roles, plus our own Whisper, on a single GPU. Everything speaks the OpenAI wire format ([`project/backend/llm_client.py`](project/backend/llm_client.py)) and is served by Ollama on the GPU.
 
 **Kill the GPU and vector retrieval dies with it.** Embeddings have exactly one model, because vectors from different models aren't comparable. When the embedding endpoint is down, [`skydb.find_similar_skills`](skydb/__init__.py) degrades to lexical matching rather than poisoning the index with a foreign vector space. Semantic recall exists *because* of the AMD GPU.
 
@@ -70,11 +70,6 @@ curl localhost:11434/v1/embeddings -H 'Content-Type: application/json' \
 python3 scripts/migrate_vector_index.py
 ```
 
-**No GPU at all?** Same app, managed AMD-hosted models, zero code change — but this one costs money:
-
-```bash
-export LLM_PROVIDER=fireworks FIREWORKS_API_KEY=...
-```
 
 ## How it works
 
@@ -156,7 +151,7 @@ gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPO/skyrchitect:latest
 gcloud run deploy skyrchitect --image REGION-docker.pkg.dev/PROJECT/REPO/skyrchitect:latest --region REGION --allow-unauthenticated --port 8080
 ```
 
-Set **`VITE_API_URL`** at **Docker build time** to your Cloud Run HTTPS URL so the SPA calls the same origin’s `/api` proxy correctly. Pass secrets (**`FIREWORKS_API_KEY`**, **`GITLAB_TOKEN`**, etc.) as Cloud Run environment variables—not in git. On Cloud Run there is no GPU, so set `LLM_PROVIDER=fireworks`.
+Set **`VITE_API_URL`** at **Docker build time** so the SPA calls the backend origin's `/api` correctly. Pass secrets (**`GITLAB_TOKEN`**, etc.) as environment variables — not in git. The backend must be able to reach the AMD GPU inference endpoint (`LLM_BASE_URL`).
 
 ## Example Terraform (reference)
 
@@ -172,7 +167,6 @@ Set **`VITE_API_URL`** at **Docker build time** to your Cloud Run HTTPS URL so t
 | Companion backend | **FastAPI**, **Terraform** CLI, **GitLab REST** |
 | Companion frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind** |
 | Inference (GPU) | **Gemma 4** + **mxbai-embed-large** on **Ollama / ROCm / AMD MI300X** |
-| Inference (managed fallback) | **Fireworks AI** (AMD-hosted) |
 | Vision (diagrams) | **Gemma 4** (natively multimodal) |
 | Skill retrieval | **MongoDB Atlas Vector Search** (1024-d, cosine) |
 | App hosting (fallback) | **Google Cloud Run**, **Artifact Registry**, **Cloud Build** |

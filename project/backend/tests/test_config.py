@@ -14,7 +14,7 @@ class TestConfigSettings:
         from backend.config import settings
 
         # Settings should be loaded from .env file
-        assert settings.LLM_PROVIDER in ("amd", "fireworks")
+        assert settings.LLM_PROVIDER == "amd"
         assert settings.API_ENVIRONMENT == "development"
 
     def test_config_defaults(self):
@@ -80,14 +80,12 @@ class TestConfigSettings:
         assert len(exts) > 0
 
     def test_config_model_defaults_resolve(self):
-        """Blank LLM_MODEL falls back to the provider's default — a Gemma 3 id either way"""
-        from backend.llm_client import _resolve, _PROVIDER_DEFAULTS
+        """Blank LLM_MODEL falls back to the provider's default — a Gemma 4 id either way"""
+        from backend.llm_client import _resolve
 
-        for provider in _PROVIDER_DEFAULTS:
-            with patch.dict("os.environ", {"LLM_PROVIDER": provider}, clear=False):
-                model = _resolve("LLM_MODEL")
-                assert "gemma" in model.lower(), f"{provider} default is not a Gemma model: {model}"
-                assert any(char.isdigit() for char in model)
+        model = _resolve("LLM_MODEL")
+        assert "gemma" in model.lower(), f"default is not a Gemma model: {model}"
+        assert any(char.isdigit() for char in model)
 
     def test_embed_dimensions_match_index(self):
         """EMBED_DIMENSIONS must match the Atlas index numDimensions"""
@@ -163,12 +161,9 @@ class TestConfigValidation:
         """Test config with only required fields"""
         from backend.config import Settings
 
-        with patch.dict("os.environ", {
-            "FIREWORKS_API_KEY": "fw-test-key-minimal"
-        }, clear=True):
+        with patch.dict("os.environ", {"LLM_PROVIDER": "amd"}, clear=True):
             settings = Settings()
-            assert settings.FIREWORKS_API_KEY == "fw-test-key-minimal"
-            # Defaults to the AMD GPU, and leaves the model to the provider default
+            # Defaults to the AMD GPU, and leaves the model to the AMD default
             assert settings.LLM_PROVIDER == "amd"
             assert settings.LLM_MODEL == ""
 
@@ -191,7 +186,6 @@ class TestConfigEnvironments:
         # Valid environments
         for env in ["development", "staging", "production"]:
             with patch.dict("os.environ", {
-                "FIREWORKS_API_KEY": "fw-test",
                 "API_ENVIRONMENT": env
             }, clear=True):
                 s = Settings()

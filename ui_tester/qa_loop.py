@@ -1,6 +1,6 @@
 """Continuous autonomous QA loop for Sky Launchpad.
 
-Periodically runs a set of natural-language workflows through the Computer-Use
+Periodically runs a set of natural-language UI workflows through the
 self-test backend (which drives the local Playwright client) and logs each run
 to MongoDB Atlas (via the backend). Keeps the Apps/Learning dashboards live.
 

@@ -12,11 +12,11 @@ class TestArchitectureAgentBasics:
     def architecture_agent(self):
         """Create ArchitectureAgent instance for testing"""
         from backend.agents.architecture_agent import ArchitectureAgent
-        return ArchitectureAgent(model="gemma-3-test", api_key="test-key")
+        return ArchitectureAgent(model="gemma-test", api_key="test-key")
 
     def test_agent_initialization(self, architecture_agent):
         """Test agent initializes correctly"""
-        assert architecture_agent.model == "gemma-3-test"
+        assert architecture_agent.model == "gemma-test"
         assert architecture_agent.api_key == "test-key"
 
     def test_generate_architecture(self, architecture_agent):
@@ -66,11 +66,11 @@ class TestImageAnalysisAgentBasics:
     def image_agent(self):
         """Create ImageAnalysisAgent instance for testing"""
         from backend.agents.image_analysis_agent import ImageAnalysisAgent
-        return ImageAnalysisAgent(model="gemma-3-test", api_key="test-key")
+        return ImageAnalysisAgent(model="gemma-test", api_key="test-key")
 
     def test_image_agent_initialization(self, image_agent):
         """Test image agent initializes correctly"""
-        assert image_agent.model == "gemma-3-test"
+        assert image_agent.model == "gemma-test"
         assert image_agent.api_key == "test-key"
 
     def test_analyze_architecture_diagram(self, image_agent):

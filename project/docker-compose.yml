@@ -17,23 +17,25 @@ services:
       retries: 3
       start_period: 5s
 
-  # Backend service (example configuration)
+  # Backend service (example configuration).
+  # The canonical GPU stack is docker/docker-compose.amd.yml — this is a
+  # lightweight local variant that points at a reachable AMD inference endpoint.
   backend:
     image: python:3.11-slim
     working_dir: /app
     volumes:
       - ./backend:/app
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
-      - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID}
-    command: sh -c "pip install -r requirements.txt && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload"
+      - LLM_PROVIDER=amd
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://localhost:11434/v1}
+      - LLM_MODEL=${LLM_MODEL:-gemma4:31b}
+      - EMBED_MODEL=${EMBED_MODEL:-mxbai-embed-large}
+    command: sh -c "pip install -r requirements.txt && uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 30s
       timeout: 3s
       retries: 3

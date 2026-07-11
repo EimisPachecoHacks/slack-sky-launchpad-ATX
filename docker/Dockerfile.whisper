@@ -1,4 +1,4 @@
-# Whisper on AMD ROCm — speech-to-text on the same GPU as Gemma 3.
+# Whisper on AMD ROCm — speech-to-text on the same GPU as Gemma 4.
 #
 # Replaces the hosted Fireworks Whisper API. ROCm PyTorch is a HIP-on-CUDA-API
 # shim, so the app addresses the AMD GPU with device="cuda" (see whisper_server.py).

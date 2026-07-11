@@ -3,7 +3,7 @@ GitLab Duo Agent Platform — API Client
 
 Mirrors the three-agent pipeline defined in flows/skyrchitect-iac-generator.yaml:
   1. Requirements Analyzer  → create_issue (captures structured requirements)
-  2. IaC Generator          → (handled by Gemma 3 + Skills context)
+  2. IaC Generator          → (handled by Gemma 4 + Skills context)
   3. Code Committer         → create_commit + create_merge_request + add_issue_note
 
 Uses the same GitLab REST API endpoints that the Duo Flow agents use internally

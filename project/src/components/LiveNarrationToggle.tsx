@@ -29,7 +29,7 @@ interface NarrationFrame {
   phase?: string;
   text?: string;
   audio?: boolean;
-  gemini_live?: boolean;
+  server_audio?: boolean;
   model?: string;
 }
 

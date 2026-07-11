@@ -8,7 +8,7 @@ from fastapi import status
 class TestHealthEndpoints:
     """Test health check endpoints"""
 
-    def test_root_health_check_healthy(self, client, mock_anthropic_client):
+    def test_root_health_check_healthy(self, client):
         """Test root endpoint returns healthy status"""
         response = client.get("/")
         assert response.status_code == status.HTTP_200_OK
@@ -80,12 +80,8 @@ class TestCodeGeneration:
 
     def test_generate_terraform_code(self, client, sample_code_generation_request, mock_code_response):
         """Test Terraform code generation"""
-        with patch("anthropic.Anthropic") as mock_client:
-            mock_instance = Mock()
-            mock_message = Mock()
-            mock_message.content = [Mock(text=mock_code_response)]
-            mock_instance.messages.create = Mock(return_value=mock_message)
-            mock_client.return_value = mock_instance
+        with patch("backend.duo_client.get_duo_client") as mock_duo:
+            mock_duo.return_value.ask = Mock(return_value=mock_code_response)
 
             response = client.post("/api/code/generate", json=sample_code_generation_request)
 
@@ -105,20 +101,16 @@ class TestCodeGeneration:
             "provider": "aws"
         }
 
-        with patch("anthropic.Anthropic") as mock_client:
-            mock_instance = Mock()
-            mock_message = Mock()
-            mock_message.content = [Mock(text="AWSTemplateFormatVersion: '2010-09-09'")]
-            mock_instance.messages.create = Mock(return_value=mock_message)
-            mock_client.return_value = mock_instance
+        with patch("backend.duo_client.get_duo_client") as mock_duo:
+            mock_duo.return_value.ask = Mock(return_value="AWSTemplateFormatVersion: '2010-09-09'")
 
             response = client.post("/api/code/generate", json=request_data)
             assert response.status_code == status.HTTP_200_OK
 
-    def test_generate_code_anthropic_error(self, client, sample_code_generation_request):
-        """Test code generation when Anthropic API fails"""
-        with patch("anthropic.Anthropic") as mock_client:
-            mock_client.side_effect = Exception("Anthropic API Error")
+    def test_generate_code_error(self, client, sample_code_generation_request):
+        """Test code generation when the Duo backend fails"""
+        with patch("backend.duo_client.get_duo_client") as mock_duo:
+            mock_duo.return_value.ask = Mock(side_effect=Exception("Duo error"))
 
             response = client.post("/api/code/generate", json=sample_code_generation_request)
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -3,9 +3,9 @@ Sky Launchpad - Local Playwright Client (UI Self-Test "hands").
 
 A standalone local process that launches a Playwright Chromium browser and
 connects to the Sky Launchpad backend over WebSocket (as a client). It executes
-the backend's coordinate-based Computer-Use actions and streams screenshots back.
+the backend's coordinate-based UI actions and streams screenshots back.
 
-Coordinates from the backend are NORMALIZED to a 0-1000 range (Gemini Computer
+Coordinates from the backend are NORMALIZED to a 0-1000 range (Computer
 Use style) and are denormalized to viewport pixels here.
 
 Run:
@@ -267,7 +267,7 @@ async def main() -> None:
         context = await browser.new_context(
             viewport={"width": VIEWPORT_WIDTH, "height": VIEWPORT_HEIGHT},
             # Pin to 1x so headed/Retina screenshots stay at viewport size
-            # (2x screenshots are too large for the Computer Use model).
+            # (2x screenshots are too large for the vision model).
             device_scale_factor=1,
         )
         page = await context.new_page()

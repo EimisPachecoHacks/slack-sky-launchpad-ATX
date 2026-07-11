@@ -3,7 +3,7 @@
 Exposes an :class:`fastapi.APIRouter` (``router``) under ``/api/apps`` that the
 orchestrator (``backend/api/main.py``) mounts. Powers the "Apps" dashboard:
 listing tracked apps with a derived status, generating end-to-end UI test
-workflows via Gemma 3, and drilling into a single app's cases + run history.
+workflows via Gemma 4, and drilling into a single app's cases + run history.
 
 Design notes
 ------------
@@ -281,7 +281,7 @@ async def list_apps_dashboard() -> dict:
 
 @router.post("/{app_id}/generate-tests")
 async def generate_tests(app_id: str) -> dict:
-    """Propose 4 end-to-end UI test workflows for an app via Gemma 3.
+    """Propose 4 end-to-end UI test workflows for an app via Gemma 4.
 
     Falls back to 2 generic cases on any LLM/parse failure. Ensures the app is
     tracked in skydb (e.g. when it originated as a sample) before storing cases.
@@ -319,7 +319,7 @@ async def generate_tests(app_id: str) -> dict:
         except Exception as exc:
             logger.warning("upsert_app failed for %s: %s", app_id, exc)
 
-    # Ask Gemma 3 for concise workflows.
+    # Ask Gemma 4 for concise workflows.
     proposed: Optional[list] = None
     chat = _llm_chat()
     if chat:
@@ -354,7 +354,7 @@ async def generate_tests(app_id: str) -> dict:
                 if cleaned:
                     proposed = cleaned[:4]
         except Exception as exc:
-            logger.warning("Gemma 3 test generation failed for %s: %s", app_id, exc)
+            logger.warning("Gemma 4 test generation failed for %s: %s", app_id, exc)
 
     if not proposed:
         proposed = _generic_cases()

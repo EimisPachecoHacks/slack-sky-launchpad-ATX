@@ -23,8 +23,7 @@ cd sky
 
 To pull my later changes, just `git pull` in this same terminal.
 
-*(If the pod exposes an SSH endpoint, you can skip git and let Claude Code drive
-the pod directly — see §7.)*
+*(If the pod exposes an SSH endpoint, you can skip git and drive the pod over SSH — see §7.)*
 
 ---
 
@@ -60,10 +59,10 @@ vllm serve google/gemma-4-31b-it \
 
 **Terminal B — embeddings (1024-d):**
 ```bash
-vllm serve BAAI/bge-large-en-v1.5 \
+vllm serve mixedbread-ai/mxbai-embed-large-v1 \
   --task embed \
   --host 0.0.0.0 --port 8001 \
-  --served-model-name bge-large
+  --served-model-name mxbai-embed-large
 ```
 
 > **If a vLLM command errors** (Gemma 4 gating, ROCm multimodal quirks, or embed
@@ -86,7 +85,7 @@ which pulls Gemma from Ollama's registry with no token.
 ```bash
 rocm-smi                      # models should show up as GPU memory users
 curl localhost:8001/v1/embeddings -H 'Content-Type: application/json' \
-  -d '{"model":"bge-large","input":"compute api disabled"}' \
+  -d '{"model":"mxbai-embed-large","input":"compute api disabled"}' \
   | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["data"][0]["embedding"]), "dims")'
 # -> 1024
 ```
@@ -114,7 +113,7 @@ export LLM_BASE_URL=http://localhost:8000/v1
 export LLM_MODEL=gemma4
 export LLM_VISION_MODEL=gemma4
 export EMBED_BASE_URL=http://localhost:8001/v1
-export EMBED_MODEL=bge-large
+export EMBED_MODEL=mxbai-embed-large
 export EMBED_DIMENSIONS=1024
 export LLM_AUDIO_BASE_URL=http://localhost:8100/v1     # only if §3 is running
 # storage / MRs (optional):
@@ -160,7 +159,7 @@ Skip if `MONGODB_URI` is unset (retrieval then uses the local JSON store).
 
 ---
 
-## 7. (Optional) Let Claude Code drive the pod directly
+## 7. (Optional) Drive the pod directly over SSH
 
 If the pod UI shows an **SSH endpoint** (host / port / password), add it to your
 **local** `~/.ssh/config`:
@@ -172,9 +171,8 @@ Host amdpod
     User <pod-user>
 ```
 
-Then Claude Code can run `ssh amdpod '<cmd>'` and `rsync` files straight to the
-pod from its own tools — no git round-trip, no copy-pasting output. Without SSH,
-stick with the git + Jupyter-terminal loop (§0).
+Then you can run `ssh amdpod '<cmd>'` and `rsync` files straight to the pod — no
+git round-trip. Without SSH, use the git + Jupyter-terminal loop (§0).
 
 ---
 

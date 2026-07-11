@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Re-embed every skill after switching to the AMD-served embedding model.
+"""(Re)embed every skill with the AMD-served embedding model.
 
-The old vectors came from Gemini (`gemini-embedding-001`, unpinned dimension).
-The new ones come from `BAAI/bge-large-en-v1.5` (1024-d) served by vLLM on the
-AMD GPU. The two spaces are not comparable, so every stored vector must be
-recomputed — not just the missing ones.
+The skill embeddings are produced by `mxbai-embed-large` (1024-d) served by
+Ollama on the AMD GPU. If you ever change EMBED_MODEL, the old vectors belong to
+a different space and every stored vector must be recomputed — not just the
+missing ones — so this runs with force=True.
 
-Run this ONCE, after `vllm-embed` is up, and after recreating the Atlas index:
+Run this ONCE, after the embedding endpoint is up, and after creating the Atlas
+index:
 
     Atlas -> Search -> create a Vector Search index named $MONGODB_VECTOR_INDEX
     on the `skills` collection:
@@ -22,7 +23,7 @@ Run this ONCE, after `vllm-embed` is up, and after recreating the Atlas index:
 
 Then:
 
-    EMBED_BASE_URL=http://localhost:8001/v1 python3 scripts/migrate_vector_index.py
+    python3 scripts/migrate_vector_index.py
 
 Safe to re-run. Without MONGODB_URI it operates on the local JSON store.
 """

@@ -10,18 +10,15 @@ class Settings(BaseSettings):
     """Application settings with validation"""
 
     # ---------------------------------------------------------------------
-    # Inference — every backend speaks the OpenAI wire format (see llm_client.py)
+    # Inference — Gemma 4 on the AMD MI300X, served by Ollama (OpenAI wire format).
+    # Everything below defaults to the local GPU; blank fields take llm_client's
+    # AMD defaults. See backend/llm_client.py.
     # ---------------------------------------------------------------------
-    # LLM_PROVIDER picks the defaults: "amd" (Gemma 4 on a ROCm MI300X, served by
-    # Ollama or vLLM) or "fireworks" (managed, also AMD-hosted, needs a paid key).
-    # Any explicit LLM_* below wins.
-    LLM_PROVIDER: str = Field(default="amd", description="Inference backend: amd | fireworks")
-    LLM_BASE_URL: str = Field(default="", description="OpenAI-compatible base URL (blank = provider default)")
-    LLM_API_KEY: str = Field(default="", description="Bearer token; falls back to FIREWORKS_API_KEY")
-    LLM_MODEL: str = Field(default="", description="Text-generation model id (blank = provider default)")
-    LLM_VISION_MODEL: str = Field(default="", description="VLM for diagram analysis (blank = provider default)")
-
-    FIREWORKS_API_KEY: str = Field(default="", description="Fireworks AI API key (only for LLM_PROVIDER=fireworks)")
+    LLM_PROVIDER: str = Field(default="amd", description="Inference backend (amd)")
+    LLM_BASE_URL: str = Field(default="", description="OpenAI-compatible base URL (blank = AMD default)")
+    LLM_API_KEY: str = Field(default="", description="Bearer token (Ollama needs none)")
+    LLM_MODEL: str = Field(default="", description="Text-generation model id (blank = gemma4:31b)")
+    LLM_VISION_MODEL: str = Field(default="", description="VLM for diagram analysis (blank = gemma4:31b)")
 
     # Speech-to-text runs on our own GPU shim (services/whisper_server.py), which
     # lives on a different port than the LLM — hence a separate base URL.
@@ -102,9 +99,8 @@ class Settings(BaseSettings):
 
     @validator("LLM_PROVIDER")
     def validate_llm_provider(cls, v: str) -> str:
-        allowed = ("amd", "fireworks")
-        if v.strip().lower() not in allowed:
-            raise ValueError(f"Invalid LLM_PROVIDER: {v}. Allowed: {', '.join(allowed)}")
+        if v.strip().lower() != "amd":
+            raise ValueError(f"Invalid LLM_PROVIDER: {v}. Only 'amd' is supported.")
         return v.strip().lower()
 
     @validator("RATE_LIMIT_PER_MINUTE")
@@ -156,13 +152,11 @@ try:
 except Exception as e:
     print(f"❌ Configuration Error: {e}")
     print("\n🔧 Please check your .env file and ensure all required variables are set.")
-    print("\nKey environment variables:")
-    print("  - LLM_PROVIDER        (amd | fireworks)")
-    print("  - FIREWORKS_API_KEY   (or LLM_API_KEY) — required when LLM_PROVIDER=fireworks")
-    print("\nOptional environment variables:")
-    print("  - LLM_MODEL, LLM_VISION_MODEL, LLM_BASE_URL (blank = provider default)")
-    print("  - EMBED_BASE_URL (default: http://vllm-embed:8001/v1)")
-    print("  - EMBED_MODEL (default: BAAI/bge-large-en-v1.5), EMBED_DIMENSIONS (default: 1024)")
+    print("\nKey environment variables (all default to the local AMD GPU):")
+    print("  - LLM_BASE_URL   (default: http://localhost:11434/v1 — Ollama)")
+    print("  - LLM_MODEL / LLM_VISION_MODEL (blank = gemma4:31b)")
+    print("  - EMBED_BASE_URL (default: http://localhost:11434/v1)")
+    print("  - EMBED_MODEL (default: mxbai-embed-large), EMBED_DIMENSIONS (default: 1024)")
     print("  - API_ENVIRONMENT (default: development)")
     print("  - CORS_ORIGINS (default: http://localhost:5173,http://localhost:3000)")
     print("  - RATE_LIMIT_PER_MINUTE (default: 10)")
@@ -185,10 +179,6 @@ def validate_configuration():
     # Check for API keys in production
     if settings.is_production and not settings.API_KEYS and not settings.JWT_SECRET_KEY:
         issues.append("⚠️  No authentication configured (API_KEYS or JWT_SECRET_KEY)")
-
-    # Fireworks is a hosted API and cannot work without a key; AMD/vLLM needs none.
-    if settings.LLM_PROVIDER == "fireworks" and not (settings.LLM_API_KEY or settings.FIREWORKS_API_KEY):
-        issues.append("⚠️  LLM_PROVIDER=fireworks but neither FIREWORKS_API_KEY nor LLM_API_KEY is set")
 
     if issues:
         print("\n🔍 Configuration Issues Found:")

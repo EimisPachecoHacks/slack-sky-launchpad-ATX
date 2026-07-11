@@ -1,8 +1,8 @@
 """Self-improving repair core: diagnose a failed deployment and author a skill.
 
 When a cloud deployment FAILS this module hands the rich failure context (from
-``log_collector``) to **Gemma 3** — served either by vLLM on an AMD ROCm GPU or
-by the Fireworks AI managed API (see ``backend/llm_client.py``). The model
+``log_collector``) to **Gemma 4** on the AMD MI300X (see ``backend/llm_client.py``).
+The model
 returns:
 
   * corrected Terraform files, and
@@ -73,12 +73,12 @@ def diagnose_and_author(
 
 
 # ---------------------------------------------------------------------------
-# Repair path: Gemma 3 (AMD vLLM or Fireworks)
+# Repair path: Gemma 4 on the AMD GPU
 # ---------------------------------------------------------------------------
 
 
 def _run_llm(prompt: str) -> str:
-    """Send the repair prompt to Gemma 3 and return the raw reply text.
+    """Send the repair prompt to Gemma 4 and return the raw reply text.
 
     Imported lazily so the deployer stays usable as a standalone CLI (matching
     how ``deployer/main.py`` reaches into ``backend``).

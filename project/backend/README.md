@@ -1,21 +1,22 @@
-# Skyrchitect AI Backend
+# Sky Launchpad AI Backend
 
-AI-powered cloud architecture design and optimization API using **AWS Bedrock** and **Strands Agents SDK**.
+AI-powered cloud architecture design, repair, and deployment API — powered by
+**Gemma 4** on an **AMD Instinct MI300X**.
 
 ## Features
 
-- 🤖 **AI Architecture Generation**: Auto-generate cloud architectures from requirements
-- 💰 **Cost Optimization**: AI-powered cost optimization suggestions
-- ✅ **Architecture Validation**: Best practices and security checks
-- 🔄 **Multi-Cloud Support**: AWS, Azure, GCP comparisons
-- 🛠️ **Custom Tools**: Specialized cloud architecture tools for the AI agent
+- 🤖 **AI Architecture Generation**: Gemma 4 turns requirements into cloud architectures
+- 🖼️ **Diagram Vision**: Gemma 4 reads uploaded architecture images (natively multimodal)
+- ♻️ **Self-Improving Loop**: on a failed deploy, Gemma 4 repairs the HCL and authors a reusable skill
+- 💰 **Cost Optimization** & **Validation**: best-practice and cost checks
+- 🔄 **Multi-Cloud**: AWS / GCP Terraform
 
 ## Technology Stack
 
-- **FastAPI**: Modern async web framework
-- **Strands Agents SDK**: AWS open-source AI agent framework
-- **AWS Bedrock**: Claude 3.5/4 LLM hosting
-- **Python 3.12+**: Backend language
+- **FastAPI**: async web framework
+- **Gemma 4** (`gemma4:31b`) via **Ollama** on **ROCm / AMD MI300X**: all inference
+- **mxbai-embed-large**: skill-retrieval embeddings (on the GPU)
+- **Python 3.12+**
 
 ## Quick Start
 
@@ -27,18 +28,14 @@ pip3 install -r requirements.txt
 
 ### 2. Configure Environment
 
-Ensure your `.env` file has:
-```env
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-AWS_DEFAULT_REGION=us-west-2
-BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
-```
+Copy `../.env.example` to `../.env`. The defaults point at the local AMD GPU
+(Ollama at `http://localhost:11434/v1`, model `gemma4:31b`) and need no API key.
+See [`backend/config.py`](config.py) for all options.
 
-### 3. Enable Bedrock Model Access
+### 3. Bring up the GPU stack
 
-Go to AWS Console and enable Claude models:
-https://us-west-2.console.aws.amazon.com/bedrock/home?region=us-west-2#/modelaccess
+`bash ../../scripts/pod_up.sh` (hackathon pod) or
+`docker compose -f ../../docker/docker-compose.amd.yml up` (droplet).
 
 ### 4. Run the Server
 
@@ -119,7 +116,7 @@ backend/
 ├── api/
 │   └── main.py              # FastAPI application
 ├── agents/
-│   └── architecture_agent.py # Strands Agent wrapper
+│   └── architecture_agent.py # Gemma 4 architecture agent
 ├── models/
 │   └── schemas.py           # Pydantic models
 ├── requirements.txt
@@ -129,15 +126,9 @@ backend/
 ## AI Agent Architecture
 
 The agent uses:
-1. **Bedrock Model**: Claude 3.5 Sonnet via AWS Bedrock
-2. **Custom Tools**: Cloud-specific functions the AI can call:
-   - `get_aws_service_info`: Service details
-   - `calculate_architecture_cost`: Cost calculations
-   - `suggest_cost_optimization`: Optimization recommendations
-   - `get_service_alternatives`: Multi-cloud alternatives
-   - `validate_architecture`: Best practices validation
-
-3. **System Prompt**: Specialized cloud architecture expertise
+1. **Model**: Gemma 4 (`gemma4:31b`) via Ollama on the AMD MI300X (see `backend/llm_client.py`)
+2. **Skills context**: curated GCP skills + auto-authored learned skills injected into the prompt
+3. **System Prompt**: specialized cloud-architecture expertise
 
 ## Deployment
 
@@ -170,22 +161,23 @@ CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AWS_ACCESS_KEY_ID` | AWS access key | Required |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | Required |
-| `AWS_DEFAULT_REGION` | AWS region | us-west-2 |
-| `BEDROCK_MODEL_ID` | Bedrock model ID | claude-3-5-sonnet |
-| `PORT` | API port | 8000 |
+| `LLM_BASE_URL` | OpenAI-compatible inference URL | `http://localhost:11434/v1` (Ollama) |
+| `LLM_MODEL` | Text/vision model | `gemma4:31b` |
+| `EMBED_MODEL` | Skill-retrieval embedder | `mxbai-embed-large` |
+| `MONGODB_URI` | Atlas connection (blank = local JSON) | — |
+| `PORT` | API port | 8080 |
 
 ## Troubleshooting
 
-### "AccessDeniedException" from Bedrock
-Enable model access in AWS Console (link above)
+### Generation returns empty / errors
+Confirm the GPU endpoint is up: `curl localhost:11434/v1/models`. Gemma 4 needs a
+real token budget (the app sends a large one) — tiny requests can return empty.
 
 ### Agent not initializing
-Check AWS credentials and Bedrock access
+Check that `LLM_BASE_URL` points at a reachable Ollama/vLLM endpoint.
 
 ### CORS errors
-Update `allow_origins` in `main.py` for your frontend URL
+Update `CORS_ORIGINS` in `.env` (or `config.py`) for your frontend URL.
 
 ## License
 

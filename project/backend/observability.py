@@ -2,7 +2,7 @@
 
 Provides the Self-Improvement-Stack observability layer:
   - configure_observability(app): set up Logfire and auto-instrument FastAPI +
-    httpx, so every request and every outbound Gemma 3 / Whisper call is traced.
+    httpx, so every request and every outbound Gemma 4 / Whisper call is traced.
   - record_ai_call(...): emit a Logfire span AND append to a local metrics file
     (~/.skyrchitect/ai_calls.json) so our own learning dashboard can show real
     telemetry (call counts, latency, success rate) instead of sample data.

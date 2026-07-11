@@ -120,7 +120,7 @@ services:
       whisper:
         condition: service_healthy
     # CPU only: no device access. This container is portable to Cloud Run as-is,
-    # where you would set LLM_PROVIDER=fireworks (paid) since there is no GPU.
+    # (which needs a reachable GPU inference endpoint).
 
 volumes:
   ollama-models:

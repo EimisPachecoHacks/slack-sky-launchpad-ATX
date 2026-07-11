@@ -5,7 +5,7 @@
 **Last verified:** 2026-07-10
 
 > Supersedes an earlier report written against the 2026 AI Engineer World's Fair
-> (Continual Learning theme, Gemini $5k prize). That event is no longer the target.
+> (a different event). That event is no longer the target.
 
 ---
 
@@ -81,10 +81,6 @@ never calls it, and the Terraform that actually gets applied comes from
 LLM calls. Leave `GITLAB_TOKEN` unset and that path never executes.
 
 ## 4. Credits
-
-Fireworks AI credits are **not required and not used**. `LLM_PROVIDER=fireworks`
-remains as a one-flag escape hatch for GPU-less deployments (e.g. Cloud Run); it is
-never on the critical path.
 
 The hackathon pod (8 GPU-hrs / rolling 24h, one per team) and the $100 AMD Developer
 Cloud credit are **separate, independent** allocations. The pod is not billed against

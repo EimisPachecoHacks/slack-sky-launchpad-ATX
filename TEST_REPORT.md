@@ -1,6 +1,6 @@
 > **HISTORICAL — results from a superseded stack (March 2026).**
 >
-> This report predates the port to the all-AMD inference stack (Gemma 3 +
+> This report predates the port to the all-AMD inference stack (Gemma 4 +
 > mxbai-embed-large + Whisper on ROCm). The providers, module names, and commands
 > below no longer exist. See [TEST_PLAN.md](TEST_PLAN.md) for the current plan and
 > [COMPLIANCE_REPORT.md](COMPLIANCE_REPORT.md) for verified status. Kept for provenance.

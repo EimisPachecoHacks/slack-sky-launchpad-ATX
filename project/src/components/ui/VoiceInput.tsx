@@ -12,7 +12,6 @@ interface VoiceInputProps {
  *
  * Records mic audio in the browser, then POSTs it to the backend
  * `/api/voice/transcribe` endpoint, which transcribes it with Whisper.
- * (Replaces the previous ElevenLabs Scribe integration.)
  */
 const VoiceInput: React.FC<VoiceInputProps> = ({
   onTranscript,

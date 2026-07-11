@@ -59,10 +59,10 @@ cd project && uvicorn backend.api.main:app --host 0.0.0.0 --port 8080
 | C-1 | `chat()` | `POST {LLM_BASE_URL}/chat/completions`, `Authorization: Bearer …`, parses `choices[0].message.content` | ✅ |
 | C-2 | `vision_chat()` | Content array `[{type:"image_url", image_url:{url:"data:image/png;base64,…"}}, {type:"text"}]`. Ollama accepts base64 data URIs; it rejects remote `http(s)` image URLs | ✅ |
 | C-3 | `transcribe()` | `multipart/form-data` to `{LLM_AUDIO_BASE_URL}/audio/transcriptions` with `file` + `model` | ✅ |
-| C-4 | `embed()` — no `dimensions` | Payload keys are exactly `{model, input}`. Sending `dimensions` 422s on bge-large and is ignored by Ollama | ✅ |
+| C-4 | `embed()` — no `dimensions` | Payload keys are exactly `{model, input}`. Ollama ignores a `dimensions` field, so we never send it | ✅ |
 | C-5 | `embed()` — opt-in `dimensions` | `EMBED_SEND_DIMENSIONS=true` re-adds the field (Matryoshka models only) | ✅ |
 | C-6 | Embedding width guard | Endpoint returns 1024-d while `EMBED_DIMENSIONS=768` → returns `None`, logs an error, writes nothing | ✅ |
-| C-7 | Provider switching | `LLM_PROVIDER=amd` → `gemma4:31b` @ `:11434`; `=fireworks` → `accounts/fireworks/models/gemma-3-27b-it`; an explicit `LLM_MODEL` overrides both | ✅ |
+| C-7 | Model resolution | `LLM_PROVIDER=amd` → `gemma4:31b` @ `:11434`; an explicit `LLM_MODEL` overrides the default | ✅ |
 
 ---
 
@@ -129,8 +129,7 @@ cd project && uvicorn backend.api.main:app --host 0.0.0.0 --port 8080
 | ID | Case | Expected | Status |
 |---|---|---|---|
 | R-1 | No inference endpoint at all | Backend still starts; generation raises a clear error rather than crashing on import | ✅ |
-| R-2 | `LLM_PROVIDER=openai` | `ValidationError` at startup (allow-list is `amd`/`fireworks`) | ✅ |
-| R-3 | `LLM_PROVIDER=fireworks` with no key | Startup warns; no crash | ✅ |
+| R-2 | `LLM_PROVIDER=openai` | `ValidationError` at startup (only `amd` is allowed) | ✅ |
 | R-4 | No `MONGODB_URI` | `skydb` falls back to `~/.skyrchitect/db/` local JSON | ✅ |
 | R-5 | Deleted modules stay deleted | Nothing imports `gemini_client`, `gemini_live`, `minimax_client`, `computer_use_agent`, or `antigravity_client` | ✅ |
 | R-6 | No retired SDKs | No `import anthropic` / `google.genai` / `google.adk` / `google.generativeai` anywhere in the tree | ✅ |
