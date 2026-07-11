@@ -284,12 +284,15 @@ async def _handle_run(stream_ws: WebSocket, workflow: str, target_url: str) -> N
 
         # --- Drive the workflow ---
         #
-        # The autonomous vision-action driver was retired with the move to a
-        # fully open stack: no OpenAI-compatible provider serves a
-        # computer-use-tuned model, and Qwen is not grounded for pixel-level
-        # click targeting. Bug *discovery* is now the operator's job (drive the
-        # app with ui_tester/playwright_client.py); bug *repair* is still
-        # autonomous via POST /api/uitest/fix.
+        # Bug *discovery* is operator-driven: the Playwright client
+        # (ui_tester/playwright_client.py) drives the live app and reports
+        # observed failures. Bug *repair* is autonomous — POST /api/uitest/fix
+        # hands the failure to Qwen, which authors a structured fix.
+        #
+        # A fully autonomous vision-action driver (screenshot -> qwen3.7-plus
+        # grounding -> click/type) is a supported upgrade: Qwen3-VL is grounded
+        # for pixel-level GUI control. Drop a computer_use_agent.run_workflow in
+        # here to enable it; the operator-driven path below is the default.
         try:
             from backend.uitest.computer_use_agent import run_workflow
 

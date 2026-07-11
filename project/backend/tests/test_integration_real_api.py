@@ -18,12 +18,15 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def skip_if_no_api_key():
-    """Skip tests if no valid API key is configured"""
-    import httpx
-    try:
-        httpx.get(settings.LLM_BASE_URL or "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", timeout=2)
-    except Exception:
-        pytest.skip("Skipping: no reachable LLM endpoint (LLM_BASE_URL)")
+    """Skip these real-API tests unless a Qwen Cloud key is actually configured.
+
+    The DashScope endpoint is reachable without auth, so reachability alone
+    isn't enough — require DASHSCOPE_API_KEY (or LLM_API_KEY) to be set.
+    """
+    import os
+    if not (settings.DASHSCOPE_API_KEY or settings.LLM_API_KEY
+            or os.getenv("DASHSCOPE_API_KEY") or os.getenv("LLM_API_KEY")):
+        pytest.skip("Skipping: no DASHSCOPE_API_KEY configured (real-API test)")
 
 
 class TestRealArchitectureGeneration:

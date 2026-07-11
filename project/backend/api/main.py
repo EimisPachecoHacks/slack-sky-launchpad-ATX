@@ -75,7 +75,7 @@ from backend.skills_loader import get_skills_context, get_skills_summary
 
 
 def _strip_markdown_fences(text: str) -> str:
-    """Remove markdown fences and extract HCL code from Duo responses."""
+    """Remove markdown fences and extract HCL code from model responses."""
     blocks = re.findall(r'```(?:hcl|terraform|tf)?\s*\n(.*?)```', text, re.DOTALL)
     if blocks:
         return "\n\n".join(blocks).strip()
@@ -652,14 +652,14 @@ async def generate_infrastructure_code(
     **Rate Limit**: Yes
     """
     try:
-        from backend.duo_client import get_duo_client
+        from backend import llm_client
 
         architecture = request.architecture
         code_type = request.code_type
         provider = request.provider.value
 
         logger.info(f"\n{'='*80}")
-        logger.info(f"💻 CODE GENERATION REQUEST — via GitLab Duo Agent Platform")
+        logger.info(f"💻 CODE GENERATION REQUEST — via Qwen (IaC Generator)")
         logger.info(f"{'='*80}")
         logger.info(f"Code Type: {code_type.upper()}")
         logger.info(f"Provider: {provider}")
@@ -668,51 +668,55 @@ async def generate_infrastructure_code(
         num_components = len(components)
         logger.info(f"Components: {num_components}")
 
-        duo = get_duo_client()
-
         # =============================================================
-        # DUO AGENT 2: IaC Generator
-        # Routed through `glab duo cli run --goal` (headless mode)
-        # Skills are auto-loaded by Duo CLI from workspace SKILL.md files
-        # (mirrors: flows/skyrchitect-iac-generator.yaml → iac_generator)
+        # IaC Generator — Qwen (qwen3.7-max) writes the Terraform.
+        # Learned skills from past deploy failures are injected as context so
+        # code generation benefits from the self-improving memory loop.
         # =============================================================
         logger.info(f"\n{'─'*60}")
-        logger.info(f"🤖 DUO AGENT 2: IaC Generator (GitLab Duo CLI)")
+        logger.info(f"🤖 IaC Generator (Qwen)")
         logger.info(f"{'─'*60}")
-        logger.info(f"   Platform: glab duo cli run --goal (headless mode)")
-        logger.info(f"   Skills: auto-loaded from workspace SKILL.md files")
-        logger.info(f"   AGENTS.md: auto-loaded from project root")
-        logger.info(f"   chat-rules.md: auto-loaded from .gitlab/duo/")
 
         skills_summary = get_skills_summary()
         for skill in skills_summary:
             status = "✅ AVAILABLE" if skill["loaded"] else "❌ MISSING"
             logger.info(f"   SKILL: {skill['name']} → {status}")
+
+        learned_context = ""
+        try:
+            from deployer.skill_library import get_learned_skills_context
+            learned_context = get_learned_skills_context(query=f"{provider} {code_type}") or ""
+        except Exception as exc:  # skills are best-effort context, never fatal
+            logger.info(f"   (learned-skills context unavailable: {exc})")
         logger.info(f"{'─'*60}")
 
+        code_system = (
+            "You are an expert infrastructure engineer. You output ONLY valid, "
+            "syntactically complete Terraform/IaC code — no prose, no markdown "
+            "fences, no explanations. Every block closes all its braces.\n\n"
+            + (f"Learned skills from past deployment failures (apply them to avoid "
+               f"repeating mistakes):\n{learned_context}\n\n" if learned_context else "")
+        )
         provider_override = (
             f"The user selected {provider.upper()} as their cloud provider for this architecture. "
             f"Generate {provider.upper()} Terraform resources (provider: {provider}). "
-            f"IMPORTANT: Do NOT create files, branches, commits, or merge requests. "
-            f"Do NOT use any write tools. "
-            f"Output the complete Terraform code as TEXT in your response. "
-            f"Include the full HCL code inside a single ```hcl code block.\n\n"
+            f"Output the complete Terraform code as TEXT only.\n\n"
         )
 
-        def generate_via_duo(prompt: str, label: str) -> str:
-            """Generate code via GitLab Duo CLI headless mode."""
+        def generate_via_qwen(prompt: str, label: str) -> str:
+            """Generate IaC via Qwen (qwen3.7-max)."""
             full = provider_override + prompt
-            logger.info(f"   📡 Sending to GitLab Duo: {label} ({len(full)} chars)")
-            response = duo.ask(full)
+            logger.info(f"   📡 Sending to Qwen: {label} ({len(full)} chars)")
+            response = llm_client.chat(full, system=code_system, kind="code", max_tokens=8000)
             code = _strip_markdown_fences(response)
-            logger.info(f"   ✅ {label}: received {len(code)} chars from Duo")
+            logger.info(f"   ✅ {label}: received {len(code)} chars from Qwen")
             return code
 
         if num_components > 6:
             chunk_size = 4
             groups = [components[i:i+chunk_size] for i in range(0, num_components, chunk_size)]
             num_parts = len(groups) + 1
-            logger.info(f"🔄 Using {num_parts}-part Duo generation for {num_components} components")
+            logger.info(f"🔄 Using {num_parts}-part Qwen generation for {num_components} components")
 
             all_parts = []
 
@@ -758,7 +762,7 @@ CRITICAL RULES:
 - This is part {part_num} of {num_parts}"""
 
                 logger.info(f"📝 Generating Part {part_num}/{num_parts}: {len(group)} services via Duo...")
-                part_code = generate_via_duo(prompt, f"Part {part_num}/{num_parts}")
+                part_code = generate_via_qwen(prompt, f"Part {part_num}/{num_parts}")
                 all_parts.append(part_code)
 
             logger.info(f"📝 Generating Part {num_parts}/{num_parts}: Outputs via Duo...")
@@ -774,16 +778,16 @@ CRITICAL RULES:
 - Every output block must be syntactically complete
 - Reference resources that would exist from the services: {', '.join(c.get('name','') for c in components)}"""
 
-            outputs_code = generate_via_duo(outputs_prompt, f"Part {num_parts}/{num_parts} (outputs)")
+            outputs_code = generate_via_qwen(outputs_prompt, f"Part {num_parts}/{num_parts} (outputs)")
             all_parts.append(outputs_code)
 
             code_response = "\n\n".join(all_parts)
             part_sizes = " | ".join([f"Part {i+1}: {len(p)} chars" for i, p in enumerate(all_parts)])
-            logger.info(f"✅ Multi-part Duo generation complete ({len(code_response)} chars total)")
+            logger.info(f"✅ Multi-part Qwen generation complete ({len(code_response)} chars total)")
             logger.info(f"   {part_sizes}")
 
         else:
-            logger.info(f"📝 Using single-part Duo generation for {num_components} components")
+            logger.info(f"📝 Using single-part Qwen generation for {num_components} components")
             components_desc = "\n".join([
                 f"- {comp.get('name', 'Unknown')}: {comp.get('description', '')}"
                 for comp in components
@@ -808,7 +812,7 @@ Generate COMPLETE, working code with:
 CRITICAL: Output ONLY valid {code_type} code. No markdown fences, no explanations.
 Every block must be syntactically complete with all braces closed."""
 
-            code_response = generate_via_duo(prompt, "Single-part")
+            code_response = generate_via_qwen(prompt, "Single-part")
 
         logger.info(f"{'='*80}\n")
 
@@ -816,33 +820,30 @@ Every block must be syntactically complete with all braces closed."""
 
         return AgentResponse(
             success=True,
-            message=f"{code_type.capitalize()} code generated successfully via GitLab Duo Agent Platform",
+            message=f"{code_type.capitalize()} code generated successfully via Qwen",
             data={
                 "code": str(code_response),
                 "code_type": code_type,
                 "provider": architecture.get('provider', 'aws'),
                 "skills_used": skills_used,
-                "duo_agent": "iac_generator",
-                "duo_platform": "glab duo cli (headless)",
+                "generator": "iac_generator",
+                "model": "qwen3.7-max",
             },
             reasoning=str(code_response)
         )
 
     except Exception as e:
-        logger.error(f"❌ Error generating code via Duo: {e}")
-        # Code generation runs through GitLab Duo (GraphQL Chat API, with a
-        # glab-CLI fallback). When neither is reachable — no GITLAB_TOKEN, or the
-        # glab binary isn't installed — the raw subprocess/stderr text is
-        # meaningless to the user. Translate it into a clear message; the full
-        # error stays in the logs above.
+        logger.error(f"❌ Error generating code via Qwen: {e}")
+        # Code generation runs on Qwen (qwen3.7-max). When it can't be reached —
+        # missing/invalid DASHSCOPE_API_KEY or a transport error — surface a
+        # clear message; the full error stays in the logs above.
         raw = str(e)
         low = raw.lower()
-        if any(k in low for k in ("glab", "duo", "gitlab", "no such file")):
+        if any(k in low for k in ("dashscope", "api key", "apikey", "401", "unauthorized")):
             detail = (
-                "Code generation is unavailable: GitLab Duo could not be reached "
-                "(the Duo Chat API and the glab CLI fallback both failed). Check "
-                "GITLAB_TOKEN / Duo access, or install the glab CLI. Architecture "
-                "design is unaffected — it runs on Qwen."
+                "Code generation is unavailable: Qwen Cloud could not be reached. "
+                "Check DASHSCOPE_API_KEY (and that its prefix matches the base URL). "
+                "Architecture design uses the same key."
             )
         else:
             detail = f"Code generation failed: {raw}"

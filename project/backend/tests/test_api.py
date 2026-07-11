@@ -80,9 +80,7 @@ class TestCodeGeneration:
 
     def test_generate_terraform_code(self, client, sample_code_generation_request, mock_code_response):
         """Test Terraform code generation"""
-        with patch("backend.duo_client.get_duo_client") as mock_duo:
-            mock_duo.return_value.ask = Mock(return_value=mock_code_response)
-
+        with patch("backend.llm_client.chat", return_value=mock_code_response):
             response = client.post("/api/code/generate", json=sample_code_generation_request)
 
             assert response.status_code == status.HTTP_200_OK
@@ -101,17 +99,13 @@ class TestCodeGeneration:
             "provider": "aws"
         }
 
-        with patch("backend.duo_client.get_duo_client") as mock_duo:
-            mock_duo.return_value.ask = Mock(return_value="AWSTemplateFormatVersion: '2010-09-09'")
-
+        with patch("backend.llm_client.chat", return_value="AWSTemplateFormatVersion: '2010-09-09'"):
             response = client.post("/api/code/generate", json=request_data)
             assert response.status_code == status.HTTP_200_OK
 
     def test_generate_code_error(self, client, sample_code_generation_request):
-        """Test code generation when the Duo backend fails"""
-        with patch("backend.duo_client.get_duo_client") as mock_duo:
-            mock_duo.return_value.ask = Mock(side_effect=Exception("Duo error"))
-
+        """Test code generation when the Qwen backend fails"""
+        with patch("backend.llm_client.chat", side_effect=Exception("Qwen error")):
             response = client.post("/api/code/generate", json=sample_code_generation_request)
             assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
