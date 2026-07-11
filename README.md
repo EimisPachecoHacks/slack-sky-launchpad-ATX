@@ -1,66 +1,68 @@
 # Sky Launchpad
 
-**Infrastructure that learns from its own failures.** Turn **natural language** or **uploaded diagrams** into **multi-cloud Terraform**, **deploy for real**, then **save proven code to GitLab** — powered end to end by **Gemma 4 running on an AMD Instinct MI300X**.
+**An autopilot agent for cloud infrastructure that learns from its own failures.** Turn **natural language** or an **uploaded architecture diagram** into **Terraform**, **deploy it for real to Alibaba Cloud**, and — when a deploy fails — **diagnose, repair, and remember the fix** so the same failure never happens twice. Reasoning, vision, embeddings, and speech all run on **Qwen models on Qwen Cloud**.
 
-- **Primary UX:** Web app under [`project/`](project/) (Vite + FastAPI): architecture → code → **real `terraform apply`** (AWS/GCP) → GitLab MR on success (**deploy-first, validate-then-save**).
-- **GitLab-native assets:** Custom **flow**, **chat agent**, **skills**, **chat rules**, and **MR review** instructions live in this repo for Duo-driven workflows inside GitLab.
+- **Primary UX:** Web app under [`project/`](project/) (Vite + FastAPI): requirements → architecture → Terraform → **real `terraform apply`** → optional GitLab MR on success, with a **human-in-the-loop deploy checkpoint**.
+- **The differentiator:** a **persistent, self-improving memory** — every deploy failure becomes a reusable `SKILL.md`, embedded and retrieved by vector similarity to pre-empt recurrence.
 
-## Built for the AMD Developer Hackathon: ACT II — Unicorn Track
+## Built for the Global AI Hackathon with Qwen Cloud — Track 4: Autopilot Agent
 
-Everything runs on AMD silicon, and **AMD is load-bearing for both halves of the self-improving loop** — not a bolt-on accelerator:
+Track 4 asks for *"agents that automate real-world business workflows end-to-end with minimal human input."* Sky Launchpad automates the full infrastructure workflow — **design → generate IaC → deploy → validate → commit → learn** — with human checkpoints only where they matter (approving a real deploy).
 
-| Role | Model | Where |
+**Qwen Cloud is load-bearing across every stage:**
+
+| Role | Model | Endpoint |
 |---|---|---|
-| Architecture generation | **Gemma 4** (`gemma4:31b`) | Ollama on ROCm (MI300X) |
-| Failure repair + skill authoring | **Gemma 4** | Ollama on ROCm (MI300X) |
-| Diagram vision (Gemma 4 is natively multimodal) | **Gemma 4** | Ollama on ROCm (MI300X) |
-| Skill-retrieval embeddings | **mxbai-embed-large** (1024-d) | Ollama on ROCm (MI300X) |
-| Speech-to-text | **openai/whisper-large-v3** | PyTorch-ROCm (MI300X) |
+| Architecture reasoning + IaC generation | **`qwen3.7-max`** | Qwen Cloud (OpenAI-compatible) |
+| Failure repair + skill authoring | **`qwen3.7-max`** | Qwen Cloud |
+| Diagram vision (screenshot → structured JSON) | **`qwen3.7-plus`** | Qwen Cloud |
+| Skill-retrieval embeddings | **`text-embedding-v4`** (1024-d) | Qwen Cloud |
+| Speech-to-text (voice input) | **`qwen3-asr-flash`** | Qwen Cloud |
 
-No hosted inference: every token and every vector is computed on the MI300X. One open model in three roles, plus our own Whisper, on a single GPU. Everything speaks the OpenAI wire format ([`project/backend/llm_client.py`](project/backend/llm_client.py)) and is served by Ollama on the GPU.
+Everything speaks the OpenAI wire format ([`project/backend/llm_client.py`](project/backend/llm_client.py)) through a single DashScope endpoint, so one API key and a model name drive every capability.
 
-**Kill the GPU and vector retrieval dies with it.** Embeddings have exactly one model, because vectors from different models aren't comparable. When the embedding endpoint is down, [`skydb.find_similar_skills`](skydb/__init__.py) degrades to lexical matching rather than poisoning the index with a foreign vector space. Semantic recall exists *because* of the AMD GPU.
+**The deployed workload runs on Alibaba Cloud too.** The app generates `alicloud` Terraform ([`deployer/iac_generator.py`](deployer/iac_generator.py) → OSS + VPC + VSwitch + security group) and applies it to Alibaba Cloud, and the backend itself is hosted on Alibaba Cloud (Simple Application Server / ECS) for the hackathon's proof-of-deployment.
 
-### The self-improving loop
+### The self-improving loop (persistent memory)
 
 When a deployment **fails**, Sky Launchpad doesn't just patch and forget. It **learns**:
 
-1. **[`deployer/log_collector.py`](deployer/log_collector.py)** gathers the Terraform error **plus real GCP Cloud Logging** entries.
-2. **[`deployer/repair_agent.py`](deployer/repair_agent.py)** hands that context to **Gemma 4**, which diagnoses the root cause, fixes the HCL, and **authors a new generalized `SKILL.md`**. Its persona is declared in [`deployer/AGENTS.md`](deployer/AGENTS.md).
-3. **[`deployer/skill_library.py`](deployer/skill_library.py)** persists the lesson to **both** a versioned `skills/learned/<slug>/SKILL.md` **and** a retrieval index, embedding it on the MI300X.
+1. **[`deployer/log_collector.py`](deployer/log_collector.py)** gathers the Terraform error context.
+2. **[`deployer/repair_agent.py`](deployer/repair_agent.py)** hands it to **`qwen3.7-max`**, which diagnoses the root cause, fixes the HCL, and **authors a generalized `SKILL.md`**. Its persona is declared in [`deployer/AGENTS.md`](deployer/AGENTS.md).
+3. **[`deployer/skill_library.py`](deployer/skill_library.py)** persists the lesson to **both** a versioned `skills/learned/<slug>/SKILL.md` **and** a retrieval index, embedding it with `text-embedding-v4`.
 4. **Transfer:** the next deployment retrieves matching learned skills by vector similarity and injects them into generation — so the **same failure never happens twice**.
-5. **[`project/backend/narration.py`](project/backend/narration.py)** streams a live text narration of the loop over a WebSocket (the browser speaks it aloud).
+5. **[`project/backend/narration.py`](project/backend/narration.py)** streams a live narration of the loop over a WebSocket (the browser speaks it aloud).
 
 The system becomes more useful the more it is used — with **no human editing skills**. Learned-skill metrics are exposed at `GET /api/skills/learned`.
 
 ### Run it
 
-AMD gives you two different environments, and they need different launch paths.
-
-**On the free hackathon pod** (`notebooks.amd.com/hackathon`) — a managed JupyterLab container. You are root *inside a container*, so `docker run` is unavailable. Everything installs as a plain process:
+**1. Get a Qwen Cloud key** at [home.qwencloud.com/api-keys](https://home.qwencloud.com/api-keys) and configure the app:
 
 ```bash
-bash scripts/pod_up.sh          # Ollama (ROCm) + Gemma 4 + embeddings + Whisper
-bash scripts/pod_up.sh --check  # just probe the environment, install nothing
-bash scripts/pod_down.sh        # stop the GPU clock (8h per rolling 24h)
+cd project
+cp .env.example .env
+# set DASHSCOPE_API_KEY=sk-...   (pay-as-you-go key -> the dashscope-intl base URL;
+#                                 sk-sp-... token-plan key -> set LLM_BASE_URL to the
+#                                 token-plan URL. Mixing them returns 401.)
 ```
 
-**On an AMD Developer Cloud GPU Droplet** — a real VM with root, Docker, and a public IP:
+**2. Run locally:**
 
 ```bash
-docker compose -f docker/docker-compose.amd.yml up
+pip install -r backend/requirements.txt
+npm install && npm run dev        # UI → http://localhost:5173
+
+# second terminal, from project/
+uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Both serve the **same models**, so the vector index stays valid across them.
-
-**Prove AMD silicon is doing the work:**
+**3. Prove Qwen Cloud is doing the work:**
 
 ```bash
-rocm-smi
-ollama ps        # PROCESSOR column must read GPU, not CPU
-
-curl localhost:11434/v1/embeddings -H 'Content-Type: application/json' \
-  -d '{"model":"mxbai-embed-large","input":"compute api disabled"}' \
+curl https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings \
+  -H "Authorization: Bearer $DASHSCOPE_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"model":"text-embedding-v4","input":"instance type not available in zone","dimensions":1024}' \
   | jq '.data[0].embedding | length'      # -> 1024
 ```
 
@@ -70,6 +72,7 @@ curl localhost:11434/v1/embeddings -H 'Content-Type: application/json' \
 python3 scripts/migrate_vector_index.py
 ```
 
+To **deploy real infrastructure**, upload an Alibaba Cloud RAM AccessKey in **Settings → Alibaba Cloud** (or `POST /api/credentials/upload?provider=alicloud`), then run a deployment.
 
 ## How it works
 
@@ -78,16 +81,18 @@ flowchart TB
   subgraph ui["Sky Launchpad UI"]
     A[Describe requirements or upload diagram]
   end
-  subgraph gpu["AMD MI300X (ROCm)"]
-    B["Gemma 4 — architecture reasoning + diagram vision"]
-    R["Gemma 4 — diagnose failure, repair HCL, author SKILL.md"]
-    V["mxbai-embed-large — embed + retrieve skills"]
+  subgraph qwen["Qwen Cloud (Alibaba Model Studio)"]
+    B["qwen3.7-max — architecture reasoning + IaC"]
+    Vz["qwen3.7-plus — diagram vision"]
+    R["qwen3.7-max — diagnose failure, repair HCL, author SKILL.md"]
+    V["text-embedding-v4 — embed + retrieve skills"]
   end
   subgraph run["Runtime"]
-    C[Terraform deployer]
+    C[Terraform deployer → Alibaba Cloud]
     E[GitLab API - MR & commits]
   end
   A --> B
+  A -. "uploaded image" .-> Vz --> B
   V -. "retrieved lessons" .-> B
   B --> C
   C -->|success| E
@@ -96,113 +101,67 @@ flowchart TB
   R -->|"retry with fix"| C
 ```
 
-1. User selects **AWS, GCP, or Azure** (UI) and enters requirements **or** uploads an architecture image (**Gemma 4** reads the diagram directly — it is natively multimodal, so vision and structured output happen in one call).
-2. **Gemma 4 on the MI300X** produces architecture JSON, informed by **`AGENTS.md`**, **`skills/`**, and any **learned skills** retrieved by vector similarity. Terraform itself is rendered by [`deployer/iac_generator.py`](deployer/iac_generator.py) (templating, no LLM).
-3. **FastAPI** runs **`terraform init/plan/apply`** against the user’s cloud using encrypted stored credentials (`deployer/` module at repo root).
-4. On **success**, validated files are committed and a **merge request** is opened via the **GitLab REST API**. On **failure**, the repair loop runs and the lesson is embedded back into step 2.
-
-> An optional GitLab-native surface ([`flows/`](flows/), [`agents/`](agents/), [`.gitlab/duo/`](.gitlab/duo/)) drives the same work from inside GitLab via Duo. It is not part of the self-improving loop — see [Models & licensing](#models--licensing).
+1. User selects a provider — **Alibaba Cloud, AWS, GCP, or Azure** — and enters requirements **or** uploads an architecture image (**`qwen3.7-plus`** reads the diagram and returns structured JSON).
+2. **`qwen3.7-max`** produces architecture JSON, informed by **`AGENTS.md`**, **`skills/`**, and any **learned skills** retrieved by vector similarity. Terraform is then generated by [`deployer/iac_generator.py`](deployer/iac_generator.py).
+3. **FastAPI** runs **`terraform init/plan/apply`** against the target cloud using encrypted stored credentials (`deployer/` module at repo root).
+4. On **success**, validated files are committed and a **merge request** is opened via the **GitLab REST API** (optional). On **failure**, the repair loop runs and the lesson is embedded back into step 2.
 
 ## Repository layout
 
 | Path | Purpose |
 |------|---------|
 | [`project/`](project/) | **React + Vite** frontend and **FastAPI** backend (`project/backend/`) |
-| [`docker/`](docker/) | **ROCm** compose stack (droplet path): `ollama`, `whisper`, `backend` |
-| [`deployer/`](deployer/) | Credential handling, Terraform workspace, deploy / retry / GitLab save |
+| [`deployer/`](deployer/) | Credential handling, Terraform workspace, deploy / retry / repair / GitLab save |
 | [`skydb/`](skydb/) | MongoDB Atlas store + Vector Search retrieval (local JSON fallback) |
-| [`flows/`](flows/) | `skyrchitect-iac-generator.yaml` — 3-step Duo flow |
-| [`agents/`](agents/) | Interactive Duo chat agent definition |
-| [`skills/`](skills/) | Five SKILL.md modules (Terraform GCP, security, cost, patterns, voice) |
-| [`.gitlab/duo/`](.gitlab/duo/) | `chat-rules.md`, MR review instructions |
+| [`skills/`](skills/) | Reusable SKILL.md modules (Terraform, security, cost, patterns) + `learned/` |
 | [`examples/terraform/`](examples/terraform/) | Reference Terraform implementations |
-| [`Dockerfile`](Dockerfile), [`cloudrun-nginx.conf`](cloudrun-nginx.conf) | **GCP Cloud Run** image: nginx + static UI + uvicorn |
+| [`Dockerfile.backend`](Dockerfile.backend) | Backend image (Terraform pre-installed) for Alibaba Cloud hosting |
 
-## GitLab Duo quick start (flow in GitLab)
+## Deploying the app to Alibaba Cloud (proof of deployment)
 
-1. Import or fork this project into your GitLab group.
-2. Enable **GitLab Duo** and **flow execution** (group settings).
-3. **Automate → Flows → New flow** — paste [`flows/skyrchitect-iac-generator.yaml`](flows/skyrchitect-iac-generator.yaml).
-4. Enable the flow; set triggers (mention / assign) per GitLab docs.
-5. Optional: create the chat agent from [`agents/skyrchitect-chat-agent.md`](agents/skyrchitect-chat-agent.md).
-6. Open an issue with the **Infrastructure Request** template and trigger the flow.
-
-## Companion app quick start (`project/`)
+The simplest path is a **Simple Application Server (SAS)** with the Docker image, in the Singapore region:
 
 ```bash
-cd project
-cp .env.example .env   # then edit: LLM_PROVIDER, GITLAB_TOKEN, GITLAB_PROJECT_PATH, CORS_ORIGINS, VITE_API_URL
-
-pip install -r backend/requirements.txt
-npm install && npm run dev    # UI → http://localhost:5173
-
-# second terminal, from project/
-uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
+# on the Alibaba Cloud instance (Docker image)
+git clone <this-repo> && cd <repo>
+docker build -f Dockerfile.backend -t sky-backend:latest .
+docker run -d --name sky-backend --restart unless-stopped -p 8080:8080 \
+  -e DASHSCOPE_API_KEY=sk-... -e LLM_PROVIDER=qwen sky-backend:latest
 ```
 
-Deploy and credential routes inject the **monorepo root** into `sys.path` so the **`deployer/`** package imports correctly.
-
-## Deploying the app to GCP (Cloud Run)
-
-From the **repository root** (not `project/`):
-
-```bash
-gcloud builds submit --tag REGION-docker.pkg.dev/PROJECT/REPO/skyrchitect:latest .
-gcloud run deploy skyrchitect --image REGION-docker.pkg.dev/PROJECT/REPO/skyrchitect:latest --region REGION --allow-unauthenticated --port 8080
-```
-
-Set **`VITE_API_URL`** at **Docker build time** so the SPA calls the backend origin's `/api` correctly. Pass secrets (**`GITLAB_TOKEN`**, etc.) as environment variables — not in git. The backend must be able to reach the AMD GPU inference endpoint (`LLM_BASE_URL`).
-
-## Example Terraform (reference)
-
-- [Three-tier web app](examples/terraform/gcp-three-tier-webapp/)
-- [Serverless API](examples/terraform/gcp-serverless-api/)
-- [Data pipeline](examples/terraform/gcp-data-pipeline/)
+Then screenshot the **Workbench Overview** showing the running instance for the submission.
 
 ## Technology
 
 | Layer | Stack |
 |-------|--------|
-| Hackathon platform | **GitLab Duo** (flows, agents, skills, chat rules) |
-| Companion backend | **FastAPI**, **Terraform** CLI, **GitLab REST** |
-| Companion frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind** |
-| Inference (GPU) | **Gemma 4** + **mxbai-embed-large** on **Ollama / ROCm / AMD MI300X** |
-| Vision (diagrams) | **Gemma 4** (natively multimodal) |
+| Inference | **Qwen Cloud** — `qwen3.7-max`, `qwen3.7-plus`, `text-embedding-v4`, `qwen3-asr-flash` |
+| Backend | **FastAPI**, **Terraform** CLI, **GitLab REST** |
+| Frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind** |
+| Deploy target | **Alibaba Cloud** (`alicloud` Terraform: OSS, VPC, VSwitch) — plus AWS/GCP/Azure |
+| App hosting | **Alibaba Cloud** Simple Application Server / ECS |
 | Skill retrieval | **MongoDB Atlas Vector Search** (1024-d, cosine) |
-| App hosting (fallback) | **Google Cloud Run**, **Artifact Registry**, **Cloud Build** |
-| Voice | **Whisper** (input) + browser SpeechSynthesis (output) |
+| Voice | **`qwen3-asr-flash`** (input) + browser SpeechSynthesis (output; CosyVoice available as a server-side upgrade) |
 
 ## Models & licensing
 
-Every model in the inference path is open-weight and self-hosted on the MI300X. We
-distinguish **open weights** from **OSI open source**, because they are not the same
-thing and Gemma is the case that matters:
+Every model in the inference path is a **Qwen model served on Qwen Cloud** (Alibaba Cloud Model Studio) via the OpenAI-compatible API — commercial, hosted, and accessed with a single `DASHSCOPE_API_KEY`. The hackathon provides free trial credits.
 
 | Component | License | Notes |
 |---|---|---|
-| **Gemma 4** (`gemma4:31b`) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) | **Open weights, not OSI.** The Gemma *code* is Apache 2.0; the *weights* are not. Gated on Hugging Face — pulling via Ollama's registry avoids the token. Commercial use permitted, subject to the prohibited-use policy. |
-| **mxbai-embed-large-v1** | Apache 2.0 | Fully OSI. Natively 1024-d. |
-| **openai/whisper-large-v3** | Apache 2.0 | Fully OSI, not gated. |
-| **Ollama** | MIT | Serving runtime, bundles its own ROCm build. |
-| **ROCm / PyTorch** | MIT / BSD-3 | AMD GPU stack. |
+| **Qwen models** (`qwen3.7-max`, `qwen3.7-plus`, `text-embedding-v4`, `qwen3-asr-flash`) | Commercial API (Qwen Cloud) | Hosted; not self-run. |
 | **FastAPI**, **React**, **Vite**, **pymongo** | MIT / Apache 2.0 | Application frameworks. |
-| **Terraform CLI** (1.7.5) | **BUSL-1.1** | Not open source since v1.6. We only *invoke* the CLI; we don't redistribute or resell it, so the non-compete clause doesn't bite. Swap in [OpenTofu](https://opentofu.org) (MPL-2.0) if you need a fully open toolchain. |
+| **Terraform CLI** (1.7.5) | **BUSL-1.1** | Not open source since v1.6. We only *invoke* the CLI. Swap in [OpenTofu](https://opentofu.org) (MPL-2.0) for a fully open toolchain. |
+| **alicloud / google / aws Terraform providers** | MPL-2.0 / Apache 2.0 | Deploy-time only. |
 
-**One proprietary AI service remains in the repo, deliberately.** `POST /api/infrastructure/generate`
-routes to **GitLab Duo** ([`project/backend/duo_client.py`](project/backend/duo_client.py)), which powers
-the optional GitLab-native flow surface in [`flows/`](flows/), [`agents/`](agents/) and
-[`.gitlab/duo/`](.gitlab/duo/). It is **not part of the self-improving loop**: the Terraform that
-actually gets applied comes from [`deployer/iac_generator.py`](deployer/iac_generator.py) (pure
-templating, zero LLM calls), and every model call in the failure→repair→learn→retrieve cycle runs on
-the AMD GPU. Disable it by leaving `GITLAB_TOKEN` unset.
+> GitLab is used only as the **git host** for committing validated Terraform and opening merge requests on success. It is optional — leave `GITLAB_TOKEN` unset to disable it.
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Setup](docs/SETUP.md)
-- [Flow reference](docs/FLOW_REFERENCE.md)
 - [Demo script](docs/DEMO_SCRIPT.md)
 - [Devpost / submission copy](DEVPOST.md)
+- [Compliance report](COMPLIANCE_REPORT.md)
+- [Test plan](TEST_PLAN.md)
 
 ## Contributing
 

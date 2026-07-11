@@ -1,21 +1,21 @@
 # Sky Launchpad AI Backend
 
 AI-powered cloud architecture design, repair, and deployment API — powered by
-**Gemma 4** on an **AMD Instinct MI300X**.
+**Qwen (qwen3.7-max)** on an **Qwen Cloud**.
 
 ## Features
 
-- 🤖 **AI Architecture Generation**: Gemma 4 turns requirements into cloud architectures
-- 🖼️ **Diagram Vision**: Gemma 4 reads uploaded architecture images (natively multimodal)
-- ♻️ **Self-Improving Loop**: on a failed deploy, Gemma 4 repairs the HCL and authors a reusable skill
+- 🤖 **AI Architecture Generation**: Qwen (qwen3.7-max) turns requirements into cloud architectures
+- 🖼️ **Diagram Vision**: Qwen (qwen3.7-max) reads uploaded architecture images (natively multimodal)
+- ♻️ **Self-Improving Loop**: on a failed deploy, Qwen (qwen3.7-max) repairs the HCL and authors a reusable skill
 - 💰 **Cost Optimization** & **Validation**: best-practice and cost checks
 - 🔄 **Multi-Cloud**: AWS / GCP Terraform
 
 ## Technology Stack
 
 - **FastAPI**: async web framework
-- **Gemma 4** (`gemma4:31b`) via **Ollama** on **ROCm / AMD MI300X**: all inference
-- **mxbai-embed-large**: skill-retrieval embeddings (on the GPU)
+- **Qwen (qwen3.7-max)** (`qwen3.7-max`) via **Qwen Cloud** on **Qwen Cloud / Qwen Cloud**: all inference
+- **text-embedding-v4**: skill-retrieval embeddings (on the GPU)
 - **Python 3.12+**
 
 ## Quick Start
@@ -28,14 +28,14 @@ pip3 install -r requirements.txt
 
 ### 2. Configure Environment
 
-Copy `../.env.example` to `../.env`. The defaults point at the local AMD GPU
-(Ollama at `http://localhost:11434/v1`, model `gemma4:31b`) and need no API key.
+Copy `../.env.example` to `../.env`. The defaults point at Qwen Cloud
+(model `qwen3.7-max`) and need `DASHSCOPE_API_KEY`.
 See [`backend/config.py`](config.py) for all options.
 
 ### 3. Bring up the GPU stack
 
 `bash ../../scripts/pod_up.sh` (hackathon pod) or
-`docker compose -f ../../docker/docker-compose.amd.yml up` (droplet).
+`docker build -f Dockerfile.backend` then run on Alibaba Cloud.
 
 ### 4. Run the Server
 
@@ -116,7 +116,7 @@ backend/
 ├── api/
 │   └── main.py              # FastAPI application
 ├── agents/
-│   └── architecture_agent.py # Gemma 4 architecture agent
+│   └── architecture_agent.py # Qwen (qwen3.7-max) architecture agent
 ├── models/
 │   └── schemas.py           # Pydantic models
 ├── requirements.txt
@@ -126,7 +126,7 @@ backend/
 ## AI Agent Architecture
 
 The agent uses:
-1. **Model**: Gemma 4 (`gemma4:31b`) via Ollama on the AMD MI300X (see `backend/llm_client.py`)
+1. **Model**: Qwen (qwen3.7-max) (`qwen3.7-max`) on Qwen Cloud (see `backend/llm_client.py`)
 2. **Skills context**: curated GCP skills + auto-authored learned skills injected into the prompt
 3. **System Prompt**: specialized cloud-architecture expertise
 
@@ -161,20 +161,20 @@ CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LLM_BASE_URL` | OpenAI-compatible inference URL | `http://localhost:11434/v1` (Ollama) |
-| `LLM_MODEL` | Text/vision model | `gemma4:31b` |
-| `EMBED_MODEL` | Skill-retrieval embedder | `mxbai-embed-large` |
+| `LLM_BASE_URL` | OpenAI-compatible inference URL | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` (Qwen Cloud) |
+| `LLM_MODEL` | Text/vision model | `qwen3.7-max` |
+| `EMBED_MODEL` | Skill-retrieval embedder | `text-embedding-v4` |
 | `MONGODB_URI` | Atlas connection (blank = local JSON) | — |
 | `PORT` | API port | 8080 |
 
 ## Troubleshooting
 
 ### Generation returns empty / errors
-Confirm the GPU endpoint is up: `curl localhost:11434/v1/models`. Gemma 4 needs a
+Confirm your key works: `curl -H "Authorization: Bearer $DASHSCOPE_API_KEY" dashscope-intl.aliyuncs.com/compatible-mode/v1/models`. Qwen needs a
 real token budget (the app sends a large one) — tiny requests can return empty.
 
 ### Agent not initializing
-Check that `LLM_BASE_URL` points at a reachable Ollama/vLLM endpoint.
+Check that `LLM_BASE_URL` points at a reachable Qwen Cloud endpoint.
 
 ### CORS errors
 Update `CORS_ORIGINS` in `.env` (or `config.py`) for your frontend URL.

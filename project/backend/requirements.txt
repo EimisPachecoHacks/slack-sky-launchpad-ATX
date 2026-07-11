@@ -6,7 +6,7 @@ uvicorn[standard]>=0.34.2
 pydantic>=2.12.0
 pydantic-settings>=2.6.1
 
-# AI — every backend (AMD vLLM, Fireworks) speaks the OpenAI wire format, so the
+# AI — Qwen Cloud (Alibaba Model Studio) speaks the OpenAI wire format, so the
 # only client we need is an HTTP client. See backend/llm_client.py.
 httpx>=0.27.0
 requests>=2.31.0  # GitLab + Duo clients

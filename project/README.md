@@ -1,6 +1,6 @@
 # Skyrchitect — companion application (`project/`)
 
-**React + FastAPI** UI for **architecture design**, **Terraform code generation**, and **real cloud deployment** — powered by **Gemma 4 on an AMD MI300X** (text + diagram vision), with an optional GitLab Duo surface.
+**React + FastAPI** UI for **architecture design**, **Terraform code generation**, and **real cloud deployment** — powered by **Qwen on Qwen Cloud** (text + diagram vision), with an optional GitLab Duo surface.
 
 See the **[repository root README](../README.md)** for the full story (GitLab Duo flow, skills, Cloud Run deployment, and repo layout).
 
@@ -17,7 +17,7 @@ The Python **`deployer`** package lives at **repo root** (`../deployer/`); the b
 
 - Node.js 18+
 - Python 3.11+ (3.12 recommended)
-- A reachable **AMD GPU inference endpoint** (Ollama serving `gemma4:31b`) — no API key needed
+- A reachable **Qwen Cloud inference endpoint** (Qwen Cloud serving `qwen3.7-max`) — no API key needed
 - *(optional)* **GitLab** personal access token (`GITLAB_TOKEN`) for the Duo surface + merge requests
 
 ## Setup
@@ -25,8 +25,8 @@ The Python **`deployer`** package lives at **repo root** (`../deployer/`); the b
 ```bash
 cd project
 cp .env.example .env
-# Edit .env — defaults point at the local AMD GPU (no API key):
-#   LLM_BASE_URL=http://localhost:11434/v1  LLM_MODEL=gemma4:31b
+# Edit .env — defaults point at Qwen Cloud (needs DASHSCOPE_API_KEY):
+#   LLM_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1  LLM_MODEL=qwen3.7-max
 #   VITE_API_URL=http://localhost:8080
 #   (optional) GITLAB_TOKEN, GITLAB_PROJECT_PATH for the Duo surface
 
@@ -52,8 +52,8 @@ Open **http://localhost:5173**. The UI calls **`VITE_API_URL`** (typically the F
 
 | Area | Behavior |
 |------|----------|
-| **Architecture** | Text requirements → **Gemma 4** on the MI300X → structured diagram + components |
-| **Image flow** | **Gemma 4** reads the uploaded diagram directly (natively multimodal) → structured JSON |
+| **Architecture** | Text requirements → **Qwen (qwen3.7-max)** on Qwen Cloud → structured diagram + components |
+| **Image flow** | **Qwen (qwen3.7-max)** reads the uploaded diagram directly (natively multimodal) → structured JSON |
 | **Code** | Duo generates **Terraform** (primary) with project **skills** / **AGENTS.md** context |
 | **Deploy** | **Real** `terraform init/plan/apply` to **AWS** or **GCP** using uploaded credentials |
 | **GitLab** | After successful apply, backend can create branch / commit / **merge request** |
@@ -66,8 +66,8 @@ The **production container** is built from the **monorepo root** [`Dockerfile`](
 
 | Variable | Role |
 |----------|------|
-| `LLM_BASE_URL` | Inference endpoint (default Ollama `:11434/v1`) |
-| `LLM_MODEL` | Default `gemma4:31b` |
+| `LLM_BASE_URL` | Inference endpoint (default Qwen Cloud ` Qwen Cloud endpoint`) |
+| `LLM_MODEL` | Default `qwen3.7-max` |
 | `GITLAB_TOKEN` | GitLab REST + Duo |
 | `GITLAB_PROJECT_PATH` | `namespace/project` |
 | `GITLAB_URL` | e.g. `https://gitlab.com` |

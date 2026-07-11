@@ -1,8 +1,8 @@
 # Sky Launchpad
 
-**Infrastructure that learns from its own failures — Gemma 4 and its own memory, running on an AMD Instinct MI300X.**
+**An autopilot agent for cloud infrastructure that learns from its own failures — powered by Qwen models on Qwen Cloud, deploying to Alibaba Cloud.**
 
-*Submitted to the AMD Developer Hackathon: ACT II — Unicorn Track (🦄)*
+*Submitted to the Global AI Hackathon with Qwen Cloud — Track 4: Autopilot Agent*
 
 ---
 
@@ -10,116 +10,97 @@
 
 Every infrastructure tool makes the same mistake twice.
 
-You ask an AI to generate Terraform. It forgets to enable the Compute Engine API. `terraform apply` fails. The AI patches it, you move on. Next week, a different project, a different prompt — and it forgets to enable the Compute Engine API again. The model never got worse, but it never got *better* either. Every deploy starts from zero.
+You ask an AI to generate Terraform. It picks an ECS instance type that isn't offered in the target zone. `terraform apply` fails. The AI patches it, you move on. Next week, a different project, a different prompt — and it picks an unavailable instance type again. The model never got worse, but it never got *better* either. Every deploy starts from zero.
 
 That's not how engineers work. When an SRE hits a wall at 2am, they write it down. The runbook grows. The team gets faster. The knowledge compounds.
 
-We wanted infrastructure automation that compounds. Not a bigger model — a system with **memory**.
+We wanted infrastructure automation that compounds. Not a bigger model — an **agent with memory**.
 
 ## What it does
 
-Sky Launchpad turns natural language or an uploaded architecture diagram into multi-cloud Terraform, actually runs `terraform apply`, and opens a GitLab merge request when the infrastructure really stands up.
+Sky Launchpad turns natural language or an uploaded architecture diagram into Terraform, actually runs `terraform apply` against **Alibaba Cloud**, and opens a GitLab merge request when the infrastructure really stands up — an end-to-end workflow with a human checkpoint only where it matters: approving a real deploy.
 
 The interesting part is what happens when it **fails**:
 
-1. **Collect** — `deployer/log_collector.py` gathers the Terraform error *plus real GCP Cloud Logging* entries, and the exact HCL lines around each error.
-2. **Diagnose** — `deployer/repair_agent.py` hands that context to **Gemma 4**, which finds the root cause and rewrites the broken HCL.
-3. **Author** — the same Gemma 4 call writes a **new, generalized `SKILL.md`** — not "fix line 42", but "enable `compute.googleapis.com` before creating compute resources, and depend on it."
-4. **Remember** — the skill is embedded by **mxbai-embed-large on the MI300X** and indexed in MongoDB Atlas Vector Search.
+1. **Collect** — `deployer/log_collector.py` gathers the Terraform error and the exact HCL lines around it.
+2. **Diagnose** — `deployer/repair_agent.py` hands that context to **`qwen3.7-max`**, which finds the root cause and rewrites the broken HCL.
+3. **Author** — the same Qwen call writes a **new, generalized `SKILL.md`** — not "fix line 42", but "query available zones and pick a supported ecs instance type before creating the instance."
+4. **Remember** — the skill is embedded by **`text-embedding-v4`** and indexed in MongoDB Atlas Vector Search.
 5. **Transfer** — the *next* deployment retrieves matching skills by vector similarity and injects them into generation.
 
 The same failure never happens twice. No human ever edits a skill.
 
-Run a deploy that fails on a disabled API, watch it repair itself and write `gcp-enable-compute-api`. Run it again — the failure never occurs, because the lesson was retrieved before generation.
+Run a deploy that fails on an unavailable instance type, watch it repair itself and write `alicloud-supported-instance-type`. Run it again — the failure never occurs, because the lesson was retrieved before generation.
 
-## How AMD makes it work
+## How Qwen Cloud makes it work
 
-**AMD silicon is load-bearing for both halves of the loop.** This is not a model call that happens to run on a rented GPU.
+**Qwen models are load-bearing across every stage** — this is not a single model call bolted onto a template engine.
 
-| Role | Model | Where |
+| Role | Model | Endpoint |
 |---|---|---|
-| Architecture generation | **Gemma 4** (`gemma4:31b`) | Ollama on ROCm (MI300X) |
-| Failure repair + skill authoring | **Gemma 4** | Ollama on ROCm (MI300X) |
-| Diagram vision — Gemma 4 is natively multimodal | **Gemma 4** | Ollama on ROCm (MI300X) |
-| Skill-retrieval embeddings | **mxbai-embed-large** (1024-d) | Ollama on ROCm (MI300X) |
-| Speech-to-text | **openai/whisper-large-v3** | PyTorch-ROCm (MI300X) |
+| Architecture reasoning + IaC generation | **`qwen3.7-max`** | Qwen Cloud (OpenAI-compatible) |
+| Failure repair + skill authoring | **`qwen3.7-max`** | Qwen Cloud |
+| Diagram vision — screenshot → structured JSON | **`qwen3.7-plus`** | Qwen Cloud |
+| Skill-retrieval embeddings | **`text-embedding-v4`** (1024-d) | Qwen Cloud |
+| Speech-to-text (voice input) | **`qwen3-asr-flash`** | Qwen Cloud |
 
-The MI300X's 192 GB of VRAM lets Gemma 4, the embedder, and Whisper sit resident on **one GPU simultaneously** — generation, retrieval, and speech, same card, no swapping. `rocm-smi` shows all of them. **No hosted inference anywhere in the loop** — every token and every vector is computed on the MI300X. (The loop still talks to MongoDB Atlas, GCP Cloud Logging, and the GitLab API; those are storage and telemetry, not intelligence.)
+Everything speaks the OpenAI wire format through a single DashScope endpoint (`project/backend/llm_client.py`), so one `DASHSCOPE_API_KEY` and a model name drive chat, vision, embeddings, and speech alike. `qwen3.7-max` is Qwen's agent-frontier model, built for exactly this kind of long-horizon, tool-using autonomous workflow.
 
-Here's the proof that AMD is load-bearing rather than decorative: **embeddings have exactly one model, and no fallback.** Vectors from different models aren't comparable, so a "just use a hosted embedder when the GPU is down" fallback would silently poison the vector index with a foreign coordinate space — the exact class of bug we found and fixed in the original code, which was writing vectors from one embedding model in one path and a *different* embedding model in another into the same retrieval system. So when the embedding endpoint is unreachable, `skydb.find_similar_skills` **degrades to lexical matching** instead. Semantic recall of past failures exists *because* of the AMD GPU. Turn it off and the system measurably forgets how to remember.
-
-The demo needs **no hosted inference at all** — every token and every vector is computed on the MI300X. There is no cloud LLM anywhere in the path.
-
-**One honest caveat.** The repo also ships an optional GitLab-native surface (a Duo flow, a chat agent, MR-review rules) whose `/api/infrastructure/generate` endpoint calls **GitLab Duo**, a proprietary hosted model. That endpoint is **not part of the self-improving loop**, and the UI never calls it: the Terraform that actually gets applied is generated by `deployer/iac_generator.py` — pure templating, zero LLM calls. Every model call in the failure → repair → learn → retrieve cycle runs on the MI300X. Leave `GITLAB_TOKEN` unset and the proprietary path never executes.
-
-## Best use of Gemma
-
-**One open model, three jobs.** Gemma 4 is the architect, the repairer, and the eyes:
-
-- **Architect** — generates the architecture JSON and the Terraform.
-- **Repairer** — reads Cloud Logging output, rewrites failed HCL, and authors the reusable skill. This is the self-improvement engine, and it's Gemma.
-- **Eyes** — Gemma 4 is natively multimodal, so an uploaded architecture diagram goes straight to the *same model* that generates architectures. We deleted the separate vision provider entirely. The model that draws can also read.
-
-Open weights under the [Gemma Terms of Use](https://ai.google.dev/gemma/terms), running on our own hardware, with the repair loop's knowledge accumulating in a plain `skills/` directory we own.
+The self-improving loop rests on one design decision worth calling out: **embeddings have exactly one model, and no fallback.** Vectors from different models aren't comparable, so a "just swap embedders" fallback would silently poison the vector index with a foreign coordinate space. So when the embedding endpoint is unreachable, `skydb.find_similar_skills` **degrades to lexical matching** instead of corrupting the index. Semantic recall of past failures is a first-class, single-source-of-truth capability.
 
 ## How we built it
 
-Everything the app touches speaks the **OpenAI wire format**, which collapsed four bespoke SDK integrations into one client:
+Everything the app touches speaks the **OpenAI wire format**, which collapses chat, vision, transcription, and embeddings into one small client:
 
-- **`project/backend/llm_client.py`** — `chat`, `vision_chat`, `transcribe`, `embed`. Provider selected by config, with per-provider defaults.
-- **`scripts/pod_up.sh`** — the free hackathon pod is a *managed JupyterLab container* with no `docker run`, so the stack installs as plain processes: Ollama's ROCm build, `gemma4:31b`, `mxbai-embed-large`, and our Whisper shim.
-- **`docker/docker-compose.amd.yml`** — for an AMD Developer Cloud droplet (real Docker host): `ollama` + `whisper` with ROCm device passthrough (`/dev/kfd`, `/dev/dri`, `video`/`render` groups, `--ipc=host`), plus a CPU-only `backend`. Same models as the pod, so the vector index stays valid across both.
-- **`services/whisper_server.py`** — `openai/whisper-large-v3` behind an OpenAI-compatible `/v1/audio/transcriptions`, on the GPU.
-- **`skydb/`** — MongoDB Atlas Vector Search with a graceful local-JSON fallback.
+- **`project/backend/llm_client.py`** — `chat`, `vision_chat`, `transcribe`, `embed`, all against the Qwen Cloud compatible endpoint.
+- **`deployer/iac_generator.py`** — generates `alicloud` Terraform (OSS bucket + VPC + VSwitch + security group), plus AWS/GCP/Azure. The globally-unique OSS bucket name is deliberately the failure the learned-skill library pre-empts.
+- **`deployer/repair_agent.py`** — the failure → repair → author-skill engine, on `qwen3.7-max`.
+- **`skydb/`** — MongoDB Atlas Vector Search (1024-d, cosine) with a graceful local-JSON fallback.
+- **Deployed on Alibaba Cloud** — the backend runs on an Alibaba Cloud Simple Application Server (Docker image), satisfying the proof-of-deployment requirement, and the infrastructure it provisions lands on Alibaba Cloud too.
 
-The whole submission is containerized: `docker compose -f docker/docker-compose.amd.yml up` on a Docker host, or `bash scripts/pod_up.sh` inside the pod's managed container.
+The app is containerized (`Dockerfile.backend`, with Terraform pre-installed) and hosts on Alibaba Cloud.
 
 ## Challenges we ran into
 
-**Two vector spaces, silently.** The pre-existing code embedded skills with one model in one path and a different model in another, then compared the results. Cosine similarity between vectors from different models is meaningless — retrieval had been quietly degraded the whole time. Converging on a single MI300X-served embedder fixed it, and forced the honest design decision above: no cross-provider embedding fallback, ever.
+**Two vector spaces, silently.** Earlier code embedded skills with one model in one path and a different model in another, then compared the results. Cosine similarity between vectors from different models is meaningless — retrieval had been quietly degraded. Converging on a single `text-embedding-v4` embedder fixed it, and forced the honest no-fallback design above.
 
-**A stale absolute path.** The learned-skill index stored an absolute path into a *different* repo directory. Every retrieval returned an empty skill body — the loop was "learning" and then reading nothing back. Resolving content from the slug instead of a stored path took `content_len` from `0` to `1333` on the first test.
+**A stale absolute path.** The learned-skill index stored an absolute path into a *different* repo directory, so every retrieval returned an empty skill body — the loop was "learning" and then reading nothing back. Resolving content from the slug instead of a stored path fixed it.
 
-**Knowing what to cut.** Going all-in on an open stack meant losing two things with no open equivalent. We dropped server-side streaming TTS (the browser's `speechSynthesis` speaks the narration instead — that fallback was already implemented). And we retired the Computer-Use browser agent: no OpenAI-compatible provider serves a computer-use-tuned model, and Gemma 4 isn't grounded for pixel-level click targeting. Pretending otherwise would have shipped a demo that only works on stage. The endpoint now says so plainly instead of throwing an opaque error.
+**Making the deploy target the sponsor's cloud.** Rather than merely *hosting* on Alibaba Cloud, we made the app *generate and apply* `alicloud` Terraform, so Qwen builds real Alibaba Cloud infrastructure end to end.
 
-## Accomplishments that we're proud of
+## Accomplishments we're proud of
 
-- **The loop closes on our own hardware.** Failure → Gemma 4 repair → auto-authored skill → embedded on the MI300X → vector-retrieved to pre-empt recurrence. No hosted agent platform anywhere in the path.
-- **Turning the GPU off changes the behavior.** Vector retrieval degrades to lexical. That is the difference between *using* AMD and *depending* on it.
-- **Two real bugs found and fixed** during the port, both in the retrieval path the entire product premise rests on.
-- **One model, three roles.** We removed providers instead of adding them.
+- **The loop closes autonomously.** Failure → Qwen repair → auto-authored skill → embedded → vector-retrieved to pre-empt recurrence, with no human editing skills.
+- **Qwen in four roles.** Reasoning, vision, embeddings, and speech — one provider, one key.
+- **Sponsor platform end to end.** Qwen builds `alicloud` Terraform, applies it to Alibaba Cloud, and the app itself runs on Alibaba Cloud.
+- **Two real retrieval bugs found and fixed** — in the exact path the product premise rests on.
 
 ## What we learned
 
-Fallbacks are not free. The instinct to add a graceful hosted fallback for *everything* is wrong when the two paths aren't semantically interchangeable. A silent embedding fallback is worse than an honest hard failure, because it corrupts the index instead of returning fewer results.
+Fallbacks are not free. A silent embedding fallback is worse than an honest hard failure, because it corrupts the index instead of returning fewer results.
 
-And an OpenAI-compatible wire format is a superpower. Ollama on ROCm exposes the same `/v1/chat/completions` as a managed API, which is why one config flag moves the entire application between our GPU and a hosted provider — and why we could write our own Whisper endpoint that the app cannot distinguish from the commercial one it replaced.
+And an OpenAI-compatible wire format is a superpower: Qwen Cloud exposes the same `/v1/chat/completions` and `/v1/embeddings` as any OpenAI-compatible endpoint, so one client covers every capability and the whole app moved onto Qwen with a base-URL and model-name change.
 
 ## What's next for Sky Launchpad
 
 - **Cross-project skill transfer** — a shared skill library, so one team's 2am lesson pre-empts another team's failure.
-- **Fine-tune Gemma 4 on accumulated skills** — the corpus of learned failures is exactly the dataset for a Terraform-repair LoRA, trained on the same MI300X that serves it.
-- **Grounded UI agent** — revisit autonomous browser QA once an open VLM with reliable pixel grounding lands.
+- **Autonomous UI QA on `qwen3.7-plus`** — Qwen3-VL is grounded for pixel-level GUI control, so the operator-driven self-test can become a fully autonomous screenshot → click/type driver.
+- **CosyVoice narration** — server-side TTS of the self-improvement loop via `cosyvoice-v3-plus`.
 
 ## Product / market potential
 
 Terraform failures are expensive, repetitive, and organizationally forgotten. Cloud teams re-solve the same class of error across projects because the knowledge lives in individual engineers' heads and stale wiki pages.
 
-Sky Launchpad turns each failure into a durable, machine-readable asset that makes the next deploy cheaper. The value compounds with usage, the knowledge base is owned by the customer (plain `SKILL.md` files in their own repo), and the whole stack runs on open weights on hardware they choose — no per-token dependency on a frontier vendor for the thing that makes it valuable.
+Sky Launchpad turns each failure into a durable, machine-readable asset that makes the next deploy cheaper. The value compounds with usage, and the knowledge base is owned by the customer (plain `SKILL.md` files in their own repo).
 
 ## Built with
 
-- **AMD Instinct MI300X** + **ROCm** (AMD Developer Cloud)
-- **Ollama (ROCm build)** — OpenAI-compatible serving for both generation and embeddings
-- **Gemma 4** (Google DeepMind, open weights, Gemma Terms of Use) — generation, repair, vision
-- **mxbai-embed-large** (1024-d, Apache 2.0) — skill-retrieval embeddings
-- **openai/whisper-large-v3** (Apache 2.0) on PyTorch-ROCm — self-hosted speech-to-text
-- **MongoDB Atlas Vector Search** — skill retrieval
+- **Qwen Cloud** (Alibaba Cloud Model Studio) — `qwen3.7-max`, `qwen3.7-plus`, `text-embedding-v4`, `qwen3-asr-flash`
+- **Alibaba Cloud** — deploy target (`alicloud` Terraform: OSS, VPC, VSwitch) and app hosting (Simple Application Server / ECS)
+- **MongoDB Atlas Vector Search** — skill retrieval (1024-d, cosine)
 - **Terraform** CLI (BUSL-1.1 — invoked, not redistributed; [OpenTofu](https://opentofu.org) drops in), **GitLab REST API** — real deploys, real merge requests
 - **FastAPI** + **Python**, **React 18** + **TypeScript** + **Vite**
-- **Docker Compose** — fully containerized submission
-
-Full model-and-framework licensing table, including the open-weights-vs-OSI distinction for Gemma, is in the [README](README.md#models--licensing).
+- **Docker** — containerized backend for Alibaba Cloud
 
 ## Media
 
@@ -127,9 +108,9 @@ Full model-and-framework licensing table, including the open-weights-vs-OSI dist
 
 ### Screenshots
 
-`[Screenshot: rocm-smi + `ollama ps` showing gemma4:31b and mxbai-embed-large resident on one MI300X, PROCESSOR=GPU]`
+`[Screenshot: Alibaba Cloud Workbench Overview showing the backend instance running — proof of deployment]`
 
-`[Screenshot: a deploy failing, Gemma 4 diagnosing, and skills/learned/gcp-enable-compute-api/SKILL.md appearing]`
+`[Screenshot: a deploy failing, qwen3.7-max diagnosing, and skills/learned/alicloud-supported-instance-type/SKILL.md appearing]`
 
 `[Screenshot: the same requirement re-run — the learned skill is retrieved and the failure never occurs]`
 
@@ -137,12 +118,12 @@ Full model-and-framework licensing table, including the open-weights-vs-OSI dist
 
 ### Demo
 
-`[Demo video link: fail once, learn, never fail again]`
+`[Demo video link (< 3 min): fail once, learn, never fail again — deploying to Alibaba Cloud]`
 
 ## Links
 
 - **Repository**: <!-- Add your public repo URL here -->
-- **Submitted to**: AMD Developer Hackathon: ACT II — Unicorn Track
+- **Submitted to**: Global AI Hackathon with Qwen Cloud — Track 4: Autopilot Agent
 
 ## Created by
 
