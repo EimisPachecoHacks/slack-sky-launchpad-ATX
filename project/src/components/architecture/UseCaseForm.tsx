@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, MinusCircle, Loader2, Sparkles, Brain, Cpu, DollarSign, CheckCircle2 } from 'lucide-react';
 import Button from '../ui/Button';
-import Card from '../ui/Card';
 import VoiceInput from '../ui/VoiceInput';
 import { CloudProvider } from '../../types';
 
@@ -76,15 +75,23 @@ const UseCaseForm: React.FC<UseCaseFormProps> = ({ provider, onSubmit, isGenerat
       case 'aws': return 'AWS';
       case 'azure': return 'Azure';
       case 'gcp': return 'GCP';
+      case 'alicloud': return 'Alibaba Cloud';
       default: return provider.toUpperCase();
     }
+  };
+
+  const providerThemeClass: Record<CloudProvider, string> = {
+    alicloud: 'alicloud-theme',
+    aws: 'aws-theme',
+    azure: 'azure-theme',
+    gcp: 'gcp-theme'
   };
 
   const currentStep = loadingSteps[loadingStep];
   const StepIcon = currentStep.icon;
 
   return (
-    <div className={`${provider}-theme max-w-3xl mx-auto relative`}>
+    <div className={`${providerThemeClass[provider]} max-w-3xl mx-auto relative`}>
       <div className="component-glass-card p-8">
       <h2 className="text-2xl font-bold mb-6">Describe Your Vision. Sky Launchpad Designs</h2>
       <p className="text-text-secondary mb-6">
@@ -174,7 +181,7 @@ const UseCaseForm: React.FC<UseCaseFormProps> = ({ provider, onSubmit, isGenerat
           <button
             type="button"
             onClick={addRequirement}
-            className="mt-3 text-blue-400 hover:text-blue-300 flex items-center space-x-2"
+            className="component-add-requirement mt-3 flex items-center space-x-2"
           >
             <PlusCircle className="w-5 h-5" />
             <span>Add Requirement</span>

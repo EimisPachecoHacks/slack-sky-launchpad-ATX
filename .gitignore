@@ -31,9 +31,12 @@ terraform.rc
 *_credentials.csv
 *_accessKeys.csv
 *accessKeys*.csv
+AccessKey-*.csv
+accesskey-*.csv
 credentials/
 ~/.skyrchitect/
 .skyrchitect/
+infra/alibaba/backend/.deploy/
 
 # Build artifacts
 __pycache__/
@@ -62,3 +65,15 @@ cerebras-bot.json
 gcp-credentials*.json
 *.pem
 *.p12
+
+# NVIDIA tester — browser session (Slack login cookies!) and run artifacts
+nvidia/tester/.slack-profile/
+nvidia/tester/runs/
+# stray debug logs from tester/agent runs
+*-stderr.log
+*-stderr2.log
+tester-stderr.log
+tests/pytest.log
+
+# pytest logs (copied around by sync)
+**/pytest.log

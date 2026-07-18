@@ -142,13 +142,14 @@ def select_provider() -> str:
         stored = " [credentials stored]" if credential_exists(key) else ""
         print(f"  {i}. {info['name']} ({key.upper()}){stored}")
     print()
+    valid_choices = {str(index): key for index, (key, _) in enumerate(providers, 1)}
+    valid_choices.update({key: key for key, _ in providers})
+
     while True:
-        choice = input("Enter choice (1 or 2): ").strip()
-        if choice in ("1", "gcp"):
-            return "gcp"
-        if choice in ("2", "aws"):
-            return "aws"
-        print("Invalid choice. Enter 1 for GCP or 2 for AWS.")
+        choice = input(f"Enter choice (1-{len(providers)} or provider name): ").strip().lower()
+        if choice in valid_choices:
+            return valid_choices[choice]
+        print(f"Invalid choice. Choose 1-{len(providers)} or one of: {', '.join(valid_choices.values())}.")
 
 
 def setup_credentials(provider: str) -> dict:
@@ -488,7 +489,7 @@ def run_pipeline(provider: str = None, auto: bool = False):
 
 def main():
     parser = argparse.ArgumentParser(description="Skyrchitect Deploy-First Pipeline")
-    parser.add_argument("--provider", choices=["gcp", "aws"], help="Cloud provider")
+    parser.add_argument("--provider", choices=list(SUPPORTED_PROVIDERS), help="Cloud provider")
     parser.add_argument(
         "--auto", action="store_true", help="Use stored credentials automatically"
     )

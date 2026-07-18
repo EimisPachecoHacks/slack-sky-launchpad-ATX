@@ -192,7 +192,7 @@ const Deployment: React.FC = () => {
                     <div className="mt-4 pt-4 border-t border-green-500/20">
                       <div className="flex items-center space-x-2 mb-2">
                         <GitBranch className="w-4 h-4 text-orange-400" />
-                        <span className="text-orange-400 font-semibold text-sm">GitLab Duo — Code Committed</span>
+                        <span className="text-orange-400 font-semibold text-sm">GitLab — Code Committed</span>
                       </div>
                       <p className="text-xs text-gray-400 mb-2">
                         Deployment-validated Terraform code has been saved to GitLab via the Code Committer agent.

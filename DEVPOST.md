@@ -56,9 +56,9 @@ Everything the app touches speaks the **OpenAI wire format**, which collapses ch
 - **`deployer/iac_generator.py`** — generates `alicloud` Terraform (OSS bucket + VPC + VSwitch + security group), plus AWS/GCP/Azure. The globally-unique OSS bucket name is deliberately the failure the learned-skill library pre-empts.
 - **`deployer/repair_agent.py`** — the failure → repair → author-skill engine, on `qwen3.7-max`.
 - **`skydb/`** — MongoDB Atlas Vector Search (1024-d, cosine) with a graceful local-JSON fallback.
-- **Deployed on Alibaba Cloud** — the backend runs on an Alibaba Cloud Simple Application Server (Docker image), satisfying the proof-of-deployment requirement, and the infrastructure it provisions lands on Alibaba Cloud too.
+- **Alibaba Cloud proof deployment** — the backend/UI is packaged as one Docker image and the reproducible ECS/VPC deployment is defined in `infra/alibaba/backend/main.tf`; generated customer infrastructure lands on Alibaba Cloud too.
 
-The app is containerized (`Dockerfile.backend`, with Terraform pre-installed) and hosts on Alibaba Cloud.
+The app is containerized (`Dockerfile`, with Terraform pre-installed) for its Alibaba Cloud ECS proof host.
 
 ## Challenges we ran into
 
@@ -104,7 +104,13 @@ Sky Launchpad turns each failure into a durable, machine-readable asset that mak
 
 ## Media
 
-<!-- Replace these placeholders with actual screenshots and links -->
+The repository contains both required technical proof artifacts:
+
+- **Alibaba Cloud services/API code:** [`infra/alibaba/backend/main.tf`](infra/alibaba/backend/main.tf)
+- **Architecture diagram:** [`README.md`](README.md#architecture)
+- **Deployment verification record:** [`docs/ALIBABA_DEPLOYMENT_PROOF.md`](docs/ALIBABA_DEPLOYMENT_PROOF.md)
+
+<!-- Replace the remaining placeholders after the successful ECS apply. -->
 
 ### Screenshots
 

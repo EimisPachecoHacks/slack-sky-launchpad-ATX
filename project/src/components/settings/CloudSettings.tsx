@@ -787,7 +787,7 @@ const CloudSettings: React.FC = () => {
                 <div className="mt-6">
                   <label className="block text-sm font-medium mb-2">
                     <FileKey className="w-4 h-4 inline mr-1" />
-                    RAM AccessKey JSON File {serverCredsExist['alicloud'] ? '(already stored on server)' : '*'}
+                    RAM AccessKey JSON or CSV {serverCredsExist['alicloud'] ? '(already stored on server)' : '*'}
                   </label>
                   {serverCredsExist['alicloud'] && !credentialFile && (
                     <div className="flex items-center space-x-2 mb-3 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
@@ -813,15 +813,15 @@ const CloudSettings: React.FC = () => {
                     ) : (
                       <div>
                         <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-400">Click to upload your RAM AccessKey JSON</p>
-                        <p className="text-xs text-gray-500 mt-1">{`{ "access_key_id": "...", "access_key_secret": "...", "region": "ap-southeast-1" }`}</p>
+                        <p className="text-sm text-gray-400">Upload the RAM AccessKey JSON or Alibaba console CSV</p>
+                        <p className="text-xs text-gray-500 mt-1">Secrets are encrypted locally and never committed to Git.</p>
                       </div>
                     )}
                   </div>
                   <input
                     id="alicloud-cred-file"
                     type="file"
-                    accept=".json"
+                    accept=".json,.csv,text/csv,application/json"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files?.[0]) {
@@ -844,8 +844,8 @@ const CloudSettings: React.FC = () => {
                     <li>2. Go to RAM → Users → create a user with programmatic access</li>
                     <li>3. Grant it ECS / VPC / OSS permissions (e.g. AliyunECSFullAccess, AliyunVPCFullAccess, AliyunOSSFullAccess)</li>
                     <li>4. Create an AccessKey for that user</li>
-                    <li>5. Save it as JSON with access_key_id / access_key_secret / region</li>
-                    <li>6. Upload the JSON file above</li>
+                    <li>5. Download Alibaba's AccessKey CSV, or save the documented JSON format</li>
+                    <li>6. Upload the file above; it is encrypted at rest</li>
                   </ol>
                 </div>
 

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Cloud, Database, Server } from 'lucide-react';
-import Card from '../ui/Card';
 import { CloudProvider } from '../../types';
 
 interface ProviderSelectorProps {
@@ -13,6 +12,13 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
   onSelect
 }) => {
   const providers = [
+    {
+      id: 'alicloud',
+      name: 'Alibaba Cloud',
+      icon: <Cloud className="w-10 h-10 text-orange-400" />,
+      description: 'Alibaba Cloud (alicloud)',
+      color: 'from-orange-400 to-red-500'
+    },
     {
       id: 'aws',
       name: 'AWS',
@@ -33,13 +39,6 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
       icon: <Server className="w-10 h-10 text-green-500" />,
       description: 'Google Cloud Platform',
       color: 'from-green-500 to-teal-500'
-    },
-    {
-      id: 'alicloud',
-      name: 'Alibaba Cloud',
-      icon: <Cloud className="w-10 h-10 text-orange-400" />,
-      description: 'Alibaba Cloud (alicloud)',
-      color: 'from-orange-400 to-red-500'
     }
   ];
 
@@ -52,9 +51,12 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
             key={provider.id}
             className={`${provider.id}-game-home`}
           >
-            <div 
-              className="game-card-wrapper"
+            <button
+              type="button"
+              className="game-card-wrapper w-full text-left"
               onClick={() => onSelect(provider.id as CloudProvider)}
+              aria-pressed={selectedProvider === provider.id}
+              aria-label={`Select ${provider.name}`}
             >
               <div className={`game-card-h ${selectedProvider === provider.id ? 'selected' : ''}`}>
                 <div className={`provider-icon bg-gradient-to-br ${provider.color}`}>
@@ -63,7 +65,7 @@ const ProviderSelector: React.FC<ProviderSelectorProps> = ({
                 <h3 className="text-xl font-bold mb-2">{provider.name}</h3>
                 <p className="text-gray-400">{provider.description}</p>
               </div>
-            </div>
+            </button>
           </div>
         ))}
       </div>

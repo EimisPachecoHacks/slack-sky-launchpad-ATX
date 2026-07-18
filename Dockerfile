@@ -21,6 +21,7 @@ COPY project/backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt gunicorn requests cryptography boto3
 COPY project/backend/ ./backend/
 COPY deployer/ ./deployer/
+COPY skydb/ ./skydb/
 COPY AGENTS.md ./AGENTS.md
 COPY .gitlab/ ./.gitlab/
 COPY skills/ ./skills/

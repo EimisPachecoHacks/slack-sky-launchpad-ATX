@@ -22,7 +22,8 @@ interface SavedCredential {
 const regionsByProvider: Record<string, string[]> = {
   aws: ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2', 'eu-west-1', 'eu-central-1', 'ap-northeast-1', 'ap-southeast-1'],
   azure: ['westus', 'westus2', 'eastus', 'eastus2', 'westeurope', 'northeurope', 'southeastasia', 'eastasia'],
-  gcp: ['us-central1', 'us-west1', 'us-east1', 'us-east4', 'europe-west1', 'europe-west4', 'asia-east1', 'asia-southeast1']
+  gcp: ['us-central1', 'us-west1', 'us-east1', 'us-east4', 'europe-west1', 'europe-west4', 'asia-east1', 'asia-southeast1'],
+  alicloud: ['ap-southeast-1', 'ap-southeast-3', 'ap-northeast-1', 'cn-hangzhou', 'cn-shanghai']
 };
 
 const DeploymentForm: React.FC<DeploymentFormProps> = ({ architecture, onDeploy }) => {
@@ -31,8 +32,7 @@ const DeploymentForm: React.FC<DeploymentFormProps> = ({ architecture, onDeploy 
   const [githubRepo, setGithubRepo] = useState('');
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [availableAccounts, setAvailableAccounts] = useState<SavedCredential[]>([]);
-
-  const regions = regionsByProvider;
+  const [deployConfirmed, setDeployConfirmed] = useState(false);
 
   useEffect(() => {
     const loadCredentials = async () => {
@@ -88,7 +88,8 @@ const DeploymentForm: React.FC<DeploymentFormProps> = ({ architecture, onDeploy 
       region,
       architecture,
       githubRepo: githubRepo.trim() !== '' ? githubRepo : undefined,
-      accountId: selectedAccount
+      accountId: selectedAccount,
+      confirmDeploy: deployConfirmed
     });
   };
 
@@ -161,7 +162,7 @@ const DeploymentForm: React.FC<DeploymentFormProps> = ({ architecture, onDeploy 
               onChange={(e) => setRegion(e.target.value)}
               className="w-full component-form-input rounded-lg px-4 py-2"
             >
-              {regions[architecture.provider].map((region) => (
+              {providerRegions.map((region) => (
                 <option key={region} value={region}>
                   {region}
                 </option>
@@ -218,13 +219,25 @@ const DeploymentForm: React.FC<DeploymentFormProps> = ({ architecture, onDeploy 
               </li>
             </ul>
           </div>
+
+          <label className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-900/20 p-4 text-sm text-amber-100">
+            <input
+              type="checkbox"
+              checked={deployConfirmed}
+              onChange={(event) => setDeployConfirmed(event.target.checked)}
+              className="mt-1 h-4 w-4"
+            />
+            <span>
+              I understand this will run Terraform against my selected cloud account and may create billable resources.
+            </span>
+          </label>
           
           <div className="flex justify-end">
             <Button
               type="submit"
               size="lg"
               className="group component-button-primary"
-              disabled={availableAccounts.length === 0}
+              disabled={availableAccounts.length === 0 || !deployConfirmed}
             >
               Deploy Architecture
               <ExternalLink className="ml-2 w-5 h-5 transform transition-transform group-hover:translate-x-1" />

@@ -1,0 +1,121 @@
+# OpenShell network policy — Sky Launchpad deployer containment
+#
+# The contained agent holds REAL power: Alibaba Cloud RAM credentials and a
+# GitLab token, and it runs genuine `terraform apply`. This policy is the
+# boundary that holds regardless of what the agent is talked into:
+#
+#   ALLOWED  — the exact endpoints the deploy loop needs, nothing else:
+#              Alibaba Cloud APIs, GitLab API, the self-hosted vLLM endpoint,
+#              the Supabase skills store, Terraform provider downloads.
+#   DENIED   — everything else, by OpenShell's deny-by-default model. That is
+#              the anti-exfiltration guarantee: no webhook.site, no pastebin,
+#              no attacker-controlled host, even if a prompt injection asks.
+#
+# Destructive-action escalation (allow-with-escalation, human-in-the-loop):
+# `terraform destroy` / resource deletion is NOT reachable autonomously — the
+# sandbox image ships a terraform shim that requires an operator approval file
+# (written from OUTSIDE the sandbox via `nemoclaw <name> exec`) before passing
+# `destroy` through. The network layer alone cannot distinguish create from
+# destroy API calls, so the boundary is: policy = reachability, shim = intent.
+
+preset:
+  name: sky-deployer
+  description: "Sky Launchpad autonomous deployer - least-privilege egress"
+
+network_policies:
+  alibaba_cloud_api:
+    name: alibaba_cloud_api
+    endpoints:
+      - host: ecs.ap-southeast-1.aliyuncs.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/**" }
+          - allow: { method: GET, path: "/**" }
+      - host: ecs.aliyuncs.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/**" }
+          - allow: { method: GET, path: "/**" }
+      - host: vpc.ap-southeast-1.aliyuncs.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/**" }
+          - allow: { method: GET, path: "/**" }
+      - host: sts.aliyuncs.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/terraform }
+      - { path: /usr/bin/python3 }
+
+  gitlab_api:
+    name: gitlab_api
+    endpoints:
+      - host: gitlab.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          # MR/issue creation and repo pushes; DELETE deliberately absent.
+          - allow: { method: GET, path: "/api/v4/**" }
+          - allow: { method: POST, path: "/api/v4/**" }
+          - allow: { method: PUT, path: "/api/v4/**" }
+    binaries:
+      - { path: /usr/bin/python3 }
+      - { path: /usr/bin/git }
+
+  vllm_inference:
+    name: vllm_inference
+    endpoints:
+      # The self-hosted vLLM (Nemotron) on the host — the agent's only brain.
+      - host: host.docker.internal
+        port: 8001
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: POST, path: "/v1/chat/completions" }
+          - allow: { method: GET, path: "/v1/models" }
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  supabase_skills:
+    name: supabase_skills
+    endpoints:
+      - host: gisrercttnamjfjqrsuu.supabase.co
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/rest/v1/**" }
+          - allow: { method: POST, path: "/rest/v1/**" }
+          - allow: { method: PATCH, path: "/rest/v1/**" }
+          # DELETE absent: the agent can learn but never erase its memory.
+    binaries:
+      - { path: /usr/bin/python3 }
+
+  terraform_registry:
+    name: terraform_registry
+    endpoints:
+      - host: registry.terraform.io
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+      - host: releases.hashicorp.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/terraform }

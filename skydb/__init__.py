@@ -147,6 +147,98 @@ class _LocalStore:
         return len(rows) - len(kept)
 
 
+# Canonical key field per collection (used by the Supabase store's generic paths).
+_COLL_KEYS = {"skills": "slug", "apps": "app_id", "test_runs": "run_id", "test_cases": "case_id"}
+
+
+class _SupabaseStore:
+    """Supabase (PostgREST + pgvector) store — used by the NVIDIA/Slack backend.
+
+    Activated only when SUPABASE_URL + SUPABASE_SERVICE_KEY are set (see
+    _get_store), so the Qwen/website backend keeps MongoDB Atlas untouched.
+    The `skills` collection maps to the typed `learned_skills` table (slug pk,
+    doc jsonb, embedding vector(1024) with an HNSW index); every other
+    collection lives in the generic `skydb_docs` (coll, key, doc) table.
+    """
+
+    def __init__(self, url: str, key: str):
+        self.url = url.rstrip("/")
+        self.key = key
+        self.kind = "supabase"
+
+    def _req(self, method, path, params=None, json_body=None, headers=None):
+        import httpx
+
+        h = {
+            "apikey": self.key,
+            "Authorization": f"Bearer {self.key}",
+            "Content-Type": "application/json",
+        }
+        if headers:
+            h.update(headers)
+        r = httpx.request(
+            method, f"{self.url}/rest/v1/{path}",
+            params=params, json=json_body, headers=h, timeout=15.0,
+        )
+        r.raise_for_status()
+        return r.json() if r.content else None
+
+    def upsert(self, coll, key_field, doc):
+        doc = dict(doc)
+        if coll == "skills":
+            row = {"slug": doc[key_field], "doc": doc, "embedding": doc.get("embedding")}
+            self._req(
+                "POST", "learned_skills", params={"on_conflict": "slug"}, json_body=row,
+                headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+            )
+        else:
+            row = {"coll": coll, "key": str(doc.get(key_field) or _new_id()), "doc": doc}
+            self._req(
+                "POST", "skydb_docs", params={"on_conflict": "coll,key"}, json_body=row,
+                headers={"Prefer": "resolution=merge-duplicates,return=minimal"},
+            )
+        return doc
+
+    def insert(self, coll, doc):
+        return self.upsert(coll, _COLL_KEYS.get(coll, "id"), dict(doc))
+
+    def _rows(self, coll, filt=None):
+        if coll == "skills":
+            rows = self._req("GET", "learned_skills", params={"select": "doc"}) or []
+        else:
+            rows = self._req("GET", "skydb_docs", params={"select": "doc", "coll": f"eq.{coll}"}) or []
+        docs = [r["doc"] for r in rows]
+        if filt:
+            docs = [d for d in docs if all(d.get(k) == v for k, v in filt.items())]
+        return docs
+
+    def all(self, coll, filt=None):
+        return self._rows(coll, filt)
+
+    def find(self, coll, filt):
+        docs = self._rows(coll, filt)
+        return docs[0] if docs else None
+
+    def update(self, coll, filt, changes):
+        for d in self._rows(coll, filt):
+            self.upsert(coll, _COLL_KEYS.get(coll, "id"), {**d, **changes})
+
+    def inc(self, coll, filt, field, amount=1):
+        for d in self._rows(coll, filt):
+            d[field] = int(d.get(field, 0)) + amount
+            self.upsert(coll, _COLL_KEYS.get(coll, "id"), d)
+
+    def delete(self, coll, filt):
+        docs = self._rows(coll, filt)
+        for d in docs:
+            key = str(d.get(_COLL_KEYS.get(coll, "id"), ""))
+            if coll == "skills":
+                self._req("DELETE", "learned_skills", params={"slug": f"eq.{key}"})
+            else:
+                self._req("DELETE", "skydb_docs", params={"coll": f"eq.{coll}", "key": f"eq.{key}"})
+        return len(docs)
+
+
 _store = None
 _store_err = ""
 
@@ -155,6 +247,20 @@ def _get_store():
     global _store, _store_err
     if _store is not None:
         return _store
+    # Supabase first, but ONLY when explicitly configured (NVIDIA backend's env);
+    # the Qwen backend sets MONGODB_URI and no SUPABASE_URL, so nothing changes there.
+    supa_url = os.getenv("SUPABASE_URL", "")
+    supa_key = os.getenv("SUPABASE_SERVICE_KEY", "")
+    if supa_url and supa_key:
+        try:
+            store = _SupabaseStore(supa_url, supa_key)
+            store._req("GET", "learned_skills", params={"select": "slug", "limit": "1"})
+            _store = store
+            logger.info("🟩 skydb using Supabase pgvector (%s)", supa_url)
+            return _store
+        except Exception as exc:
+            _store_err = str(exc)
+            logger.warning("Supabase unavailable (%s); trying MongoDB/local", exc)
     uri = os.getenv("MONGODB_URI", "")
     if uri:
         try:
@@ -182,7 +288,13 @@ def _get_store():
 
 def backend_info() -> dict:
     s = _get_store()
-    return {"backend": s.kind, "uri_set": bool(os.getenv("MONGODB_URI")), "db": _DB_NAME, "error": _store_err}
+    return {
+        "backend": s.kind,
+        "uri_set": bool(os.getenv("MONGODB_URI")),
+        "supabase_set": bool(os.getenv("SUPABASE_URL")),
+        "db": _DB_NAME,
+        "error": _store_err,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -197,10 +309,13 @@ _EMBED_DIMENSIONS = int(os.getenv("EMBED_DIMENSIONS", "1024"))
 # text-embedding-v4 (Qwen3-Embedding, Matryoshka) honours a `dimensions` request,
 # so pin it to the Atlas index width (1024). On by default for the Qwen embedder.
 _SEND_DIMENSIONS = os.getenv("EMBED_SEND_DIMENSIONS", "true").lower() in ("1", "true", "yes")
+# Asymmetric retrieval embedders (e.g. NVIDIA llama-nemotron-embed via NIM) REQUIRE
+# an `input_type` (query/passage). Off by default — the Qwen embedder doesn't use it.
+_SEND_INPUT_TYPE = os.getenv("EMBED_SEND_INPUT_TYPE", "").lower() in ("1", "true", "yes")
 
 
-def _embed_text(text: str):
-    """Canonical skill embedding via Qwen Cloud (text-embedding-v4). None on any failure.
+def _embed_text(text: str, input_type: str = "query"):
+    """Canonical skill embedding via the configured EMBED_* endpoint. None on any failure.
 
     This is the ONLY embedder in the system. Vectors from different models are
     not comparable, so there is deliberately no cross-provider fallback: when
@@ -214,6 +329,8 @@ def _embed_text(text: str):
     payload = {"model": _EMBED_MODEL, "input": text[:8000]}
     if _SEND_DIMENSIONS:
         payload["dimensions"] = _EMBED_DIMENSIONS
+    if _SEND_INPUT_TYPE:
+        payload["input_type"] = input_type
     try:
         import httpx
         r = httpx.post(
@@ -252,7 +369,7 @@ def upsert_skill(doc: dict) -> dict:
     doc.setdefault("created", _now())
     doc.setdefault("hit_count", 0)
     if not doc.get("embedding"):
-        emb = _embed_text(_skill_blob(doc))
+        emb = _embed_text(_skill_blob(doc), input_type="passage")
         if emb:
             doc["embedding"] = emb
     return _get_store().upsert("skills", "slug", doc)
@@ -268,7 +385,7 @@ def backfill_skill_embeddings(force: bool = False) -> int:
     n = 0
     for s in list_skills():
         if force or not s.get("embedding"):
-            emb = _embed_text(_skill_blob(s))
+            emb = _embed_text(_skill_blob(s), input_type="passage")
             if emb:
                 _get_store().update("skills", {"slug": s["slug"]}, {"embedding": emb})
                 n += 1
@@ -317,6 +434,21 @@ def find_similar_skills(query: str, k: int = 3, query_embedding: Optional[list] 
     given; otherwise embedding cosine over stored vectors; otherwise lexical cosine.
     """
     store = _get_store()
+    # Supabase pgvector path (HNSW cosine via the match_learned_skills RPC)
+    if store.kind == "supabase":
+        if query_embedding is None:
+            query_embedding = _embed_text(query)
+        if query_embedding:
+            try:
+                rows = store._req(
+                    "POST", "rpc/match_learned_skills",
+                    json_body={"query_embedding": query_embedding, "match_count": k},
+                ) or []
+                out = [{**r["doc"], "score": round(float(r.get("score") or 0), 4)} for r in rows]
+                if out:
+                    return out
+            except Exception as exc:
+                logger.debug("supabase vector search failed, falling back: %s", exc)
     # Atlas Vector Search path
     if store.kind == "mongodb" and _VECTOR_INDEX:
         if query_embedding is None:

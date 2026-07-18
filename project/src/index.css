@@ -544,6 +544,89 @@
     color: rgb(59, 130, 246);
     transition: color 0.3s ease;
   }
+
+  /* Carry the selected provider's card language into the wizard form. */
+  .aws-theme { --selected-provider-rgb: 255, 153, 0; }
+  .azure-theme { --selected-provider-rgb: 59, 130, 246; }
+  .gcp-theme { --selected-provider-rgb: 79, 209, 197; }
+  .alicloud-theme { --selected-provider-rgb: 255, 106, 61; }
+
+  .aws-theme .component-glass-card,
+  .azure-theme .component-glass-card,
+  .gcp-theme .component-glass-card,
+  .alicloud-theme .component-glass-card {
+    background: linear-gradient(135deg,
+      rgba(var(--selected-provider-rgb), 0.16) 0%,
+      rgba(var(--selected-provider-rgb), 0.07) 48%,
+      rgba(8, 10, 26, 0.72) 100%);
+    border-color: rgba(var(--selected-provider-rgb), 0.6);
+    box-shadow:
+      0 0 0 1px rgba(var(--selected-provider-rgb), 0.18),
+      0 0 26px rgba(var(--selected-provider-rgb), 0.22),
+      0 10px 28px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .aws-theme .component-glass-card:hover,
+  .azure-theme .component-glass-card:hover,
+  .gcp-theme .component-glass-card:hover,
+  .alicloud-theme .component-glass-card:hover {
+    background: linear-gradient(135deg,
+      rgba(var(--selected-provider-rgb), 0.22) 0%,
+      rgba(var(--selected-provider-rgb), 0.1) 48%,
+      rgba(8, 10, 26, 0.76) 100%);
+    border-color: rgba(var(--selected-provider-rgb), 0.82);
+    box-shadow:
+      0 0 0 1px rgba(var(--selected-provider-rgb), 0.32),
+      0 0 34px rgba(var(--selected-provider-rgb), 0.34),
+      0 12px 32px rgba(0, 0, 0, 0.34);
+  }
+
+  .aws-theme .component-form-input,
+  .azure-theme .component-form-input,
+  .gcp-theme .component-form-input,
+  .alicloud-theme .component-form-input {
+    background: linear-gradient(135deg,
+      rgba(var(--selected-provider-rgb), 0.07),
+      rgba(2, 6, 23, 0.72));
+    border-color: rgba(var(--selected-provider-rgb), 0.34);
+  }
+
+  .aws-theme .component-form-input:hover,
+  .azure-theme .component-form-input:hover,
+  .gcp-theme .component-form-input:hover,
+  .alicloud-theme .component-form-input:hover,
+  .aws-theme .component-form-input:focus,
+  .azure-theme .component-form-input:focus,
+  .gcp-theme .component-form-input:focus,
+  .alicloud-theme .component-form-input:focus {
+    background: linear-gradient(135deg,
+      rgba(var(--selected-provider-rgb), 0.13),
+      rgba(2, 6, 23, 0.78));
+    border-color: rgba(var(--selected-provider-rgb), 0.85);
+    box-shadow: 0 0 0 3px rgba(var(--selected-provider-rgb), 0.18);
+  }
+
+  .aws-theme .component-button-primary,
+  .azure-theme .component-button-primary,
+  .gcp-theme .component-button-primary,
+  .alicloud-theme .component-button-primary {
+    background: linear-gradient(135deg,
+      rgba(var(--selected-provider-rgb), 0.9),
+      rgba(var(--selected-provider-rgb), 1));
+    border-color: rgba(var(--selected-provider-rgb), 0.88);
+    box-shadow: 0 4px 15px rgba(var(--selected-provider-rgb), 0.4);
+  }
+
+  .component-add-requirement {
+    color: rgb(var(--selected-provider-rgb));
+    transition: color 0.2s ease, text-shadow 0.2s ease;
+  }
+
+  .component-add-requirement:hover {
+    color: rgba(var(--selected-provider-rgb), 0.82);
+    text-shadow: 0 0 10px rgba(var(--selected-provider-rgb), 0.45);
+  }
 }
 
 @layer base {

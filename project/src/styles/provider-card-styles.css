@@ -5,6 +5,7 @@
   --aws-color-rgb: 255, 153, 0;      /* Orange for AWS */
   --azure-color-rgb: 59, 130, 246;   /* Blue for Azure */
   --gcp-color-rgb: 79, 209, 197;     /* Cyan-green for GCP */
+  --alicloud-color-rgb: 255, 106, 61; /* Alibaba orange-red */
 }
 
 /* Base game card wrapper for SVG borders */
@@ -65,6 +66,19 @@
   transition: all 0.4s ease;
 }
 
+.alicloud-game-home .game-card-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(255,106,61,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(255,106,61,1)' stroke-width='6' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(255,106,61,1)' stroke-width='3' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  z-index: 10;
+  pointer-events: none;
+  transition: all 0.4s ease;
+}
+
 /* SVG border glow on hover - enhanced shine effects */
 .azure-game-home .game-card-wrapper:hover::before {
   filter: drop-shadow(0 0 15px rgba(59,130,246,0.8)) drop-shadow(0 0 25px rgba(59,130,246,0.6));
@@ -83,6 +97,13 @@
 .gcp-game-home .game-card-wrapper:hover::before {
   filter: drop-shadow(0 0 15px rgba(79,209,197,0.8)) drop-shadow(0 0 25px rgba(79,209,197,0.6));
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(79,209,197,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(79,209,197,1)' stroke-width='7' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(79,209,197,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  z-index: 10;
+  pointer-events: none;
+}
+
+.alicloud-game-home .game-card-wrapper:hover::before {
+  filter: drop-shadow(0 0 15px rgba(255,106,61,0.8)) drop-shadow(0 0 25px rgba(255,106,61,0.6));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M 50 0 L 100 38 L 82 100' fill='none' stroke='rgba(255,106,61,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 82 100 L 18 100' fill='none' stroke='rgba(255,106,61,1)' stroke-width='7' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M 18 100 L 0 38 L 50 0' fill='none' stroke='rgba(255,106,61,1)' stroke-width='4' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
   z-index: 10;
   pointer-events: none;
 }
@@ -133,6 +154,23 @@
     rgba(var(--gcp-color-rgb), 0.4) 0%,
     rgba(var(--gcp-color-rgb), 0.25) 30%,
     rgba(var(--gcp-color-rgb), 0.1) 60%,
+    transparent 80%);
+  border-radius: 50%;
+  z-index: -1;
+  animation: external-pulse 2.5s ease-in-out infinite;
+}
+
+.alicloud-game-home .game-card-wrapper:hover::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  left: -40px;
+  right: -40px;
+  bottom: -40px;
+  background: radial-gradient(ellipse at center,
+    rgba(var(--alicloud-color-rgb), 0.4) 0%,
+    rgba(var(--alicloud-color-rgb), 0.25) 30%,
+    rgba(var(--alicloud-color-rgb), 0.1) 60%,
     transparent 80%);
   border-radius: 50%;
   z-index: -1;
@@ -271,10 +309,33 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
+/* Alibaba Cloud specific styling */
+.alicloud-game-home .game-card-h {
+  background: linear-gradient(135deg,
+    rgba(var(--alicloud-color-rgb), 0.15) 0%,
+    rgba(var(--alicloud-color-rgb), 0.08) 50%,
+    rgba(var(--alicloud-color-rgb), 0.15) 100%);
+  border-color: rgba(var(--alicloud-color-rgb), 0.3);
+}
+
+.alicloud-game-home .game-card-h:hover {
+  background: linear-gradient(135deg,
+    rgba(var(--alicloud-color-rgb), 0.25) 0%,
+    rgba(var(--alicloud-color-rgb), 0.15) 50%,
+    rgba(var(--alicloud-color-rgb), 0.25) 100%);
+  border-color: rgba(var(--alicloud-color-rgb), 0.5);
+  transform: scale(1.05);
+  box-shadow:
+    0 8px 30px rgba(var(--alicloud-color-rgb), 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
 /* Enhanced frosted glass effect for pentagon cards */
 .aws-game-home .game-card-h::before,
 .azure-game-home .game-card-h::before,
-.gcp-game-home .game-card-h::before {
+.gcp-game-home .game-card-h::before,
+.alicloud-game-home .game-card-h::before {
   content: '';
   position: absolute;
   top: 0;
@@ -317,6 +378,15 @@
   border-color: rgba(var(--gcp-color-rgb), 0.8);
   box-shadow: 
     0 12px 40px rgba(var(--gcp-color-rgb), 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.alicloud-game-home .game-card-h.selected {
+  transform: scale(1.1);
+  border-color: rgba(var(--alicloud-color-rgb), 0.8);
+  box-shadow:
+    0 12px 40px rgba(var(--alicloud-color-rgb), 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.4),
     inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }

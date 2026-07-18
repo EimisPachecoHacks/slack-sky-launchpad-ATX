@@ -15,9 +15,9 @@ class Settings(BaseSettings):
     # (qwen3.7-max / qwen3.7-plus). See backend/llm_client.py.
     # ---------------------------------------------------------------------
     LLM_PROVIDER: str = Field(default="qwen", description="Inference backend (qwen)")
-    DASHSCOPE_API_KEY: str = Field(default="", description="Qwen Cloud / DashScope API key")
+    DASHSCOPE_API_KEY: str = Field(default="", description="Qwen Cloud / DashScope API key", repr=False)
     LLM_BASE_URL: str = Field(default="", description="OpenAI-compatible base URL (blank = Qwen Cloud default)")
-    LLM_API_KEY: str = Field(default="", description="Bearer token; falls back to DASHSCOPE_API_KEY")
+    LLM_API_KEY: str = Field(default="", description="Bearer token; falls back to DASHSCOPE_API_KEY", repr=False)
     LLM_MODEL: str = Field(default="", description="Text-generation model id (blank = qwen3.7-max)")
     LLM_VISION_MODEL: str = Field(default="", description="VLM for diagram analysis (blank = qwen3.7-plus)")
 
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # not comparable, so one model owns the Atlas index. Blank base URL falls
     # back to LLM_BASE_URL (same Qwen Cloud endpoint).
     EMBED_BASE_URL: str = Field(default="", description="Embeddings base URL (blank = LLM base URL)")
-    EMBED_API_KEY: str = Field(default="", description="Embeddings bearer token; falls back to DASHSCOPE_API_KEY")
+    EMBED_API_KEY: str = Field(default="", description="Embeddings bearer token; falls back to DASHSCOPE_API_KEY", repr=False)
     EMBED_MODEL: str = Field(default="text-embedding-v4", description="Canonical skill-retrieval embedder (1024-d)")
     EMBED_DIMENSIONS: int = Field(default=1024, description="Must match the Atlas index numDimensions")
     # text-embedding-v4 (Qwen3-Embedding, Matryoshka) honours a `dimensions`
@@ -51,8 +51,8 @@ class Settings(BaseSettings):
 
     # Security Configuration
     API_KEY_HEADER: str = Field(default="X-API-Key", description="API key header name")
-    API_KEYS: str = Field(default="", description="Comma-separated list of valid API keys (optional)")
-    JWT_SECRET_KEY: str = Field(default="", description="JWT secret key for authentication (optional)")
+    API_KEYS: str = Field(default="", description="Comma-separated list of valid API keys (optional)", repr=False)
+    JWT_SECRET_KEY: str = Field(default="", description="JWT secret key for authentication (optional)", repr=False)
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
 
     # Rate Limiting
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     STORAGE_PATH: str = Field(default="./uploads", description="Local storage path")
 
     # GitLab (optional git host for MRs)
-    GITLAB_TOKEN: str = Field(default="", description="GitLab PAT with api scope")
+    GITLAB_TOKEN: str = Field(default="", description="GitLab PAT with api scope", repr=False)
     GITLAB_PROJECT_PATH: str = Field(default="", description="GitLab project path (namespace/project)")
     GITLAB_URL: str = Field(default="https://gitlab.com", description="GitLab instance URL")
 

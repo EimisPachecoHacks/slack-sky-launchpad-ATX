@@ -11,14 +11,14 @@ export interface ArchitectureRequirement {
   title: string;
   description: string;
   requirements: string[];
-  provider: 'aws' | 'azure' | 'gcp';
+  provider: 'aws' | 'azure' | 'gcp' | 'alicloud';
   optimization_goal: 'cost' | 'performance' | 'balanced';
   budget?: number;
   expected_users?: number;
 }
 
 export interface ComponentOptimizationRequest {
-  provider: 'aws' | 'azure' | 'gcp';
+  provider: 'aws' | 'azure' | 'gcp' | 'alicloud';
   components: Array<{
     name: string;
     category: string;
@@ -29,7 +29,7 @@ export interface ComponentOptimizationRequest {
 }
 
 export interface DiagramAnalysisRequest {
-  provider: 'aws' | 'azure' | 'gcp';
+  provider: 'aws' | 'azure' | 'gcp' | 'alicloud';
   nodes: string[];
   edges: string[];
   requirements?: string;
@@ -228,7 +228,12 @@ class SkyrchitectAPI {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ architecture, config, gitlab_issue_iid }),
+      body: JSON.stringify({
+        architecture,
+        config,
+        gitlab_issue_iid,
+        confirm_deploy: config.confirmDeploy === true,
+      }),
     });
 
     if (!response.ok) {

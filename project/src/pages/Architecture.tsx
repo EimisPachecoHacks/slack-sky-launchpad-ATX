@@ -129,6 +129,14 @@ const ArchitecturePage: React.FC = () => {
         color: 'from-green-500 to-teal-500',
         bgColor: 'bg-green-500/10',
         borderColor: 'border-green-500/30'
+      },
+      alicloud: {
+        name: 'Alibaba Cloud',
+        shortName: 'Alibaba',
+        icon: <Cloud className="w-8 h-8 text-orange-400" />,
+        color: 'from-orange-400 to-red-500',
+        bgColor: 'bg-orange-500/10',
+        borderColor: 'border-orange-500/30'
       }
     };
     return providers[provider];
@@ -161,7 +169,7 @@ const ArchitecturePage: React.FC = () => {
         title: data.title,
         description: data.description,
         requirements: data.requirements,
-        provider: selectedProvider as 'aws' | 'azure' | 'gcp',
+        provider: selectedProvider,
         optimization_goal: 'balanced'
       });
 
@@ -176,7 +184,7 @@ const ArchitecturePage: React.FC = () => {
         console.error('⚠️ Invalid response structure:', JSON.stringify(response, null, 2));
         console.error('⚠️ Expected response.data.diagram to exist. Got data keys:', response.data ? Object.keys(response.data) : 'no data');
         const hint = response.data?.architecture
-          ? ' The AI returned raw text instead of structured JSON — this may indicate a Duo CLI issue.'
+          ? ' Qwen returned raw text instead of structured JSON; please retry the request.'
           : '';
         setError(`AI generated a response but it was not in the expected format.${hint} Please try again.`);
       }
@@ -281,8 +289,9 @@ const ArchitecturePage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Guided Wizard */}
-        <div 
-          className="method-card-purple p-8 cursor-pointer group transition-all duration-300"
+        <button
+          type="button"
+          className="method-card-purple w-full p-8 cursor-pointer group transition-all duration-300 text-left"
           onClick={() => handleMethodSelect('wizard')}
         >
           <div className="text-center">
@@ -315,11 +324,12 @@ const ArchitecturePage: React.FC = () => {
               Start Wizard →
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Image Upload */}
-        <div 
-          className="method-card-purple p-8 cursor-pointer group transition-all duration-300"
+        <button
+          type="button"
+          className="method-card-purple w-full p-8 cursor-pointer group transition-all duration-300 text-left"
           onClick={() => handleMethodSelect('upload')}
         >
           <div className="text-center">
@@ -352,7 +362,7 @@ const ArchitecturePage: React.FC = () => {
               Upload Image →
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   );

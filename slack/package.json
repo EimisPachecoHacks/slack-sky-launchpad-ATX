@@ -1,0 +1,19 @@
+{
+  "name": "sky-launchpad-slack",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Sky Launchpad UI as a Slack app (Block Kit) — design and deploy cloud architectures from Slack",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test:blocks": "node --test test/blocks.test.js",
+    "smoke": "node test/api.smoke.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

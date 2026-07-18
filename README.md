@@ -78,8 +78,11 @@ To **deploy real infrastructure**, upload an Alibaba Cloud RAM AccessKey in **Se
 
 ```mermaid
 flowchart TB
-  subgraph ui["Sky Launchpad UI"]
-    A[Describe requirements or upload diagram]
+  subgraph alibaba["Alibaba Cloud ECS — deployed application"]
+    A[React frontend — requirements, diagram upload, approval]
+    API[FastAPI backend — orchestration and human checkpoint]
+    T[Terraform runner — Alibaba OpenAPI via alicloud provider]
+    M[(Encrypted skills and deployment state)]
   end
   subgraph qwen["Qwen Cloud (Alibaba Model Studio)"]
     B["qwen3.7-max — architecture reasoning + IaC"]
@@ -87,18 +90,22 @@ flowchart TB
     R["qwen3.7-max — diagnose failure, repair HCL, author SKILL.md"]
     V["text-embedding-v4 — embed + retrieve skills"]
   end
-  subgraph run["Runtime"]
-    C[Terraform deployer → Alibaba Cloud]
+  subgraph run["External systems"]
+    C[Alibaba Cloud — OSS, VPC, VSwitch, ECS]
+    DB[(MongoDB Atlas Vector Search or local JSON fallback)]
     E[GitLab API - MR & commits]
   end
-  A --> B
-  A -. "uploaded image" .-> Vz --> B
-  V -. "retrieved lessons" .-> B
-  B --> C
+  A --> API
+  API --> B
+  A -. "uploaded image" .-> API --> Vz --> B
+  V -. "retrieved lessons" .-> API
+  API --> T --> C
+  API --> DB
+  API --> M
   C -->|success| E
-  C -->|failure| R
+  T -->|failure| R
   R --> V
-  R -->|"retry with fix"| C
+  R -->|"retry with fix"| T
 ```
 
 1. User selects a provider — **Alibaba Cloud, AWS, GCP, or Azure** — and enters requirements **or** uploads an architecture image (**`qwen3.7-plus`** reads the diagram and returns structured JSON).
@@ -119,17 +126,22 @@ flowchart TB
 
 ## Deploying the app to Alibaba Cloud (proof of deployment)
 
-The simplest path is a **Simple Application Server (SAS)** with the Docker image, in the Singapore region:
+The reproducible proof deployment is defined in
+[`infra/alibaba/backend/main.tf`](infra/alibaba/backend/main.tf). It provisions
+a pay-as-you-go ECS instance, VPC, VSwitch, security group, public IP, and SSH
+key pair through Alibaba Cloud APIs, then the deployment script installs the
+full Dockerized UI/backend:
 
 ```bash
-# on the Alibaba Cloud instance (Docker image)
-git clone <this-repo> && cd <repo>
-docker build -f Dockerfile.backend -t sky-backend:latest .
-docker run -d --name sky-backend --restart unless-stopped -p 8080:8080 \
-  -e DASHSCOPE_API_KEY=sk-... -e LLM_PROVIDER=qwen sky-backend:latest
+export ALICLOUD_ACCESS_KEY=... ALICLOUD_SECRET_KEY=...
+export CONFIRM_ALIBABA_DEPLOY=yes
+./scripts/deploy-alibaba-backend.sh
 ```
 
-Then screenshot the **Workbench Overview** showing the running instance for the submission.
+The script prints the public application and `/health` URLs. Capture those URLs
+and the ECS instance in Alibaba Cloud Workbench for submission proof. Release
+the pay-as-you-go resources after judging with
+`CONFIRM_ALIBABA_DESTROY=yes ./scripts/destroy-alibaba-backend.sh`.
 
 ## Technology
 

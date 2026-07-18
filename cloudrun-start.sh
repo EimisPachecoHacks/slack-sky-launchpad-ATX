@@ -10,7 +10,7 @@ UVICORN_PID=$!
 
 echo "Waiting for uvicorn to be ready on port 8000..."
 for i in $(seq 1 60); do
-    if curl -sf http://127.0.0.1:8000/api/docs > /dev/null 2>&1; then
+    if curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; then
         echo "Uvicorn ready after ${i}s"
         break
     fi

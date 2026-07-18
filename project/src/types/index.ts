@@ -163,13 +163,15 @@ interface UIPreferences {
 
 // Deployment Types
 export interface DeploymentConfig {
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
   provider: CloudProvider;
   region: string;
   architecture: Architecture;
-  environment: 'development' | 'staging' | 'production';
+  environment?: 'development' | 'staging' | 'production';
   githubRepo?: string;
+  accountId?: string;
+  confirmDeploy: boolean;
   cicdPipeline?: CICDConfig;
   monitoring?: MonitoringConfig;
   security?: SecurityConfig;
@@ -432,5 +434,8 @@ export interface GCPCredentials extends CloudCredentials {
   serviceAccountEmail?: string;
 }
 
-export type ProviderCredentials = AWSCredentials | AzureCredentials | GCPCredentials;
+export interface AlibabaCredentials extends CloudCredentials {
+  provider: 'alicloud';
+}
 
+export type ProviderCredentials = AWSCredentials | AzureCredentials | GCPCredentials | AlibabaCredentials;

@@ -357,6 +357,10 @@ terraform {
       source  = "aliyun/alicloud"
       version = "~> 1.220"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -450,9 +454,9 @@ resource "alicloud_vswitch" "main" {
 
 # Deny-all-by-default security group (no ingress rules added).
 resource "alicloud_security_group" "main" {
-  name   = "${var.name_prefix}-sg-${var.environment}"
-  vpc_id = alicloud_vpc.main.id
-  tags   = local.tags
+  security_group_name = "${var.name_prefix}-sg-${var.environment}"
+  vpc_id              = alicloud_vpc.main.id
+  tags                = local.tags
 }
 """
 

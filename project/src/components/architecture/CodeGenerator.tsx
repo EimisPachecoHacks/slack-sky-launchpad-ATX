@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Code, Copy, Check, Download, Loader } from 'lucide-react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -16,6 +16,7 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ architecture }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const generationInFlight = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isGenerating) return;
@@ -30,7 +31,9 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ architecture }) => {
       const maxRetries = 3;
 
       // Skip if code already generated
-      if (generatedCode[activeTab]) return;
+      if (generatedCode[activeTab] || generationInFlight.current.has(activeTab)) return;
+
+      generationInFlight.current.add(activeTab);
 
       setIsGenerating(true);
       setError(null);
@@ -45,6 +48,7 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ architecture }) => {
             [activeTab]: response.data.code
           }));
           console.log(`✅ ${activeTab} code generated successfully`);
+          generationInFlight.current.delete(activeTab);
           setIsGenerating(false);
         } else {
           throw new Error('Code generation failed: Invalid response from server');
@@ -63,6 +67,7 @@ const CodeGenerator: React.FC<CodeGeneratorProps> = ({ architecture }) => {
         // After 3 retries, show final error
         console.error(`❌ Code generation failed after ${maxRetries} attempts`);
         setError(`Failed to generate ${activeTab} code after ${maxRetries} attempts: ${errorMessage}`);
+        generationInFlight.current.delete(activeTab);
         setIsGenerating(false);
       }
     };
@@ -614,7 +619,7 @@ resource "google_sql_user" "users" {
               <div className="flex items-center justify-center h-96">
                 <div className="text-center">
                   <Loader className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-                  <p className="text-gray-400">GitLab Duo is generating your {activeTab} code...</p>
+                  <p className="text-gray-400">Qwen is generating your {activeTab} code...</p>
                   <div className="text-2xl font-mono font-bold text-blue-400 mt-3">
                     {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, '0')}
                   </div>

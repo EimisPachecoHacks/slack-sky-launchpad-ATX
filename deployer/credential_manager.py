@@ -73,9 +73,9 @@ def parse_credential(provider: str, raw: str) -> dict:
             "type": data.get("type", ""),
         }
     elif provider == "alicloud":
-        data = json.loads(raw.lstrip("\ufeff"))
+        data = _parse_alicloud_credential(raw)
         return {
-            "access_key_id": data.get("access_key_id", data.get("AccessKeyId", "")),
+            "access_key_id": data["access_key_id"],
             "region": data.get("region", "ap-southeast-1"),
         }
     elif provider == "aws":
@@ -112,16 +112,45 @@ def parse_credential(provider: str, raw: str) -> dict:
 def get_alicloud_keys() -> tuple:
     """Get Alibaba Cloud RAM AccessKey id + secret from stored credentials.
 
-    Expects JSON: {"access_key_id": "...", "access_key_secret": "...",
-    "region": "ap-southeast-1"}. Also accepts the console's AccessKeyId /
-    AccessKeySecret capitalisation.
+    Accepts JSON or the two-column CSV downloaded from the Alibaba Cloud RAM
+    console. The raw credential remains encrypted at rest either way.
     """
-    data = json.loads(load_credential("alicloud").lstrip("﻿"))
-    key_id = data.get("access_key_id") or data.get("AccessKeyId", "")
-    secret = data.get("access_key_secret") or data.get("AccessKeySecret", "")
-    if key_id and secret:
-        return key_id, secret
-    raise ValueError("Could not extract Alibaba Cloud AccessKey from stored credentials")
+    data = _parse_alicloud_credential(load_credential("alicloud"))
+    return data["access_key_id"], data["access_key_secret"]
+
+
+def _parse_alicloud_credential(raw: str) -> dict:
+    """Normalize Alibaba RAM AccessKeys from JSON or console-exported CSV."""
+    clean = raw.lstrip("\ufeff").strip()
+    if not clean:
+        raise ValueError("Alibaba Cloud credential file is empty")
+
+    if clean.startswith("{"):
+        data = json.loads(clean)
+        key_id = data.get("access_key_id") or data.get("AccessKeyId", "")
+        secret = data.get("access_key_secret") or data.get("AccessKeySecret", "")
+        region = data.get("region", "ap-southeast-1")
+    else:
+        row = next(csv.DictReader(clean.splitlines()), None) or {}
+        normalized = {
+            (key or "").lstrip("\ufeff").strip().lower().replace("_", " "): value.strip()
+            for key, value in row.items()
+            if key
+        }
+        key_id = normalized.get("accesskey id") or normalized.get("access key id", "")
+        secret = normalized.get("accesskey secret") or normalized.get("access key secret", "")
+        region = normalized.get("region", "ap-southeast-1")
+
+    if not key_id or not secret:
+        raise ValueError(
+            "Could not extract Alibaba Cloud AccessKey. Upload the JSON template "
+            "or the CSV downloaded from the RAM AccessKey page."
+        )
+    return {
+        "access_key_id": key_id,
+        "access_key_secret": secret,
+        "region": region or "ap-southeast-1",
+    }
 
 
 def get_aws_keys() -> tuple:
