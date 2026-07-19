@@ -401,6 +401,12 @@ variable "name_prefix" {{
   type        = string
   default     = "{name_prefix}"
 }}
+
+variable "enable_oss" {{
+  description = "Create an OSS bucket. Off by default: OSS must be activated on the account (real-name verification + payment method), so a bare deploy without it succeeds on any account."
+  type        = bool
+  default     = false
+}}
 """
 
     main_tf = """\
@@ -416,14 +422,16 @@ data "alicloud_zones" "default" {
   available_resource_creation = "VSwitch"
 }
 
-# OSS bucket (analogue of GCS/S3). Names are GLOBALLY unique, so suffix with a
-# short random hash — this is exactly the failure the learned-skill library
-# pre-empts (alicloud-unique-oss-bucket-name).
+# OSS bucket (analogue of GCS/S3). Optional (var.enable_oss, default false):
+# OSS must be ACTIVATED on the account, so a bare deploy omits it and always
+# succeeds. Names are GLOBALLY unique, so suffix with a short random hash — the
+# failure the learned-skill library pre-empts (alicloud-unique-oss-bucket-name).
 resource "random_id" "suffix" {
   byte_length = 3
 }
 
 resource "alicloud_oss_bucket" "main" {
+  count         = var.enable_oss ? 1 : 0
   bucket        = "${var.name_prefix}-${var.environment}-${random_id.suffix.hex}"
   storage_class = "Standard"
 
@@ -462,8 +470,8 @@ resource "alicloud_security_group" "main" {
 
     outputs_tf = """\
 output "bucket_name" {
-  description = "Created OSS bucket name"
-  value       = alicloud_oss_bucket.main.bucket
+  description = "Created OSS bucket name (empty when OSS is disabled)"
+  value       = try(alicloud_oss_bucket.main[0].bucket, "")
 }
 
 output "vpc_id" {

@@ -166,20 +166,50 @@ export function successMessage(session, data) {
   };
 }
 
+/** Classify a deploy error: is it something the self-healing loop can fix
+ * (code/config) or an external account/permission blocker it cannot? */
+export function classifyDeployError(msg) {
+  const m = String(msg || '').toLowerCase();
+  const rules = [
+    [/userdisable|not.?activated|service is not enabled|not.?enabled|has not (been )?activated/, 'oss_disabled',
+      'A required cloud *service is not activated* on your account. Activate it in the provider console (for Alibaba OSS: activate OSS, complete real-name verification, and add a payment method), then deploy again. *No code change or retry can fix this* — it needs an account action.'],
+    [/accessdenied|forbidden|not authorized|no permission|unauthorized|403.*(oss|ram)/, 'permissions',
+      'The cloud credential is *missing a permission*. Attach the needed policy to your RAM/IAM user (e.g. `AliyunOSSFullAccess`), then deploy again. Retrying without the permission will keep failing.'],
+    [/quota|limitexceeded|exceeded.*limit|insufficient.*balance|arrears|overdue|payment/, 'quota_billing',
+      'A *quota or billing* limit was hit on your account. Raise the quota or fix billing in the provider console, then deploy again.'],
+    [/invalidaccesskey|signaturedoesnotmatch|invalid.*key|expired.*token/, 'bad_credentials',
+      'The stored cloud *credentials are invalid or expired*. Re-upload a valid access key in the web app Settings, then deploy again.'],
+  ];
+  for (const [re, code, advice] of rules) if (re.test(m)) return { recoverable: false, code, advice };
+  return { recoverable: true, code: 'code_error', advice: null };
+}
+
 /** Failure result — replaces the progress message. Returns {rich, classic, text}. */
 export function failureMessage(session, errMessage, logs) {
   const p = providerMeta(session.provider);
   const heal = parseDeployLog(logs);
-  const healLine = heal.learnedSkills.length
-    ? `🧠 The self-healing loop tried *${heal.attempts || 'several'} attempts* and *learned a new skill* (\`${clip(heal.learnedSkills[0], 60)}\`). Hit *Try Again* — the next deploy applies it to pre-empt this error.`
-    : `🧠 The self-healing loop tried *${heal.attempts || 'several'} attempts* and captured the failure. Hit *Try Again* to retry with what it learned.`;
+  const cls = classifyDeployError(errMessage);
+
+  let healLine, buttons, subtitle;
+  if (!cls.recoverable) {
+    // External account/permission blocker — the loop genuinely cannot self-heal it.
+    healLine = `⚠️ *This is not a code error — the self-healing loop can't fix it.* ${cls.advice}`;
+    buttons = [{ text: '🔁 Retry (after you fix it)', action_id: 'dep_retry', value: session.sid }];
+    subtitle = `${p.emoji} ${p.label} · ${session.deploy.region || ''} · needs an account action`;
+  } else {
+    healLine = heal.learnedSkills.length
+      ? `🧠 The self-healing loop tried *${heal.attempts || 'several'} attempts* and *learned a new skill* (\`${clip(heal.learnedSkills[0], 60)}\`). Hit *Try Again* — the next deploy applies it to pre-empt this error.`
+      : `🧠 The self-healing loop tried *${heal.attempts || 'several'} attempts* and captured the failure. Hit *Try Again* to retry with what it learned.`;
+    buttons = [{ text: '🔁 Try Again (with new skill)', action_id: 'dep_retry', value: session.sid, style: 'primary' }];
+    subtitle = `${p.emoji} ${p.label} · ${session.deploy.region || ''}${heal.attempts > 1 ? ` · after ${heal.attempts} attempts` : ''}`;
+  }
 
   const cardOpts = {
     emoji: '❌',
     title: 'DEPLOYMENT FAILED',
-    subtitle: `${p.emoji} ${p.label} · ${session.deploy.region || ''}${heal.attempts > 1 ? ` · after ${heal.attempts} attempts` : ''}`,
+    subtitle,
     body: clip(errMessage || 'Unknown error', 200),
-    buttons: [{ text: '🔁 Try Again (with new skill)', action_id: 'dep_retry', value: session.sid, style: 'primary' }],
+    buttons,
   };
   const extra = [{ type: 'section', text: mrkdwn(healLine) }];
   const err = clip(errMessage || '', 2800);
