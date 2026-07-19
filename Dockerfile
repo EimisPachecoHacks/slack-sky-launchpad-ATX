@@ -22,10 +22,8 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn requests cryptograph
 COPY project/backend/ ./backend/
 COPY deployer/ ./deployer/
 COPY skydb/ ./skydb/
-COPY AGENTS.md ./AGENTS.md
 COPY .gitlab/ ./.gitlab/
 COPY skills/ ./skills/
-COPY flows/ ./flows/
 COPY --from=frontend-build /build/dist /var/www/html
 COPY cloudrun-nginx.conf /etc/nginx/sites-available/default
 COPY cloudrun-start.sh /app/start.sh
