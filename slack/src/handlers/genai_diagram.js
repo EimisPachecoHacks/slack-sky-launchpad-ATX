@@ -41,6 +41,7 @@ export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
 
   const prompt = buildPrompt(session);
   let b64 = null;
+  let mime = 'image/png';
   for (const model of MODELS) {
     try {
       const res = await fetch(
@@ -55,19 +56,25 @@ export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
       if (!res.ok) continue; // 429 = no credit / quota; try next model
       const parts = (await res.json())?.candidates?.[0]?.content?.parts || [];
       const img = parts.find(p => p.inlineData?.data);
-      if (img) { b64 = img.inlineData.data; break; }
+      if (img) { b64 = img.inlineData.data; mime = img.inlineData.mimeType || 'image/png'; break; }
     } catch { /* try next model */ }
   }
-  if (!b64) return false;
+  const buf = b64 ? Buffer.from(b64, 'base64') : null;
+  // Guard: a valid diagram is tens of KB. Anything tiny means the model didn't
+  // actually draw one — treat as failure so the SVG fallback runs.
+  if (!buf || buf.length < 4096) return false;
 
+  // Save with the extension that MATCHES the real content (Gemini often returns
+  // JPEG). A JPEG named .png makes Slack reject/mis-render it.
+  const ext = /jpeg|jpg/i.test(mime) ? 'jpg' : 'png';
   const dir = mkdtempSync(join(tmpdir(), 'skygenai-'));
-  const file = join(dir, 'diagram-illustrated.png');
-  writeFileSync(file, Buffer.from(b64, 'base64'));
+  const file = join(dir, `architecture-diagram.${ext}`);
+  writeFileSync(file, buf);
   await client.files.uploadV2({
     channel_id: channel,
     thread_ts,
     file,
-    filename: 'architecture-diagram.png',
+    filename: `architecture-diagram.${ext}`,
     initial_comment: '🗺️ Architecture diagram',
   });
   return true;
