@@ -18,25 +18,45 @@ intentionally public and contains no AccessKey values.
   proxies the public health proof to the FastAPI backend.
 - The architecture diagram is in [`README.md`](../README.md#architecture).
 
-## Verification record — 2026-07-18
+## Verification record — 2026-07-19 (deployed and live)
 
 | Check | Result |
 |---|---|
 | Encrypted RAM AccessKey authentication | Passed |
 | `terraform validate` | Passed |
-| Live Alibaba Terraform plan | Passed: 7 to add, 0 change, 0 destroy |
-| Selected proof host | `ecs.t6-c1m2.large`, 2 vCPU / 4 GiB, 20 GB ESSD |
+| Live Alibaba Terraform apply | **Passed: 7 added** |
+| ECS instance ID | `i-t4n89eyvczy9lajwrvzg` (`sky-launchpad-hackathon`) |
+| Instance type / image | `ecs.t6-c1m2.large`, 2 vCPU / 4 GiB · `ubuntu_22_04_x64_20G_alibase_20260615` |
 | Region / zone | `ap-southeast-1` / `ap-southeast-1a` |
+| VPC / security group | `vpc-t4nkg9shyq43onpauck73` / `sg-t4n1exuje2mp1mqpl113` |
+| Instance status | `Running` |
 | Network exposure | App `8080` public; SSH `22` restricted to operator `/32` |
-| Apply | Waiting for RAM policies `AliyunECSFullAccess` and `AliyunVPCFullAccess` |
-| Public application URL | Pending successful apply |
-| Public `/health` URL | Pending successful apply |
+| Container | `sky-launchpad:latest` (631 MB), `--restart unless-stopped` |
+| **Public health URL** | **http://47.84.111.187:8080/health** → `{"status":"ok",...}` |
+| **Public status URL** | **http://47.84.111.187:8080/api/status** → `llm_provider: qwen`, `model_id: qwen3.7-max`, `llm_connected: true` |
+| Public application URL | http://47.84.111.187:8080 |
+| Slack app backend | Points at this host (`SKY_API_URL`), verified end-to-end |
 
-The first apply stopped before creating billable resources. Alibaba returned
-`Forbidden.RAM` for `vpc:CreateVpc` and `ecs:ImportKeyPair`; Terraform state
-contains only read-only data sources. Once those two system policies are attached
-to the deployment RAM user, rerun `scripts/deploy-alibaba-backend.sh` and replace
-the pending fields above with the public URLs and ECS instance ID.
+Anyone can confirm the backend is running on Alibaba Cloud, and that it is
+wired to Qwen, with a single unauthenticated request:
+
+```console
+$ curl http://47.84.111.187:8080/api/status
+{"status":"healthy","version":"1.0.0","agent_ready":true,
+ "llm_connected":true,"llm_provider":"qwen","model_id":"qwen3.7-max"}
+```
+
+### Notes from this deployment
+
+- An earlier apply had stopped with `Forbidden.RAM` on `vpc:CreateVpc` and
+  `ecs:ImportKeyPair`; attaching `AliyunECSFullAccess` and `AliyunVPCFullAccess`
+  to the deployment RAM user resolved it and the apply now completes.
+- The image build had been failing since 2026-07-11 on `COPY AGENTS.md`: that
+  file and `flows/` were removed with the GitLab Duo surface but the Dockerfile
+  still referenced them. Both COPY lines are gone; the repair agent's persona
+  ships at `deployer/AGENTS.md` via `COPY deployer/`.
+- nginx serves the React app at `/`, which shadowed the FastAPI status document,
+  so it is now also exposed at `/api/status` (see `cloudrun-nginx.conf`).
 
 ## Security and cost controls
 
