@@ -48,11 +48,13 @@ export function reviewMessage(session) {
   };
 
   const focusLabel = view === 'performance' ? 'Performance' : 'Cost Efficiency';
+  const delta = projTotal - total; // projected vs the current architecture
   const kpis = {
     type: 'section',
     fields: [
-      mrkdwn(`*💰 Total Monthly Cost*\n${money(total)}`),
-      mrkdwn(`*📈 ${view === 'performance' ? 'Extra Cost' : 'Monthly Savings'}*\n${money(view === 'performance' ? Math.max(0, projTotal - total) : savings)}`),
+      // Total reflects the ACTIVE projection so it changes with the tab.
+      mrkdwn(`*💰 Total Monthly Cost*\n${money(projTotal)}  _(now ${money(total)})_`),
+      mrkdwn(`*📈 ${view === 'performance' ? 'Extra Cost' : 'Monthly Savings'}*\n${delta < 0 ? money(-delta) : delta > 0 ? `+${money(delta)}` : '—'}`),
       mrkdwn(`*🎯 Optimization Focus*\n${focusLabel}`),
       mrkdwn(`*🧩 Components*\n${comps.length} · ${p.emoji} ${p.label}`),
     ],

@@ -49,9 +49,11 @@ export function codeMessage(session, activeTab, { generating = false } = {}) {
 
   if (entry && !generating) {
     const skills = entry.skills_used?.length ? entry.skills_used.join(', ') : 'none';
+    // "reused" — these are EXISTING skills retrieved to write better code, not
+    // newly-learned ones (new skills come only from the deploy loop).
     blocks.push({
       type: 'context',
-      elements: [mrkdwn(clip(`🤖 model: \`${entry.model || 'qwen'}\` · 🧠 learned skills applied: ${skills}`, 2900))],
+      elements: [mrkdwn(clip(`🤖 model: \`${entry.model || 'nemotron'}\` · 🧠 past skills reused: ${skills}`, 2900))],
     });
   }
 

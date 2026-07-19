@@ -170,11 +170,14 @@ test('deploy result messages', () => {
     outputs: { ip: '1.2.3.4' }, deployment_logs: Array.from({ length: 40 }, (_, i) => `log ${i}`),
   });
   assert.ok(ok.rich.find(b => b.type === 'card'));
-  assert.ok(ok.text.includes('succeeded'));
+  assert.match(ok.text, /SUCCESSFUL/i);
+  assert.ok(ok.rich.some(b => b.type === 'section' && JSON.stringify(b).includes('Merge request')), 'success shows the git push');
   assertSectionLimits(ok.classic);
 
-  const bad = failureMessage(fakeSession(), 'terraform apply failed: '.padEnd(4000, 'z'), ['line1']);
-  assert.ok(bad.text.includes('failed'));
+  const bad = failureMessage(fakeSession(), 'terraform apply failed: '.padEnd(4000, 'z'),
+    ['Attempt 3/3: terraform apply', 'learned a new skill: alicloud-quota-fix']);
+  assert.match(bad.text, /FAILED/i);
+  assert.ok(bad.rich.some(b => JSON.stringify(b).includes('self-healing')), 'failure explains the self-healing loop');
   assertSectionLimits(bad.classic);
   const retry = bad.classic.find(b => b.type === 'actions');
   assert.ok(retry.elements.some(e => e.action_id === 'dep_retry'));

@@ -816,32 +816,37 @@ Every block must be syntactically complete with all braces closed."""
 
         skills_used = [s["name"] for s in get_skills_summary() if s["loaded"]]
 
+        # Report the ACTUAL inference model/provider from config (Nemotron on the
+        # NVIDIA backend, Qwen on the Qwen backend) — never a hardcoded string.
+        _model = llm_client._resolve("LLM_MODEL")
+        _provider = llm_client._provider()
+
         return AgentResponse(
             success=True,
-            message=f"{code_type.capitalize()} code generated successfully via Qwen",
+            message=f"{code_type.capitalize()} code generated successfully via {_provider}",
             data={
                 "code": str(code_response),
                 "code_type": code_type,
                 "provider": architecture.get('provider', 'aws'),
                 "skills_used": skills_used,
                 "generator": "iac_generator",
-                "model": "qwen3.7-max",
+                "model": _model,
             },
             reasoning=str(code_response)
         )
 
     except Exception as e:
-        logger.error(f"❌ Error generating code via Qwen: {e}")
-        # Code generation runs on Qwen (qwen3.7-max). When it can't be reached —
-        # missing/invalid DASHSCOPE_API_KEY or a transport error — surface a
-        # clear message; the full error stays in the logs above.
+        _provider = llm_client._provider()
+        logger.error(f"❌ Error generating code via {_provider}: {e}")
+        # Code generation runs on the configured inference endpoint. When it can't
+        # be reached (bad key/base URL or a transport error) surface a clear
+        # message; the full error stays in the logs above.
         raw = str(e)
         low = raw.lower()
-        if any(k in low for k in ("dashscope", "api key", "apikey", "401", "unauthorized")):
+        if any(k in low for k in ("api key", "apikey", "401", "unauthorized", "connection", "timeout")):
             detail = (
-                "Code generation is unavailable: Qwen Cloud could not be reached. "
-                "Check DASHSCOPE_API_KEY (and that its prefix matches the base URL). "
-                "Architecture design uses the same key."
+                f"Code generation is unavailable: the {_provider} inference endpoint could not be reached. "
+                f"Check LLM_BASE_URL / LLM_API_KEY. Architecture design uses the same endpoint."
             )
         else:
             detail = f"Code generation failed: {raw}"
