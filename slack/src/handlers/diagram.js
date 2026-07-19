@@ -47,9 +47,6 @@ export async function uploadTable(client, channel, thread_ts, session) {
 export async function uploadDiagram(client, channel, thread_ts, session) {
   const arch = session.architecture;
   if (!arch?.diagram?.nodes?.length) return;
-  // Rich component table first (mirrors the web table), then the diagram.
-  uploadTable(client, channel, thread_ts, session).catch(() => {});
-
   const dir = mkdtempSync(join(tmpdir(), 'skydiag-'));
   const archPath = join(dir, 'arch.json');
   const outPath = join(dir, 'diagram.png');

@@ -76,14 +76,24 @@ test('useCaseView prefills previous input', () => {
   assert.equal(reqs.element.initial_value, 'scale\npostgres');
 });
 
-test('review message has rich and classic variants', () => {
-  const { rich, classic, text } = reviewMessage(fakeSession());
+test('review message: one native row per component with a Switch select where alternatives exist', () => {
+  const s = fakeSession({ alternatives: { c1: [{ name: 'ECS local disk', cost: 60, reason: 'cheaper' }] } });
+  const { rich, text } = reviewMessage(s);
   assert.ok(text.includes('E-commerce platform'));
-  const table = rich.find(b => b.type === 'data_table');
-  assert.ok(table, 'rich variant missing data_table');
-  assert.ok(table.caption, 'data_table missing required caption');
-  assert.ok(classic.every(b => b.type !== 'data_table' && b.type !== 'card'), 'classic variant contains rich blocks');
-  assertSectionLimits(classic);
+  // A section row per component, keyed by comp_<id>.
+  const rows = rich.filter(b => b.type === 'section' && String(b.block_id || '').startsWith('comp_'));
+  assert.equal(rows.length, 2, 'one section row per component');
+  // The component with alternatives has a static_select accessory; the other doesn't.
+  const withAlt = rows.find(b => b.block_id === 'comp_c1');
+  assert.equal(withAlt.accessory?.type, 'static_select', 'component with alternatives needs a Switch select');
+  assert.equal(withAlt.accessory.action_id, 'swap_pick');
+  assert.match(withAlt.accessory.options[0].value, /^s_1~~c1~~0$/);
+  assert.ok(!rows.find(b => b.block_id === 'comp_c2').accessory, 'component without alternatives has no select');
+  // No global-optimization buttons, no image/data_table.
+  assert.ok(!rich.some(b => b.type === 'data_table'), 'no native data_table (native rows instead)');
+  const actionIds = rich.filter(b => b.type === 'actions').flatMap(b => b.elements.map(e => e.action_id));
+  assert.ok(!actionIds.some(id => id.startsWith('rev_opt_')), 'global optimization buttons removed');
+  assertSectionLimits(rich);
 });
 
 test('review message survives an empty architecture', () => {

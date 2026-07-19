@@ -2,9 +2,8 @@ import * as api from '../api.js';
 import { getSession } from '../state.js';
 import { reasoningBlocks, reviewMessage } from '../blocks/review.js';
 import { codeMessage, CODE_FILENAME, INLINE_CODE_LIMIT } from '../blocks/code.js';
-import { swapLoadingView, swapErrorView, swapView } from '../blocks/swap.js';
 import { updateRich } from '../blocks/common.js';
-import { providerMeta, fmtElapsed, startProgress, clip, money } from '../util.js';
+import { clip, money } from '../util.js';
 import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { uploadDiagram } from './diagram.js';
 
@@ -27,6 +26,14 @@ function realAlternatives(arch) {
     (map[cid] ||= []).push({ name: a.name, cost: a.cost, reason: a.description || a.reason || '' });
   }
   return map;
+}
+
+/** Populate session.alternatives once (idempotent) so the review rows can each
+ * offer a Switch dropdown. Safe to await before rendering the review. */
+export async function ensureAlternatives(session) {
+  if (session.alternatives && Object.keys(session.alternatives).length) return session.alternatives;
+  session.alternatives = await buildAlternatives(session);
+  return session.alternatives;
 }
 
 /** Build the component→alternatives map: the real backend alternatives first
@@ -126,109 +133,25 @@ export async function runGenerateCode(client, session, type) {
   }
 }
 
-/** Re-design the architecture with a different optimization goal, updating the
- * review message in place — Slack's version of the web optimization switch. */
-async function reoptimize(client, session, goal) {
-  const prevGoal = session.optimization || 'balanced';
-  session.optimization = goal;
-  const { channel, ts } = session.reviewMsg;
-  const p = providerMeta(session.provider);
-  const label = s => `🧠 Re-designing *${session.title}* optimized for *${goal}* with Nemotron… (${fmtElapsed(s)} elapsed)`;
-  await client.chat.update({ channel, ts, text: label(0), blocks: [] });
-  const stop = startProgress(client, channel, ts, label, { maxUpdates: 60 });
-  try {
-    const resp = await api.generateArchitecture({
-      title: session.title,
-      description: session.description,
-      requirements: session.requirements,
-      provider: session.provider,
-      optimization_goal: goal,
-    });
-    stop();
-    session.architecture = resp.data || {};
-    session.reasoning = resp.reasoning || '';
-    session.summaryMessage = resp.message || '';
-    session.code = {}; // stale — the architecture changed
-    session.codeMsg = null;
+export default function register(app) {
+  // Per-component switch: the static_select accessory on a component row.
+  // value = "<sid>~~<componentId>~~<altIndex>".
+  app.action('swap_pick', async ({ ack, body, client, action }) => {
+    await ack();
+    const [sid, compId, idxStr] = String(action.selected_option?.value || '').split('~~');
+    const session = getSession(sid);
+    if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
+    const alt = (session.alternatives?.[compId] || [])[Number(idxStr)];
+    if (!alt) return notifyUser(client, body, 'That alternative is no longer available — regenerate to refresh.');
+    const { before, after } = applySwap(session, compId, alt);
+    const { channel, ts } = session.reviewMsg;
     const { rich, classic, text } = reviewMessage(session);
     await updateRich(client, channel, ts, text, rich, classic);
     uploadDiagram(client, channel, ts, session).catch(() => {});
-  } catch (err) {
-    stop();
-    // Restore the previous design instead of leaving a dead message.
-    session.optimization = prevGoal;
-    const { rich, classic, text } = reviewMessage(session);
-    await updateRich(client, channel, ts, text, rich, classic);
     await client.chat.postMessage({
       channel, thread_ts: ts,
-      text: `❌ Re-optimization for *${goal}* failed (${clip(err.message, 300)}). Kept the previous *${prevGoal}* design — try again in a moment.`,
+      text: `🔄 Swapped *${clip(before, 80)}* → *${clip(after, 80)}*. Cost total and diagram updated — regenerate code to match.`,
     });
-  }
-}
-
-export default function register(app) {
-  app.action(/^rev_opt_/, async ({ ack, body, client, action }) => {
-    await ack();
-    const session = getSession(action.value);
-    if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
-    const goal = action.action_id.replace('rev_opt_', '');
-    if (!['cost', 'balanced', 'performance'].includes(goal) || goal === (session.optimization || 'balanced')) return;
-    await reoptimize(client, session, goal);
-  });
-
-  // "🔄 Swap component" — placeholder modal, Nemotron proposes alternatives,
-  // then the dependent selects (component → its alternatives).
-  app.action('rev_swap', async ({ ack, body, client, action }) => {
-    await ack();
-    const session = getSession(action.value);
-    if (!session?.architecture) return notifyUser(client, body, SESSION_EXPIRED);
-    const ph = await client.views.open({ trigger_id: body.trigger_id, view: swapLoadingView(session.sid) });
-    try {
-      session.alternatives = await buildAlternatives(session);
-      // Default to the first component that actually has alternatives.
-      const firstId = (session.architecture.components || [])
-        .map(c => String(c.id)).find(id => session.alternatives[id]?.length)
-        || session.architecture.components?.[0]?.id;
-      await client.views.update({ view_id: ph.view.id, view: swapView(session, firstId) });
-    } catch (err) {
-      await client.views.update({ view_id: ph.view.id, view: swapErrorView(err.message) }).catch(() => {});
-    }
-  });
-
-  // Component picked in the swap modal — refresh the alternatives select.
-  app.action({ block_id: 'comp_b', action_id: 'v' }, async ({ ack, body, client, action }) => {
-    await ack();
-    let sid = null;
-    try { sid = JSON.parse(body.view.private_metadata || '{}').sid; } catch { /* ignore */ }
-    const session = getSession(sid);
-    if (!session) return;
-    await client.views.update({ view_id: body.view.id, view: swapView(session, action.selected_option?.value) });
-  });
-
-  app.view('sky_swap', async ({ ack, view, client }) => {
-    let sid = null;
-    try { sid = JSON.parse(view.private_metadata || '{}').sid; } catch { /* ignore */ }
-    const session = getSession(sid);
-    const vals = view.state.values;
-    const compId = vals.comp_b?.v?.selected_option?.value;
-    const altIdx = vals.alt_b?.v?.selected_option?.value;
-    if (!session || compId == null || altIdx == null) {
-      return ack({ response_action: 'errors', errors: { alt_b: 'Pick a replacement first.' } });
-    }
-    const alt = (session.alternatives?.[compId] || [])[Number(altIdx)];
-    if (!alt) return ack({ response_action: 'errors', errors: { alt_b: 'That alternative is gone — reopen the swap.' } });
-    await ack();
-    const { before, after } = applySwap(session, compId, alt);
-    if (session.reviewMsg) {
-      const { channel, ts } = session.reviewMsg;
-      const { rich, classic, text } = reviewMessage(session);
-      await updateRich(client, channel, ts, text, rich, classic);
-      uploadDiagram(client, channel, ts, session).catch(() => {});
-      await client.chat.postMessage({
-        channel, thread_ts: ts,
-        text: `🔄 Swapped *${clip(before, 80)}* → *${clip(after, 80)}*. Table, total, and diagram updated; regenerate code to match.`,
-      });
-    }
   });
 
   app.action('rev_gen_code', async ({ ack, body, client, action }) => {
