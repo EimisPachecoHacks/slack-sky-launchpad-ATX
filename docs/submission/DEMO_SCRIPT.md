@@ -29,12 +29,18 @@ the system, a **Vision agent** that reads diagrams you upload, a **Code agent**
 that writes the Terraform, a **Repair agent** that deploys and heals its own
 failures, and a **Testing agent** that drives the live app like a real user.
 
-Here is what powers them. The brain is **NVIDIA Nemotron**. It handles everything:
-architecture reasoning, Terraform generation, reading uploaded diagrams, and
-diagnosing failures. We run Nemotron **on our own vLLM server**, using open NVIDIA
-models on hardware we control instead of a hosted frontier API. It is a small
-Mixture of Experts model doing the work of an entire DevOps team. That is the
-power of a small model.
+Here is what powers them, and we use NVIDIA Nemotron models for every part. The
+main brain — architecture design, Terraform generation, and failure repair — is
+**NVIDIA Nemotron 3 Nano 30B-A3B**, a small Mixture-of-Experts model that
+activates just three-and-a-half billion parameters, doing the work of an entire
+DevOps team. Reading the diagrams you upload and driving the browser to test the
+app run on **Llama-3.1 Nemotron Nano VL 8B**, NVIDIA's vision model. And the
+self-improving memory — how it remembers past failures — is powered by
+**Llama Nemotron Embed 1B**. The two Nemotron 3 Nano and Embed models run **on
+our own vLLM server**, on hardware we control, instead of a hosted frontier API.
+The one thing that isn't Nemotron is the polished diagram picture, drawn by
+**Google's Gemini 3 Pro Image** — everything that touches your infrastructure is
+NVIDIA Nemotron.
 
 Because these agents hold **real cloud credentials and run real Terraform**, we
 contain them using **NVIDIA NemoClaw and OpenShell**. The agent can work freely
