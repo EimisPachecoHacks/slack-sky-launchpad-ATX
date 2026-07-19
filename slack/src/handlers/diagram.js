@@ -7,6 +7,36 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const PYTHON = join(REPO_ROOT, 'project', 'venv', 'bin', 'python');
 const RENDERER = join(REPO_ROOT, 'slack', 'render_diagram.py');
+const TABLE_RENDERER = join(REPO_ROOT, 'slack', 'render_table.py');
+
+function renderPng(script, archPath, outPath) {
+  return new Promise((resolve, reject) => {
+    execFile(PYTHON, [script, archPath, outPath], { timeout: 90000 }, (err, _out, stderr) => {
+      if (err) return reject(new Error((stderr || err.message).slice(0, 200)));
+      resolve();
+    });
+  });
+}
+
+/** Render the web-style component table (KPI cards + comparison) as a PNG and
+ * upload it to the review thread. Best-effort. */
+export async function uploadTable(client, channel, thread_ts, session) {
+  const arch = session.architecture;
+  if (!arch?.components?.length) return;
+  const dir = mkdtempSync(join(tmpdir(), 'skytable-'));
+  const archPath = join(dir, 'arch.json');
+  const outPath = join(dir, 'table.png');
+  writeFileSync(archPath, JSON.stringify(arch));
+  await renderPng(TABLE_RENDERER, archPath, outPath);
+  if (!existsSync(outPath)) return;
+  await client.files.uploadV2({
+    channel_id: channel,
+    thread_ts,
+    file: outPath,
+    filename: 'components-table.png',
+    initial_comment: '📊 Components — full breakdown (cost, savings, alternatives)',
+  });
+}
 
 /**
  * Render the architecture's node/edge diagram to a PNG (same data the web
@@ -17,17 +47,15 @@ const RENDERER = join(REPO_ROOT, 'slack', 'render_diagram.py');
 export async function uploadDiagram(client, channel, thread_ts, session) {
   const arch = session.architecture;
   if (!arch?.diagram?.nodes?.length) return;
+  // Rich component table first (mirrors the web table), then the diagram.
+  uploadTable(client, channel, thread_ts, session).catch(() => {});
+
   const dir = mkdtempSync(join(tmpdir(), 'skydiag-'));
   const archPath = join(dir, 'arch.json');
   const outPath = join(dir, 'diagram.png');
   writeFileSync(archPath, JSON.stringify(arch));
 
-  await new Promise((resolve, reject) => {
-    execFile(PYTHON, [RENDERER, archPath, outPath], { timeout: 90000 }, (err, _out, stderr) => {
-      if (err) return reject(new Error((stderr || err.message).slice(0, 200)));
-      resolve();
-    });
-  });
+  await renderPng(RENDERER, archPath, outPath);
   if (!existsSync(outPath)) return;
 
   await client.files.uploadV2({
