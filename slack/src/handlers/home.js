@@ -5,6 +5,7 @@ import { methodView, useCaseView } from '../blocks/wizard.js';
 import { reviewMessage } from '../blocks/review.js';
 import { postRich } from '../blocks/common.js';
 import { openDm, notifyUser, SESSION_EXPIRED } from './shared.js';
+import { uploadDiagram } from './diagram.js';
 
 /** Builds and publishes the Home dashboard; degraded (never crashes) when the backend is down. */
 export async function publishHome(client, userId) {
@@ -53,6 +54,7 @@ export default function register(app) {
     const { rich, classic, text } = reviewMessage(session);
     const posted = await postRich(client, dm, text, rich, classic);
     session.reviewMsg = { channel: dm, ts: posted.ts };
+    uploadDiagram(client, dm, posted.ts, session).catch(() => {});
   });
 
   app.action('img_start', async ({ ack, body, client }) => {

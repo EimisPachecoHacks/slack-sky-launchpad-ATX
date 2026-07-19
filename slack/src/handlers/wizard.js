@@ -6,6 +6,7 @@ import { updateRich } from '../blocks/common.js';
 import { plain, providerMeta, fmtElapsed, startProgress } from '../util.js';
 import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { publishHome } from './home.js';
+import { uploadDiagram } from './diagram.js';
 
 const sidOf = view => {
   try { return JSON.parse(view.private_metadata || '{}').sid; } catch { return null; }
@@ -36,6 +37,7 @@ export async function runGenerate(client, session) {
     const { rich, classic, text } = reviewMessage(session);
     await updateRich(client, loading.channel, loading.ts, text, rich, classic);
     session.reviewMsg = { channel: loading.channel, ts: loading.ts };
+    uploadDiagram(client, loading.channel, loading.ts, session).catch(() => {});
     publishHome(client, session.userId).catch(() => {});
   } catch (err) {
     stop();
