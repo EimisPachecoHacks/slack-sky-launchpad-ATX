@@ -47,14 +47,20 @@ export async function uploadTable(client, channel, thread_ts, session) {
 export async function uploadDiagram(client, channel, thread_ts, session) {
   const arch = session.architecture;
   if (!arch?.diagram?.nodes?.length) return;
+
+  // Primary: the provider-styled Gemini (Nano Banana) illustration — the single
+  // diagram shown. Only if Gemini is unavailable do we fall back to the exact
+  // SVG render, so the review thread always has exactly one diagram.
+  const { uploadGenaiDiagram } = await import('./genai_diagram.js');
+  const posted = await uploadGenaiDiagram(client, channel, thread_ts, session).catch(() => false);
+  if (posted) return;
+
   const dir = mkdtempSync(join(tmpdir(), 'skydiag-'));
   const archPath = join(dir, 'arch.json');
   const outPath = join(dir, 'diagram.png');
   writeFileSync(archPath, JSON.stringify(arch));
-
   await renderPng(RENDERER, archPath, outPath);
   if (!existsSync(outPath)) return;
-
   await client.files.uploadV2({
     channel_id: channel,
     thread_ts,
@@ -62,8 +68,4 @@ export async function uploadDiagram(client, channel, thread_ts, session) {
     filename: 'architecture-diagram.png',
     initial_comment: '🗺️ Architecture diagram',
   });
-
-  // Companion provider-styled illustration via Nano Banana (best-effort).
-  const { uploadGenaiDiagram } = await import('./genai_diagram.js');
-  uploadGenaiDiagram(client, channel, thread_ts, session).catch(() => {});
 }

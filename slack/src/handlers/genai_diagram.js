@@ -33,10 +33,11 @@ Title at top: "${(session.title || 'Architecture').slice(0, 60)}".
 No extra components. No invented text. Labels spelled exactly as given.`;
 }
 
-/** Generate the illustrated diagram and upload it to the review thread. */
+/** Generate the illustrated diagram and upload it. Returns true if an image was
+ * posted, false if Gemini was unavailable (so the caller can fall back). */
 export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
   const key = process.env.GENAI_API_KEY;
-  if (!key || !session.architecture?.components?.length) return;
+  if (!key || !session.architecture?.components?.length) return false;
 
   const prompt = buildPrompt(session);
   let b64 = null;
@@ -57,7 +58,7 @@ export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
       if (img) { b64 = img.inlineData.data; break; }
     } catch { /* try next model */ }
   }
-  if (!b64) return;
+  if (!b64) return false;
 
   const dir = mkdtempSync(join(tmpdir(), 'skygenai-'));
   const file = join(dir, 'diagram-illustrated.png');
@@ -66,7 +67,8 @@ export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
     channel_id: channel,
     thread_ts,
     file,
-    filename: 'architecture-illustrated.png',
-    initial_comment: '🎨 Illustrated diagram (Nano Banana, provider-styled) — the SVG above is the exact rendering',
+    filename: 'architecture-diagram.png',
+    initial_comment: '🗺️ Architecture diagram',
   });
+  return true;
 }
