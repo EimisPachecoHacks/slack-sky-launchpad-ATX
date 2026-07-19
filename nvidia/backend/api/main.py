@@ -1171,6 +1171,34 @@ async def list_credentials(
         return {"accounts": []}
 
 
+def _learn_skill_from_failure(provider: str, error_output: str, changes: list, logs: list, run_id: str) -> None:
+    """Persist a reusable skill capturing a deploy failure and the fix that
+    resolved it, so a future deploy retrieves it and pre-empts the same error.
+    This is the 'learn' step of the self-improving loop (fail -> learn -> retry).
+    Best-effort: never breaks the deploy."""
+    try:
+        from deployer.skill_library import save_skill
+        import re as _re
+        # Extract a compact error signature (ErrorCode / first Error: line).
+        sig = ""
+        m = _re.search(r"(ErrorCode=[\w.]+|Error:\s*[^\n]{0,120}|[A-Za-z.]+\.ValueNotSupported)", error_output or "")
+        if m:
+            sig = m.group(1)
+        sig = (sig or (error_output or "")[-160:]).strip()
+        fix = "; ".join(changes)[:200]
+        saved = save_skill({
+            "name": f"{provider}-deploy-fix-{run_id}",
+            "description": f"{provider} deploy failure auto-repaired: {fix[:100]}",
+            "error_signature": sig[:300],
+            "root_cause": (error_output or "")[-260:],
+            "fix_pattern": fix,
+            "provider": provider,
+        })
+        logs.append(f"[LEARN] 🧠 Authored skill '{saved.get('slug')}' from this failure — future deploys will pre-empt it.")
+    except Exception as exc:
+        logs.append(f"[LEARN] skill authoring skipped: {exc}")
+
+
 @app.post("/api/deploy", response_model=AgentResponse)
 async def deploy_architecture(
     request: dict,
@@ -1304,6 +1332,7 @@ async def deploy_architecture(
                     result = DeploymentResult(False, output)
                     final_files, changes = analyze_and_fix(final_files, result.errors)
                     if changes and attempt < MAX_DEPLOY_RETRIES:
+                        _learn_skill_from_failure(provider, output, changes, logs, run_id)
                         continue
                     raise ValueError(f"terraform plan failed: {output[:300]}")
 
@@ -1315,6 +1344,9 @@ async def deploy_architecture(
                     result = DeploymentResult(False, output)
                     final_files, changes = analyze_and_fix(final_files, result.errors)
                     if changes and attempt < MAX_DEPLOY_RETRIES:
+                        # LEARN: persist a reusable skill from this failure + fix so
+                        # future deploys pre-empt it (the self-improving loop).
+                        _learn_skill_from_failure(provider, output, changes, logs, run_id)
                         logs.append(f"[INFO] Auto-fix applied, retrying...")
                         continue
                     raise ValueError(f"terraform apply failed: {output[-800:]}")

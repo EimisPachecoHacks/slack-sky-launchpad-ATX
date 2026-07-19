@@ -1,5 +1,6 @@
 """Generate Terraform configurations for GCP and AWS."""
 
+import os
 from pathlib import Path
 
 COMMON_LABELS = """\
@@ -467,6 +468,17 @@ resource "alicloud_security_group" "main" {
   tags                = local.tags
 }
 """
+
+    # Demo aid (SKY_DEMO_FAULT=1): inject ONE invalid terraform argument so the
+    # first apply fails with a real "Unsupported argument" error. The self-
+    # healing loop then diagnoses it, authors a learned skill, removes the
+    # argument, and retries to success — fail -> learn -> retry -> succeed, end
+    # to end. No effect unless the env var is set.
+    if os.getenv("SKY_DEMO_FAULT") == "1":
+        main_tf = main_tf.replace(
+            '  tags                = local.tags\n}',
+            '  tags                = local.tags\n  not_a_real_argument = "demo-fault"\n}',
+        )
 
     outputs_tf = """\
 output "bucket_name" {
