@@ -76,7 +76,12 @@ class ArchitectureAgent:
     def _call_duo(self, prompt: str) -> str:
         """Generate an architecture response (name kept for call-site stability)."""
         logger.info(f"[ArchitectureAgent] Sending {len(prompt)} chars to {self.model}")
-        response = llm_client.chat(prompt, system=_SYSTEM_PROMPT, kind="architecture")
+        # Large architectures (many services) produce long JSON, and Nemotron is a
+        # reasoning model that also spends tokens thinking — both count against the
+        # budget. Give a generous ceiling (the model has a 256K context) so the
+        # JSON never truncates mid-object. The model still stops at the natural
+        # end, so small architectures are unaffected.
+        response = llm_client.chat(prompt, system=_SYSTEM_PROMPT, kind="architecture", max_tokens=32000)
         logger.info(f"[ArchitectureAgent] Received {len(response)} chars")
         return response
 
