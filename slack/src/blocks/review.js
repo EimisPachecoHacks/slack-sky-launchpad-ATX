@@ -19,6 +19,7 @@ export function reviewMessage(session) {
     buttons: [
       { text: '⚙️ Generate Code', action_id: 'rev_gen_code', value: session.sid, style: 'primary' },
       { text: '🧠 AI Reasoning', action_id: 'rev_details', value: session.sid },
+      { text: '🔄 Swap component', action_id: 'rev_swap', value: session.sid },
     ],
   };
 

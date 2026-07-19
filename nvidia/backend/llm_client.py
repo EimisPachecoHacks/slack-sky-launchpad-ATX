@@ -155,6 +155,11 @@ def chat(
 ) -> str:
     """Send a chat completion to the self-hosted vLLM Nemotron and return the text.
 
+    Nemotron is a REASONING model: it spends thousands of tokens thinking before
+    the answer. Callers' max_tokens assume answer-only budgets, so we raise the
+    floor — otherwise generation truncates mid-reasoning and the caller sees
+    "response did not contain valid JSON".
+
     Raises RuntimeError on a transport/HTTP error (e.g. the vLLM box is down or
     the port-forward is not running).
     """
@@ -162,7 +167,7 @@ def chat(
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    return _post_chat(_resolve("LLM_MODEL"), messages, temperature, max_tokens, kind)
+    return _post_chat(_resolve("LLM_MODEL"), messages, temperature, max(max_tokens, 12288), kind)
 
 
 def vision_chat(

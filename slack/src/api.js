@@ -79,6 +79,15 @@ export async function generateCode({ architecture, code_type, provider }) {
   }));
 }
 
+export async function askChat(question, context) {
+  const resp = unwrap(await req('/api/chat', {
+    method: 'POST',
+    timeoutMs: 240000,
+    body: { question, ...(context ? { context } : {}) },
+  }));
+  return resp?.data?.answer || '';
+}
+
 export async function analyzeImage(buffer, filename, mimetype) {
   const form = new FormData();
   form.append('file', new Blob([buffer], { type: mimetype }), filename);
