@@ -17,20 +17,40 @@ function jsonFrom(text) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
-/** Ask Nemotron for per-component alternatives: { [componentId]: [{name,cost,reason}] } */
-async function fetchAlternatives(session) {
-  const comps = (session.architecture?.components || []).map(c => ({
-    id: c.id, name: c.name, cost: c.cost, description: (c.description || '').slice(0, 120),
-  }));
-  const answer = await api.askChat(
-    `For each component of this ${session.provider} architecture, propose up to 2 alternative services ` +
-    `(same provider) with realistic monthly cost and a one-line reason (e.g. cheaper, faster, managed). ` +
-    `Components: ${JSON.stringify(comps)}\n` +
-    `Return ONLY JSON: {"alternatives":[{"component_id":"...","options":[{"name":"...","cost":12,"reason":"..."}]}]}`,
-  );
-  const parsed = jsonFrom(answer);
+/** Per-component alternatives the BACKEND already returned (same data the web
+ * ComponentList uses): arch.alternatives[], each tagged with originalComponentId. */
+function realAlternatives(arch) {
   const map = {};
-  for (const a of parsed.alternatives || []) map[String(a.component_id)] = (a.options || []).slice(0, 4);
+  for (const a of arch.alternatives || []) {
+    const cid = String(a.originalComponentId ?? a.original_component_id ?? '');
+    if (!cid) continue;
+    (map[cid] ||= []).push({ name: a.name, cost: a.cost, reason: a.description || a.reason || '' });
+  }
+  return map;
+}
+
+/** Build the component→alternatives map: the real backend alternatives first
+ * (instant, reliable), then best-effort Nemotron enrichment for any component
+ * that has none, so most rows are switchable. */
+async function buildAlternatives(session) {
+  const arch = session.architecture;
+  const map = realAlternatives(arch);
+  const missing = (arch.components || []).filter(c => !map[String(c.id)]?.length);
+  if (missing.length) {
+    try {
+      const comps = missing.map(c => ({ id: c.id, name: c.name, cost: c.cost, description: (c.description || '').slice(0, 120) }));
+      const answer = await api.askChat(
+        `For each of these ${session.provider} cloud components, propose up to 2 alternative services on the SAME ` +
+        `provider that serve the same role (e.g. a different database engine, a cheaper compute tier), with a realistic ` +
+        `monthly cost and a one-line reason. Components: ${JSON.stringify(comps)}\n` +
+        `Return ONLY JSON: {"alternatives":[{"component_id":"...","options":[{"name":"...","cost":12,"reason":"..."}]}]}`,
+      );
+      for (const a of jsonFrom(answer).alternatives || []) {
+        const cid = String(a.component_id);
+        if (!map[cid]?.length) map[cid] = (a.options || []).slice(0, 4);
+      }
+    } catch { /* real alternatives still work */ }
+  }
   return map;
 }
 
@@ -164,8 +184,11 @@ export default function register(app) {
     if (!session?.architecture) return notifyUser(client, body, SESSION_EXPIRED);
     const ph = await client.views.open({ trigger_id: body.trigger_id, view: swapLoadingView(session.sid) });
     try {
-      session.alternatives = await fetchAlternatives(session);
-      const firstId = session.architecture.components?.[0]?.id;
+      session.alternatives = await buildAlternatives(session);
+      // Default to the first component that actually has alternatives.
+      const firstId = (session.architecture.components || [])
+        .map(c => String(c.id)).find(id => session.alternatives[id]?.length)
+        || session.architecture.components?.[0]?.id;
       await client.views.update({ view_id: ph.view.id, view: swapView(session, firstId) });
     } catch (err) {
       await client.views.update({ view_id: ph.view.id, view: swapErrorView(err.message) }).catch(() => {});

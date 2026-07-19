@@ -27,8 +27,17 @@ export function swapErrorView(message) {
  * replacement. `alternatives` = { [componentId]: [{name, cost, reason}] }.
  */
 export function swapView(session, selectedId) {
-  const comps = session.architecture?.components || [];
-  const alts = (session.alternatives || {})[selectedId] || [];
+  const altMap = session.alternatives || {};
+  // Only components that actually have alternatives are switchable (web parity:
+  // you can only replace a component with a service that fills the same role).
+  const comps = (session.architecture?.components || []).filter(c => altMap[String(c.id)]?.length);
+  if (!comps.length) {
+    return {
+      type: 'modal', title: plain('Swap component'), close: plain('Close'),
+      blocks: [{ type: 'section', text: mrkdwn('No interchangeable alternatives were proposed for this architecture. Use the *Cost / Performance* buttons to re-design the whole thing instead.') }],
+    };
+  }
+  const alts = altMap[String(selectedId)] || [];
   const compOptions = comps.map(c => ({
     text: plain(clip(`${c.name} — ${money(Number(c.cost) || 0)}/mo`, 74)),
     value: String(c.id),
