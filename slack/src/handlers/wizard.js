@@ -7,7 +7,7 @@ import { plain, providerMeta, fmtElapsed, startProgress } from '../util.js';
 import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { publishHome } from './home.js';
 import { uploadDiagram } from './diagram.js';
-import { ensureAlternatives } from './review.js';
+import { ensureAlternatives, initVariants } from './review.js';
 
 const sidOf = view => {
   try { return JSON.parse(view.private_metadata || '{}').sid; } catch { return null; }
@@ -37,6 +37,8 @@ export async function runGenerate(client, session) {
     session.alternatives = null;
     // Populate per-component alternatives so each review row gets a Switch dropdown.
     await ensureAlternatives(session).catch(() => { session.alternatives = {}; });
+    // Register this as the first optimization variant (tabs generate the others lazily).
+    initVariants(session);
     stop();
     session.step = 'review';
     const { rich, classic, text } = reviewMessage(session);

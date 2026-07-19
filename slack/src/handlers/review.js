@@ -3,9 +3,26 @@ import { getSession } from '../state.js';
 import { reasoningBlocks, reviewMessage } from '../blocks/review.js';
 import { codeMessage, CODE_FILENAME, INLINE_CODE_LIMIT } from '../blocks/code.js';
 import { updateRich } from '../blocks/common.js';
-import { clip, money } from '../util.js';
+import { clip, money, fmtElapsed, startProgress, providerMeta } from '../util.js';
 import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { uploadDiagram } from './diagram.js';
+
+/** Snapshot each component's original values so a swap can be reverted. */
+function snapshotOriginals(arch) {
+  arch.__originals = {};
+  for (const c of arch.components || []) {
+    arch.__originals[String(c.id)] = { name: c.name, cost: c.cost, description: c.description };
+  }
+}
+
+/** Register the freshly-generated architecture as the first optimization variant. */
+export function initVariants(session) {
+  const goal = session.optimization || 'balanced';
+  snapshotOriginals(session.architecture);
+  session.architecture.__alternatives = session.alternatives;
+  session.variants = { [goal]: session.architecture };
+  session.activeVariant = goal;
+}
 
 /** Parse JSON out of an LLM answer (tolerates fences and prose). */
 function jsonFrom(text) {
@@ -134,23 +151,88 @@ export async function runGenerateCode(client, session, type) {
 }
 
 export default function register(app) {
+  // Optimization "tabs": switch to a cached variant instantly, or generate it once.
+  app.action(/^rev_tab_/, async ({ ack, body, client, action }) => {
+    await ack();
+    const session = getSession(action.value);
+    if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
+    const goal = action.action_id.replace('rev_tab_', '');
+    if (!['balanced', 'cost', 'performance'].includes(goal) || goal === session.activeVariant) return;
+    const { channel, ts } = session.reviewMsg;
+
+    const cached = session.variants?.[goal];
+    if (cached) {
+      session.architecture = cached;
+      session.activeVariant = goal;
+      session.optimization = goal;
+      session.alternatives = cached.__alternatives || {};
+      session.code = {}; session.codeMsg = null;
+      const { rich, classic, text } = reviewMessage(session);
+      await updateRich(client, channel, ts, text, rich, classic);
+      uploadDiagram(client, channel, ts, session).catch(() => {});
+      return;
+    }
+
+    const p = providerMeta(session.provider);
+    const label = s => `🧠 Optimizing *${session.title}* for *${goal}* on ${p.emoji} ${p.label} with Nemotron… (${fmtElapsed(s)} elapsed)`;
+    await client.chat.update({ channel, ts, text: label(0), blocks: [{ type: 'section', text: { type: 'mrkdwn', text: label(0) } }] });
+    const stop = startProgress(client, channel, ts, label, { maxUpdates: 60 });
+    try {
+      const resp = await api.generateArchitecture({
+        title: session.title, description: session.description,
+        requirements: session.requirements, provider: session.provider, optimization_goal: goal,
+      });
+      session.architecture = resp.data || {};
+      session.reasoning = resp.reasoning || '';
+      session.summaryMessage = resp.message || '';
+      session.optimization = goal;
+      session.alternatives = null;
+      await ensureAlternatives(session).catch(() => { session.alternatives = {}; });
+      snapshotOriginals(session.architecture);
+      session.architecture.__alternatives = session.alternatives;
+      session.variants[goal] = session.architecture;
+      session.activeVariant = goal;
+      session.code = {}; session.codeMsg = null;
+      stop();
+      const { rich, classic, text } = reviewMessage(session);
+      await updateRich(client, channel, ts, text, rich, classic);
+      uploadDiagram(client, channel, ts, session).catch(() => {});
+    } catch (err) {
+      stop();
+      // Restore the previous variant view.
+      const prev = session.variants[session.activeVariant];
+      if (prev) { session.architecture = prev; session.alternatives = prev.__alternatives || {}; }
+      const { rich, classic, text } = reviewMessage(session);
+      await updateRich(client, channel, ts, text, rich, classic);
+      await client.chat.postMessage({ channel, thread_ts: ts, text: `❌ Couldn't build the *${goal}* variant (${clip(err.message, 200)}). Kept the current view.` });
+    }
+  });
+
   // Per-component switch: the static_select accessory on a component row.
-  // value = "<sid>~~<componentId>~~<altIndex>".
+  // value = "<sid>~~<componentId>~~<altIndex|restore>".
   app.action('swap_pick', async ({ ack, body, client, action }) => {
     await ack();
-    const [sid, compId, idxStr] = String(action.selected_option?.value || '').split('~~');
+    const [sid, compId, sel] = String(action.selected_option?.value || '').split('~~');
     const session = getSession(sid);
     if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
-    const alt = (session.alternatives?.[compId] || [])[Number(idxStr)];
-    if (!alt) return notifyUser(client, body, 'That alternative is no longer available — regenerate to refresh.');
-    const { before, after } = applySwap(session, compId, alt);
+    let before, after;
+    if (sel === 'restore') {
+      const orig = session.architecture.__originals?.[compId];
+      if (!orig) return notifyUser(client, body, 'No default recorded for that component.');
+      ({ before, after } = applySwap(session, compId, { name: orig.name, cost: orig.cost, reason: orig.description }));
+    } else {
+      const alt = (session.alternatives?.[compId] || [])[Number(sel)];
+      if (!alt) return notifyUser(client, body, 'That alternative is no longer available — regenerate to refresh.');
+      ({ before, after } = applySwap(session, compId, alt));
+    }
+    session.code = {}; session.codeMsg = null;
     const { channel, ts } = session.reviewMsg;
     const { rich, classic, text } = reviewMessage(session);
     await updateRich(client, channel, ts, text, rich, classic);
     uploadDiagram(client, channel, ts, session).catch(() => {});
     await client.chat.postMessage({
       channel, thread_ts: ts,
-      text: `🔄 Swapped *${clip(before, 80)}* → *${clip(after, 80)}*. Cost total and diagram updated — regenerate code to match.`,
+      text: `${sel === 'restore' ? '↩️ Restored' : '🔄 Swapped'} *${clip(before, 80)}* → *${clip(after, 80)}*. Cost total and diagram updated.`,
     });
   });
 
