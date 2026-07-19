@@ -54,7 +54,11 @@ function unwrap(resp) {
   return resp;
 }
 
-export const health = () => req('/', { timeoutMs: 8000 });
+// The status document is served at the backend root locally, but in the
+// Alibaba Cloud deployment nginx serves the React app there and exposes the
+// same document at /api/status. Try that first, fall back to the root.
+export const health = () =>
+  req('/api/status', { timeoutMs: 8000 }).catch(() => req('/', { timeoutMs: 8000 }));
 export const learnedSkills = () => req('/api/skills/learned', { timeoutMs: 8000 });
 export const learningSummary = () => req('/api/learning/summary', { timeoutMs: 8000 });
 
