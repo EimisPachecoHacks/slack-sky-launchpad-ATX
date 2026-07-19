@@ -79,8 +79,11 @@ To **deploy real infrastructure**, upload an Alibaba Cloud RAM AccessKey in **Se
 
 ```mermaid
 flowchart TB
-  subgraph alibaba["Alibaba Cloud ECS — deployed application"]
+  subgraph clients["Interfaces"]
+    S["Slack app — Block Kit: design, cost/performance tabs,<br/>component swaps, deploy, test results"]
     A[React frontend — requirements, diagram upload, approval]
+  end
+  subgraph alibaba["Alibaba Cloud ECS — deployed backend"]
     API[FastAPI backend — orchestration and human checkpoint]
     T[Terraform runner — Alibaba OpenAPI via alicloud provider]
     M[(Encrypted skills and deployment state)]
@@ -96,8 +99,10 @@ flowchart TB
     DB[(MongoDB Atlas Vector Search or local JSON fallback)]
     E[GitLab API - MR & commits]
   end
+  S -->|Socket Mode| API
   A --> API
   API --> B
+  S -. "DM'd diagram" .-> API
   A -. "uploaded image" .-> API --> Vz --> B
   V -. "retrieved lessons" .-> API
   API --> T --> C
