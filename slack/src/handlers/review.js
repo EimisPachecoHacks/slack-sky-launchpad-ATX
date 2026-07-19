@@ -1,8 +1,11 @@
 import * as api from '../api.js';
 import { getSession } from '../state.js';
-import { reasoningBlocks } from '../blocks/review.js';
+import { reasoningBlocks, reviewMessage } from '../blocks/review.js';
 import { codeMessage, CODE_FILENAME, INLINE_CODE_LIMIT } from '../blocks/code.js';
+import { updateRich } from '../blocks/common.js';
+import { providerMeta, fmtElapsed, startProgress } from '../util.js';
 import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
+import { uploadDiagram } from './diagram.js';
 
 async function renderCodeMessage(client, session, type, opts = {}) {
   const { blocks, text } = codeMessage(session, type, opts);
@@ -55,7 +58,48 @@ export async function runGenerateCode(client, session, type) {
   }
 }
 
+/** Re-design the architecture with a different optimization goal, updating the
+ * review message in place — Slack's version of the web optimization switch. */
+async function reoptimize(client, session, goal) {
+  session.optimization = goal;
+  const { channel, ts } = session.reviewMsg;
+  const p = providerMeta(session.provider);
+  const label = s => `🧠 Re-designing *${session.title}* optimized for *${goal}* with Nemotron… (${fmtElapsed(s)} elapsed)`;
+  await client.chat.update({ channel, ts, text: label(0), blocks: [] });
+  const stop = startProgress(client, channel, ts, label, { maxUpdates: 60 });
+  try {
+    const resp = await api.generateArchitecture({
+      title: session.title,
+      description: session.description,
+      requirements: session.requirements,
+      provider: session.provider,
+      optimization_goal: goal,
+    });
+    stop();
+    session.architecture = resp.data || {};
+    session.reasoning = resp.reasoning || '';
+    session.summaryMessage = resp.message || '';
+    session.code = {}; // stale — the architecture changed
+    session.codeMsg = null;
+    const { rich, classic, text } = reviewMessage(session);
+    await updateRich(client, channel, ts, text, rich, classic);
+    uploadDiagram(client, channel, ts, session).catch(() => {});
+  } catch (err) {
+    stop();
+    await client.chat.update({ channel, ts, text: `❌ Re-optimization failed: ${err.message} — the previous design is stale; run /sky new to start fresh.` });
+  }
+}
+
 export default function register(app) {
+  app.action(/^rev_opt_/, async ({ ack, body, client, action }) => {
+    await ack();
+    const session = getSession(action.value);
+    if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
+    const goal = action.action_id.replace('rev_opt_', '');
+    if (!['cost', 'balanced', 'performance'].includes(goal) || goal === (session.optimization || 'balanced')) return;
+    await reoptimize(client, session, goal);
+  });
+
   app.action('rev_gen_code', async ({ ack, body, client, action }) => {
     await ack();
     const session = getSession(action.value);

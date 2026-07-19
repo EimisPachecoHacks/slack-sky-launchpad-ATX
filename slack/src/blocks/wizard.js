@@ -63,7 +63,7 @@ export function useCaseView(session) {
     close: plain('Cancel'),
     blocks: [
       { type: 'header', text: plain('📝 Describe your project') },
-      { type: 'context', elements: [mrkdwn(`Provider: *${p.emoji} ${p.label}* · optimization: balanced`)] },
+      { type: 'context', elements: [mrkdwn(`Provider: *${p.emoji} ${p.label}*`)] },
       {
         type: 'input',
         block_id: 'title_b',
@@ -95,10 +95,27 @@ export function useCaseView(session) {
           ...pre((session.requirements || []).join('\n')),
         },
       },
+      {
+        type: 'input',
+        block_id: 'opt_b',
+        optional: true,
+        label: plain('Optimization goal'),
+        element: {
+          type: 'static_select', action_id: 'v',
+          initial_option: OPT_OPTIONS.find(o => o.value === (session.optimization || 'balanced')),
+          options: OPT_OPTIONS,
+        },
+      },
       { type: 'actions', elements: [{ type: 'button', text: plain('← Change provider'), action_id: 'wiz_back', value: 'provider' }] },
     ],
   };
 }
+
+const OPT_OPTIONS = [
+  { text: plain('⚖️ Balanced'), value: 'balanced' },
+  { text: plain('💰 Cost — cheapest that works'), value: 'cost' },
+  { text: plain('🚀 Performance — speed first'), value: 'performance' },
+];
 
 /** Shown when the user picks the image path inside the wizard. */
 export function imageInstructionsView(sid) {

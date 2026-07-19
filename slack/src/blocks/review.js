@@ -22,13 +22,34 @@ export function reviewMessage(session) {
     ],
   };
 
+  // Components often lack `type`; the diagram nodes carry it (matched by id).
+  const nodeById = {};
+  for (const n of arch.diagram?.nodes || []) nodeById[n.id] = n;
+  const typeOf = c => c.type || nodeById[c.id]?.subLabel || nodeById[c.id]?.type || '—';
+
   const cols = ['Component', 'Type', 'Est. $/mo'];
   const rows = comps.map(c => ({
     Component: c.name || c.id || '?',
-    Type: c.type || '—',
+    Type: typeOf(c),
     'Est. $/mo': Number(c.cost) || 0,
   }));
   const caption = `Components — est. ${money(cost)}/mo total`;
+
+  // Optimization switcher — same three goals as the web version; the active
+  // goal is highlighted. Clicking re-generates the architecture with that goal.
+  const goal = session.optimization || 'balanced';
+  const OPT = [['cost', '💰 Cost'], ['balanced', '⚖️ Balanced'], ['performance', '🚀 Performance']];
+  const optRow = {
+    type: 'actions',
+    elements: OPT.map(([g, label]) => ({
+      type: 'button',
+      text: { type: 'plain_text', text: g === goal ? `${label} ✓` : label, emoji: true },
+      action_id: `rev_opt_${g}`,
+      value: session.sid,
+      ...(g === goal ? { style: 'primary' } : {}),
+    })),
+  };
+  const optHint = { type: 'context', elements: [mrkdwn(`Optimization: *${goal}* — switch to re-design the architecture for that goal`)] };
 
   const ctxParts = [];
   if (session.detectedComponents?.length) ctxParts.push(`👁️ Detected: ${clip(session.detectedComponents.join(', '), 200)}`);
@@ -36,8 +57,8 @@ export function reviewMessage(session) {
   ctxParts.push(`session \`${session.sid}\``);
   const context = { type: 'context', elements: [mrkdwn(ctxParts.join(' · '))] };
 
-  const rich = [card(cardOpts), ...(rows.length ? [dataTable(cols, rows, caption)] : []), context];
-  const classic = [...cardClassic(cardOpts), ...(rows.length ? tableClassic(cols, rows) : []), context];
+  const rich = [card(cardOpts), ...(rows.length ? [dataTable(cols, rows, caption)] : []), optHint, optRow, context];
+  const classic = [...cardClassic(cardOpts), ...(rows.length ? tableClassic(cols, rows) : []), optHint, optRow, context];
   const text = `Architecture ready: ${session.title || arch.name || 'untitled'} — ${comps.length} components, ~${money(cost)}/mo`;
   return { rich, classic, text };
 }

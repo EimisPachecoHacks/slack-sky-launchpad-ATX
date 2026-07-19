@@ -63,11 +63,11 @@ export async function listCredentials() {
   return resp?.accounts || [];
 }
 
-export async function generateArchitecture({ title, description, requirements, provider }) {
+export async function generateArchitecture({ title, description, requirements, provider, optimization_goal = 'balanced' }) {
   return unwrap(await req('/api/architecture/generate', {
     method: 'POST',
     timeoutMs: 180000,
-    body: { title, description, requirements, provider, optimization_goal: 'balanced' },
+    body: { title, description, requirements, provider, optimization_goal },
   }));
 }
 

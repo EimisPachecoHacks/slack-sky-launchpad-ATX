@@ -25,6 +25,7 @@ export async function runGenerate(client, session) {
       description: session.description,
       requirements: session.requirements,
       provider: session.provider,
+      optimization_goal: session.optimization || 'balanced',
     });
     stop();
     session.architecture = resp.data || {};
@@ -105,6 +106,7 @@ export default function register(app) {
     session.title = title;
     session.description = description;
     session.requirements = (vals.reqs_b?.v?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+    session.optimization = vals.opt_b?.v?.selected_option?.value || 'balanced';
     await runGenerate(client, session);
   });
 }
