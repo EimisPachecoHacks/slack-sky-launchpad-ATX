@@ -16,9 +16,11 @@ export class ApiError extends Error {
 async function req(path, { method = 'GET', body, form, timeoutMs = 30000, auth = false, _retried = false } = {}) {
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
-  // The backend allows unauthenticated access in development mode (empty API_KEYS),
-  // so send the key only when configured and let the server decide.
-  if (auth && process.env.SKY_API_KEY) headers['X-API-Key'] = process.env.SKY_API_KEY;
+  // When the backend has API_KEYS configured (the Alibaba Cloud deployment),
+  // EVERY endpoint requires the key — FastAPI resolves the api-key sub-dependency
+  // before optional_authentication can catch its error — so send it on every
+  // request when configured. Dev backends with empty API_KEYS just ignore it.
+  if (process.env.SKY_API_KEY) headers['X-API-Key'] = process.env.SKY_API_KEY;
   let res;
   try {
     res = await fetch(BASE() + path, {
