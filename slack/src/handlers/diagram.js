@@ -37,4 +37,8 @@ export async function uploadDiagram(client, channel, thread_ts, session) {
     filename: 'architecture-diagram.png',
     initial_comment: '🗺️ Architecture diagram',
   });
+
+  // Companion provider-styled illustration via Nano Banana (best-effort).
+  const { uploadGenaiDiagram } = await import('./genai_diagram.js');
+  uploadGenaiDiagram(client, channel, thread_ts, session).catch(() => {});
 }
