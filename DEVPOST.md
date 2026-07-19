@@ -20,6 +20,8 @@ We wanted infrastructure automation that compounds. Not a bigger model — an **
 
 Sky Launchpad turns natural language or an uploaded architecture diagram into Terraform, actually runs `terraform apply` against **Alibaba Cloud**, and opens a GitLab merge request when the infrastructure really stands up — an end-to-end workflow with a human checkpoint only where it matters: approving a real deploy.
 
+**It lives in Slack.** Describe a system in a channel and the architecture, cost breakdown, and diagram come back as messages; **Cost Optimized / Performance Optimized** tabs re-project the same design instantly, any single component can be swapped from a dropdown, and one click each generates Terraform and deploys it. We chose Slack because infrastructure decisions are *team* conversations — everyone sees the design, the cost, and the diagram, and there is no new tool to learn. The same backend also serves a React web app.
+
 The interesting part is what happens when it **fails**:
 
 1. **Collect** — `deployer/log_collector.py` gathers the Terraform error and the exact HCL lines around it.
