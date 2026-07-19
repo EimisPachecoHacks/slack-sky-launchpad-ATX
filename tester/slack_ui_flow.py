@@ -7,10 +7,10 @@ Slack UI with exact selectors, so the flow completes reliably:
   fill title + description -> Generate Architecture -> wait for the live
   "Designing…" message -> (bonus) wait for the review card.
 
-Screenshots land in nvidia/tester/runs/slack-flow-<ts>/ at every step.
+Screenshots land in tester/runs/slack-flow-<ts>/ at every step.
 
 Usage:
-    python nvidia/tester/slack_ui_flow.py --workspace-url https://app.slack.com/client/<TEAM>/<CH>
+    python tester/slack_ui_flow.py --workspace-url https://app.slack.com/client/<TEAM>/<CH>
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PROFILE_DIR = REPO_ROOT / "nvidia" / "tester" / ".slack-profile"
+PROFILE_DIR = REPO_ROOT / "tester" / ".slack-profile"
 
 
 def main() -> None:
@@ -31,7 +31,7 @@ def main() -> None:
     ap.add_argument("--workspace-url", required=True)
     args = ap.parse_args()
 
-    run_dir = REPO_ROOT / "nvidia" / "tester" / "runs" / f"slack-flow-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    run_dir = REPO_ROOT / "tester" / "runs" / f"slack-flow-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     run_dir.mkdir(parents=True, exist_ok=True)
     shots: list[str] = []
     n = 0

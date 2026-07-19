@@ -20,7 +20,7 @@ export function codeMessage(session, activeTab, { generating = false } = {}) {
   ];
 
   if (generating) {
-    blocks.push({ type: 'context', elements: [mrkdwn(`⏳ Generating ${TAB_LABEL[activeTab]} with Nemotron…`)] });
+    blocks.push({ type: 'context', elements: [mrkdwn(`⏳ Generating ${TAB_LABEL[activeTab]} with Qwen…`)] });
   } else if (entry?.code) {
     if (entry.code.length <= INLINE_CODE_LIMIT) {
       blocks.push({ type: 'section', text: mrkdwn('```\n' + entry.code + '\n```') });
@@ -53,7 +53,7 @@ export function codeMessage(session, activeTab, { generating = false } = {}) {
     // newly-learned ones (new skills come only from the deploy loop).
     blocks.push({
       type: 'context',
-      elements: [mrkdwn(clip(`🤖 model: \`${entry.model || 'nemotron'}\` · 🧠 past skills reused: ${skills}`, 2900))],
+      elements: [mrkdwn(clip(`🤖 model: \`${entry.model || 'qwen'}\` · 🧠 past skills reused: ${skills}`, 2900))],
     });
   }
 

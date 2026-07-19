@@ -1,22 +1,22 @@
-"""Sky Launchpad autonomous UI tester — computer-use style, powered by Nemotron.
+"""Sky Launchpad autonomous UI tester — computer-use style, powered by Qwen.
 
 Acts like a human user on a deployed web app:
 
-  1. Nemotron 3 Nano 30B (self-hosted vLLM) reads the app description and
+  1. Qwen (qwen3.7-max on Qwen Cloud) reads the app description and
      WRITES the test cases — including "known pitfalls" retrieved from the
      learned-skills memory (Supabase pgvector), so past lessons shape new runs.
   2. For every step, a real Chromium (Playwright) page is SCREENSHOTTED and the
-     Nemotron Nano VL vision model decides the next action (click/type/verdict)
+     Qwen vision model (qwen3.7-plus) decides the next action (click/type/verdict)
      from the pixels — no selectors, no DOM assumptions.
   3. Verdicts land in skydb (test_cases / test_runs -> Supabase). Every bug
-     found is distilled into a learned skill (SKILL.md + Nemotron embedding),
+     found is distilled into a learned skill (SKILL.md + Qwen embedding),
      which future runs retrieve — the Recursive Intelligence loop.
 
 Every screenshot is saved under the run directory and listed in the JSON
 summary printed to stdout (the Slack app uploads them with the results).
 
 Usage:
-    python nvidia/tester/agent.py --url http://<app-ip> [--app-name skynotes]
+    python tester/agent.py --url http://<app-ip> [--app-name skynotes]
         [--out runs] [--max-cases 4] [--max-steps 8]
 """
 
@@ -34,18 +34,18 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))          # skydb, deployer
-sys.path.insert(0, str(REPO_ROOT / "nvidia"))  # backend (NVIDIA variant)
+sys.path.insert(0, str(REPO_ROOT / "project"))  # backend (Qwen on Qwen Cloud)
 
-# Load nvidia/.env (last occurrence wins, like dotenv) without overriding real env.
+# Load project/.env (last occurrence wins, like dotenv) without overriding real env.
 _env_file_vars = {}
-for line in (REPO_ROOT / "nvidia" / ".env").read_text().splitlines():
+for line in (REPO_ROOT / "project" / ".env").read_text().splitlines():
     m = re.match(r"^([A-Z0-9_]+)=(.*)$", line.strip())
     if m:
         _env_file_vars[m.group(1)] = m.group(2)  # last occurrence wins, like dotenv
 for _k, _v in _env_file_vars.items():
     os.environ.setdefault(_k, _v)  # real env still beats the file
 
-from backend import llm_client  # noqa: E402  (NVIDIA variant: vLLM chat + NIM vision)
+from backend import llm_client  # noqa: E402  (Qwen: qwen3.7-max chat + qwen3.7-plus vision)
 import skydb  # noqa: E402
 from deployer import skill_library  # noqa: E402
 
@@ -74,7 +74,7 @@ def _json_from(text: str):
 
 
 def make_plan(url: str, app_name: str, max_cases: int) -> list[dict]:
-    """Nemotron 30B writes the test plan, informed by learned skills."""
+    """Qwen 30B writes the test plan, informed by learned skills."""
     known = skill_library.get_learned_skills_context(query=f"web ui testing {app_name} signup todo form validation") or ""
     for s in skydb.find_similar_skills(f"web ui testing {app_name}", k=3):
         if s.get("slug"):
@@ -243,7 +243,7 @@ def _act_on(page, idx, action, text):
 
 
 def run_case(page, case: dict, run_dir: Path, case_idx: int, max_steps: int, url: str) -> dict:
-    """Element-indexed agent: Nemotron (text model) reads the page's interactive
+    """Element-indexed agent: Qwen (text model) reads the page's interactive
     elements + visible text and chooses actions by index — reliable execution,
     with a screenshot saved every step for review/recording."""
     history: list[str] = []
@@ -307,7 +307,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", required=True)
     ap.add_argument("--app-name", default="webapp")
-    ap.add_argument("--out", default=str(REPO_ROOT / "nvidia" / "tester" / "runs"))
+    ap.add_argument("--out", default=str(REPO_ROOT / "tester" / "runs"))
     ap.add_argument("--max-cases", type=int, default=4)
     ap.add_argument("--max-steps", type=int, default=8)
     ap.add_argument("--headed", action="store_true", help="show the browser window (for recording)")
@@ -341,7 +341,7 @@ def main() -> None:
     passed = sum(1 for r in results if r["status"] == "pass")
     failed = sum(1 for r in results if r["status"] == "fail")
     skydb.add_test_run({
-        "app_id": args.app_name, "workflow": "nemotron-ui-agent",
+        "app_id": args.app_name, "workflow": "qwen-ui-agent",
         "status": "failed" if failed else ("passed" if passed else "inconclusive"),
         "summary": f"{passed} passed / {failed} failed / {len(results)-passed-failed} inconclusive",
         "bug": next(({"title": r["case"]["title"], "reason": r["reason"]} for r in results if r["status"] == "fail"), None),

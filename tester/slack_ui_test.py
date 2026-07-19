@@ -1,12 +1,12 @@
 """Drive the SLACK WEB CLIENT like a human user — the agent tests our own Slack app.
 
 Opens a VISIBLE Chromium window with a persistent profile (log into Slack once;
-the session is remembered for future runs). Then the same Nemotron vision loop
+the session is remembered for future runs). Then the same Qwen vision loop
 from agent.py chats with the Sky Launchpad bot and fills its wizard forms,
 screenshotting every step.
 
 Usage:
-    python nvidia/tester/slack_ui_test.py --workspace-url https://app.slack.com/client/<TEAM>/<CHANNEL>
+    python tester/slack_ui_test.py --workspace-url https://app.slack.com/client/<TEAM>/<CHANNEL>
 """
 
 from __future__ import annotations
@@ -19,9 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from agent import REPO_ROOT, run_case  # noqa: E402  (also loads nvidia/.env + models)
+from agent import REPO_ROOT, run_case  # noqa: E402  (also loads project/.env + models)
 
-PROFILE_DIR = REPO_ROOT / "nvidia" / "tester" / ".slack-profile"
+PROFILE_DIR = REPO_ROOT / "tester" / ".slack-profile"
 
 CASES = [
     {
@@ -37,7 +37,7 @@ CASES = [
             "Click the larger 'Project description' text area and type 'A tiny notes web app with a signup form, for a live demo'",
             "Click the 'Generate Architecture' button at the bottom-right of the modal",
         ],
-        "expected": "The modal closes and a message appears saying the architecture is being designed (a loading message mentioning Qwen or Nemotron with an elapsed timer).",
+        "expected": "The modal closes and a message appears saying the architecture is being designed (a loading message mentioning Qwen or Qwen with an elapsed timer).",
     },
 ]
 
@@ -48,7 +48,7 @@ def main() -> None:
     ap.add_argument("--max-steps", type=int, default=16)
     args = ap.parse_args()
 
-    run_dir = REPO_ROOT / "nvidia" / "tester" / "runs" / f"slack-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    run_dir = REPO_ROOT / "tester" / "runs" / f"slack-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     from playwright.sync_api import sync_playwright

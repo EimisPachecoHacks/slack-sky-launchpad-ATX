@@ -13,7 +13,7 @@ const STEP_LABEL = {
 export function homeView({ health = null, skills = null, recents = [] } = {}) {
   const blocks = [
     { type: 'header', text: plain('🚀 Sky Launchpad') },
-    { type: 'section', text: mrkdwn('Turn plain English or an architecture diagram into *deployed cloud infrastructure* — designed, coded, and applied with Terraform, powered by NVIDIA Nemotron on self-hosted vLLM.') },
+    { type: 'section', text: mrkdwn('Turn plain English or an architecture diagram into *deployed cloud infrastructure* — designed, coded, and applied with Terraform, powered by Qwen on Alibaba Cloud.') },
     {
       type: 'actions',
       elements: [

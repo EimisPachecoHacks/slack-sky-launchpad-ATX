@@ -1,4 +1,4 @@
-"""Sky Launchpad testbed target app — a tiny site for the NemoClaw tester to test.
+"""Sky Launchpad testbed target app — a tiny site for the UI tester to test.
 
 Pure stdlib (no pip installs on the instance). Signup form + todo list with TWO
 DELIBERATELY SEEDED BUGS the agent should find:

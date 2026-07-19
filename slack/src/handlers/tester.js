@@ -8,13 +8,13 @@ import { notifyUser, SESSION_EXPIRED, openDm } from './shared.js';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const PYTHON = join(REPO_ROOT, 'project', 'venv', 'bin', 'python');
-const AGENT = join(REPO_ROOT, 'nvidia', 'tester', 'agent.py');
+const AGENT = join(REPO_ROOT, 'tester', 'agent.py');
 
 const STATUS_EMOJI = { pass: '✅', fail: '🐛', inconclusive: '❓' };
 
-/** Spawn the Nemotron UI-test agent against a URL and post results + screenshots. */
+/** Spawn the Qwen UI-test agent against a URL and post results + screenshots. */
 export async function runTester(client, channel, { url, appName = 'webapp' }) {
-  const label = s => `🧪 Nemotron test agent is using *${appName}* like a human — planning cases, clicking, screenshotting… (${fmtElapsed(s)} elapsed)`;
+  const label = s => `🧪 Qwen test agent is using *${appName}* like a human — planning cases, clicking, screenshotting… (${fmtElapsed(s)} elapsed)`;
   const progress = await client.chat.postMessage({ channel, text: label(0) });
   const stop = startProgress(client, channel, progress.ts, label, { maxUpdates: 180 });
 

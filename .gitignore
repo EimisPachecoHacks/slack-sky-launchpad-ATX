@@ -66,9 +66,9 @@ gcp-credentials*.json
 *.pem
 *.p12
 
-# NVIDIA tester — browser session (Slack login cookies!) and run artifacts
-nvidia/tester/.slack-profile/
-nvidia/tester/runs/
+# UI tester — browser session (Slack login cookies!) and run artifacts
+tester/.slack-profile/
+tester/runs/
 # stray debug logs from tester/agent runs
 *-stderr.log
 *-stderr2.log

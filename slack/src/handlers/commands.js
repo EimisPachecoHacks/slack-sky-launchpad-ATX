@@ -18,7 +18,7 @@ export default function register(app) {
           return;
         }
         const channel = command.channel_id;
-        await respond({ response_type: 'ephemeral', text: `🧪 Starting the Nemotron test agent on ${url}…` });
+        await respond({ response_type: 'ephemeral', text: `🧪 Starting the Qwen test agent on ${url}…` });
         try {
           await runTester(client, channel, { url, appName: new URL(url).hostname });
         } catch (err) {

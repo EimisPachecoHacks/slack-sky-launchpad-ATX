@@ -152,7 +152,7 @@ _COLL_KEYS = {"skills": "slug", "apps": "app_id", "test_runs": "run_id", "test_c
 
 
 class _SupabaseStore:
-    """Supabase (PostgREST + pgvector) store — used by the NVIDIA/Slack backend.
+    """Supabase (PostgREST + pgvector) store — used by the Slack backend.
 
     Activated only when SUPABASE_URL + SUPABASE_SERVICE_KEY are set (see
     _get_store), so the Qwen/website backend keeps MongoDB Atlas untouched.
@@ -247,7 +247,7 @@ def _get_store():
     global _store, _store_err
     if _store is not None:
         return _store
-    # Supabase first, but ONLY when explicitly configured (NVIDIA backend's env);
+    # Supabase first, but ONLY when explicitly configured (Slack backend's env);
     # the Qwen backend sets MONGODB_URI and no SUPABASE_URL, so nothing changes there.
     supa_url = os.getenv("SUPABASE_URL", "")
     supa_key = os.getenv("SUPABASE_SERVICE_KEY", "")
@@ -309,7 +309,7 @@ _EMBED_DIMENSIONS = int(os.getenv("EMBED_DIMENSIONS", "1024"))
 # text-embedding-v4 (Qwen3-Embedding, Matryoshka) honours a `dimensions` request,
 # so pin it to the Atlas index width (1024). On by default for the Qwen embedder.
 _SEND_DIMENSIONS = os.getenv("EMBED_SEND_DIMENSIONS", "true").lower() in ("1", "true", "yes")
-# Asymmetric retrieval embedders (e.g. NVIDIA llama-nemotron-embed via NIM) REQUIRE
+# Asymmetric retrieval embedders REQUIRE
 # an `input_type` (query/passage). Off by default — the Qwen embedder doesn't use it.
 _SEND_INPUT_TYPE = os.getenv("EMBED_SEND_INPUT_TYPE", "").lower() in ("1", "true", "yes")
 

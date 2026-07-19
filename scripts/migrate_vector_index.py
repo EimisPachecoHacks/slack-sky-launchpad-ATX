@@ -47,7 +47,7 @@ def main() -> int:
     # Fail loudly rather than silently writing a lexical-only index.
     probe = skydb._embed_text("connectivity probe")
     if probe is None:
-        print("❌ embedding endpoint unreachable — start vllm-embed first.")
+        print("❌ embedding endpoint unreachable — start the embedding endpoint first.")
         print("   (Nothing was written. Retrieval would fall back to lexical cosine.)")
         return 1
     if len(probe) != skydb._EMBED_DIMENSIONS:

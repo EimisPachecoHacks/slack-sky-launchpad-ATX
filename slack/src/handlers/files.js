@@ -11,7 +11,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const OK_MIME = new Set(['image/png', 'image/jpeg', 'application/pdf']);
 const seen = new Set(); // Slack can deliver the same upload via multiple events
 
-/** The AI Image Analysis path: DM'd diagram → Nemotron vision → the shared review flow. */
+/** The AI Image Analysis path: DM'd diagram → Qwen vision → the shared review flow. */
 export async function handleImageUpload(client, event) {
   const file = event.files?.[0];
   if (!file || seen.has(file.id)) return;
@@ -26,7 +26,7 @@ export async function handleImageUpload(client, event) {
     return client.chat.postMessage({ channel: event.channel, text: '⚠️ That file is over the *10 MB* limit — try a smaller export of the diagram.' });
   }
 
-  const label = s => `🔍 Analyzing your architecture diagram with Nemotron vision… (${fmtElapsed(s)} elapsed)`;
+  const label = s => `🔍 Analyzing your architecture diagram with Qwen vision… (${fmtElapsed(s)} elapsed)`;
   const loading = await client.chat.postMessage({ channel: event.channel, text: label(0) });
   const stop = startProgress(client, event.channel, loading.ts, label, { maxUpdates: 60 });
 

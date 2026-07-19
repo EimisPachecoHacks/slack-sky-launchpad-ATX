@@ -17,7 +17,7 @@ const sidOf = view => {
 export async function runGenerate(client, session) {
   session.step = 'generating';
   const p = providerMeta(session.provider);
-  const label = s => `🧠 Designing *${session.title}* on ${p.emoji} ${p.label} with Nemotron… (${fmtElapsed(s)} elapsed)`;
+  const label = s => `🧠 Designing *${session.title}* on ${p.emoji} ${p.label} with Qwen… (${fmtElapsed(s)} elapsed)`;
   const loading = await postToSession(client, session, { text: label(0) });
   const stop = startProgress(client, loading.channel, loading.ts, label, { maxUpdates: 60 });
   try {
