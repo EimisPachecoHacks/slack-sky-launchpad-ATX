@@ -7,7 +7,7 @@ import { plain, providerMeta, fmtElapsed, startProgress } from '../util.js';
 import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { publishHome } from './home.js';
 import { uploadDiagram } from './diagram.js';
-import { ensureAlternatives, initVariants } from './review.js';
+import { ensureOptimizations } from './review.js';
 
 const sidOf = view => {
   try { return JSON.parse(view.private_metadata || '{}').sid; } catch { return null; }
@@ -34,11 +34,10 @@ export async function runGenerate(client, session) {
     session.summaryMessage = resp.message || '';
     session.gitlabIssueIid = resp.data?.gitlab_issue_iid ?? null;
     session.gitlabIssueUrl = resp.data?.gitlab_issue_url ?? null;
-    session.alternatives = null;
-    // Populate per-component alternatives so each review row gets a Switch dropdown.
-    await ensureAlternatives(session).catch(() => { session.alternatives = {}; });
-    // Register this as the first optimization variant (tabs generate the others lazily).
-    initVariants(session);
+    session.optim = null;
+    session.viewMode = 'cost';
+    // Compute cost/performance options once so the tabs can project instantly.
+    await ensureOptimizations(session).catch(() => { session.optim = {}; });
     stop();
     session.step = 'review';
     const { rich, classic, text } = reviewMessage(session);

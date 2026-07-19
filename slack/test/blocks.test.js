@@ -76,23 +76,36 @@ test('useCaseView prefills previous input', () => {
   assert.equal(reqs.element.initial_value, 'scale\npostgres');
 });
 
-test('review message: one native row per component with a Switch select where alternatives exist', () => {
-  const s = fakeSession({ alternatives: { c1: [{ name: 'ECS local disk', cost: 60, reason: 'cheaper' }] } });
+test('review: Cost/Performance tabs are a projection view; rows show cost- or perf-optimized cost', () => {
+  const s = fakeSession({
+    viewMode: 'cost',
+    optim: {
+      c1: { cost: { name: 'PolarDB cheap', cost: 60, note: 'cheaper' }, performance: { name: 'PolarDB HA', cost: 120, note: 'faster' } },
+    },
+  });
   const { rich, text } = reviewMessage(s);
   assert.ok(text.includes('E-commerce platform'));
-  // A section row per component, keyed by comp_<id>.
-  const rows = rich.filter(b => b.type === 'section' && String(b.block_id || '').startsWith('comp_'));
-  assert.equal(rows.length, 2, 'one section row per component');
-  // The component with alternatives has a static_select accessory; the other doesn't.
-  const withAlt = rows.find(b => b.block_id === 'comp_c1');
-  assert.equal(withAlt.accessory?.type, 'static_select', 'component with alternatives needs a Switch select');
-  assert.equal(withAlt.accessory.action_id, 'swap_pick');
-  assert.match(withAlt.accessory.options[0].value, /^s_1~~c1~~0$/);
-  assert.ok(!rows.find(b => b.block_id === 'comp_c2').accessory, 'component without alternatives has no select');
-  // No global-optimization buttons, no image/data_table.
-  assert.ok(!rich.some(b => b.type === 'data_table'), 'no native data_table (native rows instead)');
-  const actionIds = rich.filter(b => b.type === 'actions').flatMap(b => b.elements.map(e => e.action_id));
-  assert.ok(!actionIds.some(id => id.startsWith('rev_opt_')), 'global optimization buttons removed');
+
+  // Exactly two tabs, cost active, both view-toggle action_ids (no rev_opt/regenerate).
+  const tabRow = rich.find(b => b.type === 'actions' && b.elements[0].action_id?.startsWith('rev_tab_'));
+  assert.deepEqual(tabRow.elements.map(e => e.action_id), ['rev_tab_cost', 'rev_tab_performance']);
+  assert.equal(tabRow.elements[0].style, 'primary', 'cost tab active');
+  assert.ok(!tabRow.elements[1].style, 'performance tab inactive');
+
+  // Under the cost view, c1's row shows its cost-optimized projection.
+  const c1cost = rich.find(b => b.block_id === 'comp_c1').text.text;
+  assert.match(c1cost, /Cost-optimized:.*PolarDB cheap.*\$60/);
+
+  // Flip to performance view (pure projection change) — same data, different column.
+  const perf = reviewMessage({ ...s, viewMode: 'performance' });
+  const c1perf = perf.rich.find(b => b.block_id === 'comp_c1').text.text;
+  assert.match(c1perf, /Performance-optimized:.*PolarDB HA.*\$120/);
+
+  // The row dropdown applies a switch (cost/performance/restore), not a tab.
+  const acc = rich.find(b => b.block_id === 'comp_c1').accessory;
+  assert.equal(acc.action_id, 'swap_pick');
+  assert.ok(acc.options.some(o => o.value === 's_1~~c1~~cost'));
+  assert.ok(acc.options.some(o => o.value === 's_1~~c1~~performance'));
   assertSectionLimits(rich);
 });
 

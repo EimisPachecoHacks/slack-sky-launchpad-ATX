@@ -5,7 +5,7 @@ import { updateRich } from '../blocks/common.js';
 import { fmtElapsed, startProgress } from '../util.js';
 import { publishHome } from './home.js';
 import { uploadDiagram } from './diagram.js';
-import { ensureAlternatives, initVariants } from './review.js';
+import { ensureOptimizations } from './review.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const OK_MIME = new Set(['image/png', 'image/jpeg', 'application/pdf']);
@@ -55,9 +55,10 @@ export async function handleImageUpload(client, event) {
     session.step = 'review';
 
     stop();
-    session.alternatives = null;
-    await ensureAlternatives(session).catch(() => { session.alternatives = {}; });
-    initVariants(session);
+    session.optim = null;
+    session.viewMode = 'cost';
+    // Compute cost/performance options once so the tabs can project instantly.
+    await ensureOptimizations(session).catch(() => { session.optim = {}; });
     const { rich, classic, text } = reviewMessage(session);
     await updateRich(client, event.channel, loading.ts, text, rich, classic);
     session.reviewMsg = { channel: event.channel, ts: loading.ts };

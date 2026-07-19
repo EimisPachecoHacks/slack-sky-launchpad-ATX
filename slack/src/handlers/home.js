@@ -6,7 +6,7 @@ import { reviewMessage } from '../blocks/review.js';
 import { postRich } from '../blocks/common.js';
 import { openDm, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { uploadDiagram } from './diagram.js';
-import { ensureAlternatives, initVariants } from './review.js';
+import { ensureOptimizations } from './review.js';
 
 /** Builds and publishes the Home dashboard; degraded (never crashes) when the backend is down. */
 export async function publishHome(client, userId) {
@@ -52,9 +52,10 @@ export default function register(app) {
     if (!session?.architecture) return notifyUser(client, body, SESSION_EXPIRED);
     const dm = await openDm(client, body.user.id);
     session.channel = dm;
-    session.alternatives = null;
-    await ensureAlternatives(session).catch(() => { session.alternatives = {}; });
-    initVariants(session);
+    session.optim = null;
+    session.viewMode = 'cost';
+    // Compute cost/performance options once so the tabs can project instantly.
+    await ensureOptimizations(session).catch(() => { session.optim = {}; });
     const { rich, classic, text } = reviewMessage(session);
     const posted = await postRich(client, dm, text, rich, classic);
     session.reviewMsg = { channel: dm, ts: posted.ts };

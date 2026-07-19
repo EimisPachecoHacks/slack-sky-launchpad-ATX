@@ -8,20 +8,11 @@ import { postToSession, notifyUser, SESSION_EXPIRED } from './shared.js';
 import { uploadDiagram } from './diagram.js';
 
 /** Snapshot each component's original values so a swap can be reverted. */
-function snapshotOriginals(arch) {
+export function snapshotOriginals(arch) {
   arch.__originals = {};
   for (const c of arch.components || []) {
     arch.__originals[String(c.id)] = { name: c.name, cost: c.cost, description: c.description };
   }
-}
-
-/** Register the freshly-generated architecture as the first optimization variant. */
-export function initVariants(session) {
-  const goal = session.optimization || 'balanced';
-  snapshotOriginals(session.architecture);
-  session.architecture.__alternatives = session.alternatives;
-  session.variants = { [goal]: session.architecture };
-  session.activeVariant = goal;
 }
 
 /** Parse JSON out of an LLM answer (tolerates fences and prose). */
@@ -33,52 +24,47 @@ function jsonFrom(text) {
   return JSON.parse(cleaned.slice(start, end + 1));
 }
 
-/** Per-component alternatives the BACKEND already returned (same data the web
- * ComponentList uses): arch.alternatives[], each tagged with originalComponentId. */
-function realAlternatives(arch) {
-  const map = {};
-  for (const a of arch.alternatives || []) {
+/**
+ * Populate session.optim ONCE (idempotent): for each component, a cost-optimized
+ * and a performance-optimized option (name, cost, note). This is the data the
+ * Cost/Performance tabs project — computed at generation, so tab switching is
+ * a pure instant view change with no further model calls. Best-effort: on
+ * failure, tabs still render (components just show "already optimal").
+ */
+export async function ensureOptimizations(session) {
+  if (session.optim) return session.optim;
+  snapshotOriginals(session.architecture);
+  const comps = (session.architecture?.components || []).map(c => ({
+    id: c.id, name: c.name, cost: c.cost, type: c.type, description: (c.description || '').slice(0, 100),
+  }));
+  session.optim = {};
+  // Seed with any real backend alternatives (cheapest → cost bucket).
+  for (const a of session.architecture?.alternatives || []) {
     const cid = String(a.originalComponentId ?? a.original_component_id ?? '');
     if (!cid) continue;
-    (map[cid] ||= []).push({ name: a.name, cost: a.cost, reason: a.description || a.reason || '' });
+    (session.optim[cid] ||= {}).cost = { name: a.name, cost: a.cost, note: a.description || '' };
   }
-  return map;
+  try {
+    const answer = await api.askChat(
+      `You are a ${session.provider} cloud cost/performance advisor. For EACH component below, give:\n` +
+      `- "cost": the cheapest same-role service that still works (name + realistic monthly cost + short note),\n` +
+      `- "performance": the fastest/most capable same-role service (name + realistic monthly cost + short note).\n` +
+      `If the current component is already best for a dimension, repeat its exact name and cost.\n` +
+      `Components: ${JSON.stringify(comps)}\n` +
+      `Return ONLY JSON: {"items":[{"component_id":"...","cost":{"name":"...","cost":12,"note":"..."},"performance":{"name":"...","cost":40,"note":"..."}}]}`,
+    );
+    for (const it of jsonFrom(answer).items || []) {
+      const cid = String(it.component_id);
+      const entry = (session.optim[cid] ||= {});
+      if (it.cost?.name) entry.cost = it.cost;
+      if (it.performance?.name) entry.performance = it.performance;
+    }
+  } catch { /* tabs still work; components without data show "already optimal" */ }
+  return session.optim;
 }
 
-/** Populate session.alternatives once (idempotent) so the review rows can each
- * offer a Switch dropdown. Safe to await before rendering the review. */
-export async function ensureAlternatives(session) {
-  if (session.alternatives && Object.keys(session.alternatives).length) return session.alternatives;
-  session.alternatives = await buildAlternatives(session);
-  return session.alternatives;
-}
-
-/** Build the component→alternatives map: the real backend alternatives first
- * (instant, reliable), then best-effort Nemotron enrichment for any component
- * that has none, so most rows are switchable. */
-async function buildAlternatives(session) {
-  const arch = session.architecture;
-  const map = realAlternatives(arch);
-  const missing = (arch.components || []).filter(c => !map[String(c.id)]?.length);
-  if (missing.length) {
-    try {
-      const comps = missing.map(c => ({ id: c.id, name: c.name, cost: c.cost, description: (c.description || '').slice(0, 120) }));
-      const answer = await api.askChat(
-        `For each of these ${session.provider} cloud components, propose up to 2 alternative services on the SAME ` +
-        `provider that serve the same role (e.g. a different database engine, a cheaper compute tier), with a realistic ` +
-        `monthly cost and a one-line reason. Components: ${JSON.stringify(comps)}\n` +
-        `Return ONLY JSON: {"alternatives":[{"component_id":"...","options":[{"name":"...","cost":12,"reason":"..."}]}]}`,
-      );
-      for (const a of jsonFrom(answer).alternatives || []) {
-        const cid = String(a.component_id);
-        if (!map[cid]?.length) map[cid] = (a.options || []).slice(0, 4);
-      }
-    } catch { /* real alternatives still work */ }
-  }
-  return map;
-}
-
-/** Apply a chosen alternative to the architecture: component, diagram node, totals. */
+/** Apply a chosen option {name,cost,note|reason} to a component: updates the
+ * component, its diagram node, and the total. */
 function applySwap(session, compId, alt) {
   const arch = session.architecture;
   const comp = (arch.components || []).find(c => String(c.id) === String(compId));
@@ -86,7 +72,7 @@ function applySwap(session, compId, alt) {
   const before = `${comp.name} (${money(Number(comp.cost) || 0)}/mo)`;
   comp.name = alt.name;
   comp.cost = Number(alt.cost) || comp.cost;
-  comp.description = alt.reason || comp.description;
+  comp.description = alt.note || alt.reason || comp.description;
   const node = (arch.diagram?.nodes || []).find(n => String(n.id) === String(compId));
   if (node) {
     node.label = alt.name;
@@ -151,80 +137,37 @@ export async function runGenerateCode(client, session, type) {
 }
 
 export default function register(app) {
-  // Optimization "tabs": switch to a cached variant instantly, or generate it once.
+  // Cost/Performance projection "tabs" — PURE VIEW TOGGLE. No API call, no
+  // regeneration; just re-render the same table under the selected projection.
   app.action(/^rev_tab_/, async ({ ack, body, client, action }) => {
     await ack();
     const session = getSession(action.value);
     if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
-    const goal = action.action_id.replace('rev_tab_', '');
-    if (!['balanced', 'cost', 'performance'].includes(goal) || goal === session.activeVariant) return;
+    const view = action.action_id.replace('rev_tab_', '');
+    if (!['cost', 'performance'].includes(view) || view === (session.viewMode || 'cost')) return;
+    session.viewMode = view;
     const { channel, ts } = session.reviewMsg;
-
-    const cached = session.variants?.[goal];
-    if (cached) {
-      session.architecture = cached;
-      session.activeVariant = goal;
-      session.optimization = goal;
-      session.alternatives = cached.__alternatives || {};
-      session.code = {}; session.codeMsg = null;
-      const { rich, classic, text } = reviewMessage(session);
-      await updateRich(client, channel, ts, text, rich, classic);
-      uploadDiagram(client, channel, ts, session).catch(() => {});
-      return;
-    }
-
-    const p = providerMeta(session.provider);
-    const label = s => `🧠 Optimizing *${session.title}* for *${goal}* on ${p.emoji} ${p.label} with Nemotron… (${fmtElapsed(s)} elapsed)`;
-    await client.chat.update({ channel, ts, text: label(0), blocks: [{ type: 'section', text: { type: 'mrkdwn', text: label(0) } }] });
-    const stop = startProgress(client, channel, ts, label, { maxUpdates: 60 });
-    try {
-      const resp = await api.generateArchitecture({
-        title: session.title, description: session.description,
-        requirements: session.requirements, provider: session.provider, optimization_goal: goal,
-      });
-      session.architecture = resp.data || {};
-      session.reasoning = resp.reasoning || '';
-      session.summaryMessage = resp.message || '';
-      session.optimization = goal;
-      session.alternatives = null;
-      await ensureAlternatives(session).catch(() => { session.alternatives = {}; });
-      snapshotOriginals(session.architecture);
-      session.architecture.__alternatives = session.alternatives;
-      session.variants[goal] = session.architecture;
-      session.activeVariant = goal;
-      session.code = {}; session.codeMsg = null;
-      stop();
-      const { rich, classic, text } = reviewMessage(session);
-      await updateRich(client, channel, ts, text, rich, classic);
-      uploadDiagram(client, channel, ts, session).catch(() => {});
-    } catch (err) {
-      stop();
-      // Restore the previous variant view.
-      const prev = session.variants[session.activeVariant];
-      if (prev) { session.architecture = prev; session.alternatives = prev.__alternatives || {}; }
-      const { rich, classic, text } = reviewMessage(session);
-      await updateRich(client, channel, ts, text, rich, classic);
-      await client.chat.postMessage({ channel, thread_ts: ts, text: `❌ Couldn't build the *${goal}* variant (${clip(err.message, 200)}). Kept the current view.` });
-    }
+    const { rich, classic, text } = reviewMessage(session);
+    await updateRich(client, channel, ts, text, rich, classic); // instant; diagram unchanged
   });
 
-  // Per-component switch: the static_select accessory on a component row.
-  // value = "<sid>~~<componentId>~~<altIndex|restore>".
+  // Per-component switch: static_select accessory on a component row.
+  // value = "<sid>~~<componentId>~~<cost|performance|restore>".
   app.action('swap_pick', async ({ ack, body, client, action }) => {
     await ack();
     const [sid, compId, sel] = String(action.selected_option?.value || '').split('~~');
     const session = getSession(sid);
     if (!session?.architecture || !session.reviewMsg) return notifyUser(client, body, SESSION_EXPIRED);
-    let before, after;
+    let opt;
     if (sel === 'restore') {
       const orig = session.architecture.__originals?.[compId];
       if (!orig) return notifyUser(client, body, 'No default recorded for that component.');
-      ({ before, after } = applySwap(session, compId, { name: orig.name, cost: orig.cost, reason: orig.description }));
+      opt = { name: orig.name, cost: orig.cost, note: orig.description };
     } else {
-      const alt = (session.alternatives?.[compId] || [])[Number(sel)];
-      if (!alt) return notifyUser(client, body, 'That alternative is no longer available — regenerate to refresh.');
-      ({ before, after } = applySwap(session, compId, alt));
+      opt = session.optim?.[compId]?.[sel];
+      if (!opt) return notifyUser(client, body, 'That option is no longer available.');
     }
+    const { before, after } = applySwap(session, compId, opt);
     session.code = {}; session.codeMsg = null;
     const { channel, ts } = session.reviewMsg;
     const { rich, classic, text } = reviewMessage(session);
@@ -232,7 +175,7 @@ export default function register(app) {
     uploadDiagram(client, channel, ts, session).catch(() => {});
     await client.chat.postMessage({
       channel, thread_ts: ts,
-      text: `${sel === 'restore' ? '↩️ Restored' : '🔄 Swapped'} *${clip(before, 80)}* → *${clip(after, 80)}*. Cost total and diagram updated.`,
+      text: `${sel === 'restore' ? '↩️ Restored' : '🔄 Switched'} *${clip(before, 80)}* → *${clip(after, 80)}*. Cost total and diagram updated.`,
     });
   });
 
