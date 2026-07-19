@@ -67,10 +67,17 @@ ssh "${SSH_ARGS[@]}" "root@${PUBLIC_IP}" 'test -f /var/lib/sky-launchpad/provisi
 
 # Transfer source without Git metadata, local dependencies, Terraform state, or
 # raw credentials. Runtime secrets are uploaded separately with mode 600.
+# Transfer excludes are a SECURITY control, not just a size optimisation: this
+# host is internet-facing, so no secret may ever land on it. The runtime .env is
+# the single exception and is uploaded separately below with mode 600.
+# Patterns are matched by basename too (--exclude matches any path component),
+# so a new secret file in any directory is caught by the wildcard rules.
 tar -C "${REPO_ROOT}" \
   --exclude='./.git' \
   --exclude='./project/node_modules' \
   --exclude='./node_modules' \
+  --exclude='./project/venv' \
+  --exclude='./.venv' \
   --exclude='./infra/alibaba/backend/.terraform' \
   --exclude='./infra/alibaba/backend/.deploy' \
   --exclude='./*.tfstate*' \
@@ -78,8 +85,26 @@ tar -C "${REPO_ROOT}" \
   --exclude='./.env.local' \
   --exclude='./project/.env' \
   --exclude='./project/.env.local' \
+  --exclude='./slack/.env' \
   --exclude='./AccessKey-*.csv' \
+  --exclude='*accessKeys*.csv' \
+  --exclude='*credentials*.csv' \
+  --exclude='*bot*.json' \
+  --exclude='*-service-account.json' \
+  --exclude='*.pem' \
+  --exclude='*.p12' \
+  --exclude='.slack-profile' \
+  --exclude='./tester/runs' \
+  --exclude='__pycache__' \
   -czf - . | ssh "${SSH_ARGS[@]}" "root@${PUBLIC_IP}" 'tar -xzf - -C /opt/sky-launchpad'
+
+# Fail closed: if a secret ever reaches the public host, stop before starting it.
+if ssh "${SSH_ARGS[@]}" "root@${PUBLIC_IP}" \
+     'ls /opt/sky-launchpad/*.csv /opt/sky-launchpad/*bot*.json /opt/sky-launchpad/**/.slack-profile' \
+     >/dev/null 2>&1; then
+  echo "ABORT: secret material found on the public host after transfer." >&2
+  exit 3
+fi
 
 awk '!/^(API_ENVIRONMENT|API_KEYS|CORS_ORIGINS|SKYRCHITECT_HOME)=/' "${DEPLOY_ENV_FILE}" > "${RUNTIME_ENV}"
 printf '\nAPI_ENVIRONMENT=production\nCORS_ORIGINS=http://%s:8080\nSKYRCHITECT_HOME=/var/lib/sky-launchpad\n' "${PUBLIC_IP}" >> "${RUNTIME_ENV}"

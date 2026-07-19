@@ -2,7 +2,8 @@
 
 **An autopilot agent for cloud infrastructure that learns from its own failures.** Turn **natural language** or an **uploaded architecture diagram** into **Terraform**, **deploy it for real to Alibaba Cloud**, and — when a deploy fails — **diagnose, repair, and remember the fix** so the same failure never happens twice. Reasoning, vision, embeddings, and speech all run on **Qwen models on Qwen Cloud**.
 
-- **Primary UX:** Web app under [`project/`](project/) (Vite + FastAPI): requirements → architecture → Terraform → **real `terraform apply`** → optional GitLab MR on success, with a **human-in-the-loop deploy checkpoint**.
+- **Primary UX: Slack.** The whole workflow lives in [`slack/`](slack/) as a Block Kit app — describe a system in a channel and the architecture, costs, diagram, Terraform, deploy, and test results all come back as messages. Infrastructure decisions are team conversations, so the agent works where the team already talks.
+- **Also available as a web app** under [`project/`](project/) (Vite + FastAPI), sharing the same backend: requirements → architecture → Terraform → **real `terraform apply`** → optional GitLab MR on success, with a **human-in-the-loop deploy checkpoint**.
 - **The differentiator:** a **persistent, self-improving memory** — every deploy failure becomes a reusable `SKILL.md`, embedded and retrieved by vector similarity to pre-empt recurrence.
 
 ## Built for the Global AI Hackathon with Qwen Cloud — Track 4: Autopilot Agent
