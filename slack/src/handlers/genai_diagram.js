@@ -37,7 +37,8 @@ No extra components. No invented text. Labels spelled exactly as given.`;
  * posted, false if Gemini was unavailable (so the caller can fall back). */
 export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
   const key = process.env.GENAI_API_KEY;
-  if (!key || !session.architecture?.components?.length) return false;
+  if (!key) { console.error('[genai] no GENAI_API_KEY'); return false; }
+  if (!session.architecture?.components?.length) { console.error('[genai] no components'); return false; }
 
   const prompt = buildPrompt(session);
   let b64 = null;
@@ -53,16 +54,17 @@ export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
           signal: AbortSignal.timeout(150000),
         },
       );
-      if (!res.ok) continue; // 429 = no credit / quota; try next model
+      if (!res.ok) { console.error(`[genai] ${model} HTTP ${res.status}`); continue; } // 429 = no credit / quota; try next model
       const parts = (await res.json())?.candidates?.[0]?.content?.parts || [];
       const img = parts.find(p => p.inlineData?.data);
-      if (img) { b64 = img.inlineData.data; mime = img.inlineData.mimeType || 'image/png'; break; }
-    } catch { /* try next model */ }
+      if (img) { b64 = img.inlineData.data; mime = img.inlineData.mimeType || 'image/png'; console.error(`[genai] ${model} returned ${mime}`); break; }
+      console.error(`[genai] ${model} 200 but no image part`);
+    } catch (e) { console.error(`[genai] ${model} error:`, e?.message); }
   }
   const buf = b64 ? Buffer.from(b64, 'base64') : null;
   // Guard: a valid diagram is tens of KB. Anything tiny means the model didn't
   // actually draw one — treat as failure so the SVG fallback runs.
-  if (!buf || buf.length < 4096) return false;
+  if (!buf || buf.length < 4096) { console.error('[genai] no usable image (buf too small/absent)'); return false; }
 
   // Save with the extension that MATCHES the real content (Gemini often returns
   // JPEG). A JPEG named .png makes Slack reject/mis-render it.
@@ -70,12 +72,13 @@ export async function uploadGenaiDiagram(client, channel, thread_ts, session) {
   const dir = mkdtempSync(join(tmpdir(), 'skygenai-'));
   const file = join(dir, `architecture-diagram.${ext}`);
   writeFileSync(file, buf);
+  // Post to the CHANNEL (no thread_ts): a threaded upload collapses to "1 reply"
+  // that the user never opens — the whole point is the diagram must be visible.
   await client.files.uploadV2({
     channel_id: channel,
-    thread_ts,
     file,
     filename: `architecture-diagram.${ext}`,
-    initial_comment: '🗺️ Architecture diagram',
+    initial_comment: `🗺️ *Architecture diagram* — ${session.title || 'Architecture'}`,
   });
   return true;
 }
