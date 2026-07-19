@@ -20,7 +20,7 @@ export function codeMessage(session, activeTab, { generating = false } = {}) {
   ];
 
   if (generating) {
-    blocks.push({ type: 'context', elements: [mrkdwn(`⏳ Generating ${TAB_LABEL[activeTab]} with Qwen…`)] });
+    blocks.push({ type: 'context', elements: [mrkdwn(`⏳ Generating ${TAB_LABEL[activeTab]} with Nemotron…`)] });
   } else if (entry?.code) {
     if (entry.code.length <= INLINE_CODE_LIMIT) {
       blocks.push({ type: 'section', text: mrkdwn('```\n' + entry.code + '\n```') });

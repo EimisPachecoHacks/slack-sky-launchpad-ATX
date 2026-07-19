@@ -17,12 +17,12 @@ export function methodView(sid) {
       { type: 'divider' },
       {
         type: 'section',
-        text: mrkdwn('*🧭 Guided Wizard*\nDescribe your project in plain English and Qwen designs the architecture for you.'),
+        text: mrkdwn('*🧭 Guided Wizard*\nDescribe your project in plain English and Nemotron designs the architecture for you.'),
         accessory: { type: 'button', style: 'primary', text: plain('Start'), action_id: 'wiz_method', value: 'guided' },
       },
       {
         type: 'section',
-        text: mrkdwn('*🖼️ AI Image Analysis*\nUpload a diagram (PNG, JPG, or PDF) and Qwen vision reconstructs it as a live architecture.'),
+        text: mrkdwn('*🖼️ AI Image Analysis*\nUpload a diagram (PNG, JPG, or PDF) and Nemotron vision reconstructs it as a live architecture.'),
         accessory: { type: 'button', text: plain('Use an image'), action_id: 'wiz_method', value: 'image' },
       },
     ],
@@ -110,7 +110,7 @@ export function imageInstructionsView(sid) {
     close: plain('Got it'),
     blocks: [
       { type: 'header', text: plain('🖼️ AI Image Analysis') },
-      { type: 'section', text: mrkdwn('Close this window and *upload your architecture diagram* in a DM with me.\n\n• PNG, JPG, or PDF\n• Up to 10 MB\n\nQwen vision will detect the components and rebuild the architecture — then you can generate code and deploy it, same as the wizard.') },
+      { type: 'section', text: mrkdwn('Close this window and *upload your architecture diagram* in a DM with me.\n\n• PNG, JPG, or PDF\n• Up to 10 MB\n\nNemotron vision will detect the components and rebuild the architecture — then you can generate code and deploy it, same as the wizard.') },
       { type: 'divider' },
       { type: 'actions', elements: [{ type: 'button', text: plain('← Back'), action_id: 'wiz_back', value: 'method' }] },
     ],

@@ -60,7 +60,7 @@ export default function register(app) {
     const dm = await openDm(client, body.user.id);
     await client.chat.postMessage({
       channel: dm,
-      text: '📎 Upload a *PNG, JPG, or PDF* of your architecture diagram right here and I\'ll analyze it with Qwen vision (max 10 MB).',
+      text: '📎 Upload a *PNG, JPG, or PDF* of your architecture diagram right here and I\'ll analyze it with Nemotron vision (max 10 MB).',
     });
     if (!body.channel?.id || body.channel.id !== dm) {
       await notifyUser(client, body, '📬 Check your DM with me — upload the diagram there.');

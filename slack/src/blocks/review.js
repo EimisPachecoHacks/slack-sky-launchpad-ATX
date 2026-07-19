@@ -15,7 +15,7 @@ export function reviewMessage(session) {
     emoji: '🏗️',
     title: session.title || arch.name || 'Architecture',
     subtitle: `${p.emoji} ${p.label} · ${comps.length} components · ~${money(cost)}/mo`,
-    body: clip(session.summaryMessage || arch.description || 'Architecture designed by Qwen.', 200),
+    body: clip(session.summaryMessage || arch.description || 'Architecture designed by Nemotron.', 200),
     buttons: [
       { text: '⚙️ Generate Code', action_id: 'rev_gen_code', value: session.sid, style: 'primary' },
       { text: '🧠 AI Reasoning', action_id: 'rev_details', value: session.sid },

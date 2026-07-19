@@ -46,7 +46,7 @@ Socket Mode means no public URL, tunnels, or signing secret are needed.
 
 - `/sky` — start card · `/sky new` — open the wizard directly · `/sky status` — backend health · `/sky help`
 - **Home tab** — the dashboard; everything can be started from there.
-- **DM the bot an image/PDF** of an architecture diagram — Qwen vision reconstructs it, then the same review → code → deploy flow applies.
+- **DM the bot an image/PDF** of an architecture diagram — Nemotron vision reconstructs it, then the same review → code → deploy flow applies.
 - Mention the bot in a channel for the start card.
 
 Flow: describe project → review architecture and costs → generate code → **Deploy** (pick account/region, confirm billable resources) → progress with elapsed time → success card with endpoint URL and GitLab MR link.
