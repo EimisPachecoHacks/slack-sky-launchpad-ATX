@@ -77,7 +77,9 @@ ECS** — provisioned by Terraform (`infra/alibaba/backend/main.tf`) into a VPC,
 VSwitch, and security group. The infrastructure the app *generates* also targets
 Alibaba Cloud: `deployer/iac_generator.py` emits `alicloud` Terraform that
 `terraform apply` runs for real. The self-improving skill library persists every
-lesson as a versioned `SKILL.md` plus a vector index for retrieval. The Slack app
+lesson as a versioned `SKILL.md` plus a vector in **PostgreSQL + pgvector running
+on Alibaba Cloud**, so skill retrieval is native cosine KNN over the Qwen
+embeddings. The Slack app
 is Bolt for JavaScript (Socket Mode, Block Kit); the web app is React + Vite. The
 browser-testing agent is built on Playwright, grounded in the page's accessibility
 tree so its clicks always land.
