@@ -147,6 +147,119 @@ class _LocalStore:
         return len(rows) - len(kept)
 
 
+class _PgVectorStore:
+    """PostgreSQL + pgvector — the vector store, running on Alibaba Cloud.
+
+    One generic table (skydb_docs) holds every collection's documents as JSONB
+    plus a pgvector `embedding` column, so skill retrieval is *native* vector
+    search (ORDER BY embedding <=> query) inside an Alibaba-hosted database,
+    rather than client-side cosine. Selected when PGVECTOR_DSN is set.
+    """
+
+    def __init__(self, dsn: str, dims: int = 1024):
+        import psycopg2  # lazy: only needed when this store is chosen
+        self._pg = psycopg2
+        self.dsn = dsn
+        self.dims = dims
+        self.kind = "pgvector"
+        self._conn = None
+        self._connect()
+        self._ensure_schema()
+
+    def _connect(self):
+        self._conn = self._pg.connect(self.dsn, connect_timeout=6)
+        self._conn.autocommit = True
+
+    def _cur(self):
+        if self._conn is None or self._conn.closed:
+            self._connect()
+        return self._conn.cursor()
+
+    def _ensure_schema(self):
+        with self._cur() as c:
+            c.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            c.execute(
+                f"CREATE TABLE IF NOT EXISTS skydb_docs (coll text NOT NULL, id text NOT NULL, "
+                f"doc jsonb NOT NULL, embedding vector({self.dims}), PRIMARY KEY (coll, id))"
+            )
+
+    @staticmethod
+    def _vec(emb):
+        return "[" + ",".join(repr(float(x)) for x in emb) + "]" if emb else None
+
+    def _put(self, coll, rid, doc):
+        import json as _j
+        with self._cur() as c:
+            c.execute(
+                "INSERT INTO skydb_docs (coll,id,doc,embedding) VALUES (%s,%s,%s,%s::vector) "
+                "ON CONFLICT (coll,id) DO UPDATE SET doc=EXCLUDED.doc, embedding=EXCLUDED.embedding",
+                (coll, str(rid), _j.dumps(doc), self._vec(doc.get("embedding"))),
+            )
+        return doc
+
+    def upsert(self, coll, key_field, doc):
+        return self._put(coll, doc.get(key_field), doc)
+
+    def insert(self, coll, doc):
+        import uuid
+        rid = doc.get("slug") or doc.get("app_id") or doc.get("id") or uuid.uuid4().hex
+        return self._put(coll, rid, doc)
+
+    def all(self, coll, filt=None):
+        import json as _j
+        q, args = "SELECT doc FROM skydb_docs WHERE coll=%s", [coll]
+        if filt:
+            q += " AND doc @> %s::jsonb"; args.append(_j.dumps(filt))
+        with self._cur() as c:
+            c.execute(q, args)
+            return [r[0] for r in c.fetchall()]
+
+    def find(self, coll, filt):
+        rows = self.all(coll, filt)
+        return rows[0] if rows else None
+
+    def update(self, coll, filt, changes):
+        import json as _j
+        with self._cur() as c:
+            if "embedding" in changes:
+                c.execute(
+                    "UPDATE skydb_docs SET doc = doc || %s::jsonb, embedding=%s::vector "
+                    "WHERE coll=%s AND doc @> %s::jsonb",
+                    (_j.dumps(changes), self._vec(changes.get("embedding")), coll, _j.dumps(filt)),
+                )
+            else:
+                c.execute(
+                    "UPDATE skydb_docs SET doc = doc || %s::jsonb WHERE coll=%s AND doc @> %s::jsonb",
+                    (_j.dumps(changes), coll, _j.dumps(filt)),
+                )
+
+    def inc(self, coll, filt, field, amount=1):
+        import json as _j
+        with self._cur() as c:
+            c.execute(
+                "UPDATE skydb_docs SET doc = jsonb_set(doc, %s, "
+                "to_jsonb(COALESCE((doc->>%s)::numeric,0) + %s)) WHERE coll=%s AND doc @> %s::jsonb",
+                ([field], field, amount, coll, _j.dumps(filt)),
+            )
+
+    def delete(self, coll, filt):
+        import json as _j
+        with self._cur() as c:
+            c.execute("DELETE FROM skydb_docs WHERE coll=%s AND doc @> %s::jsonb", (coll, _j.dumps(filt)))
+            return c.rowcount
+
+    def knn(self, coll, query_embedding, k):
+        """Native pgvector cosine KNN. Returns docs with a `score` (1 - distance)."""
+        vec = self._vec(query_embedding)
+        with self._cur() as c:
+            c.execute(
+                "SELECT doc, 1 - (embedding <=> %s::vector) AS score FROM skydb_docs "
+                "WHERE coll=%s AND embedding IS NOT NULL ORDER BY embedding <=> %s::vector LIMIT %s",
+                (vec, coll, vec, k),
+            )
+            return [{**r[0], "score": round(float(r[1]), 4)} for r in c.fetchall()]
+
+
 # Canonical key field per collection (used by the Supabase store's generic paths).
 _COLL_KEYS = {"skills": "slug", "apps": "app_id", "test_runs": "run_id", "test_cases": "case_id"}
 
@@ -247,7 +360,18 @@ def _get_store():
     global _store, _store_err
     if _store is not None:
         return _store
-    # Supabase first, but ONLY when explicitly configured (Slack backend's env);
+    # PostgreSQL + pgvector on Alibaba Cloud — the preferred vector store. Native
+    # KNN inside an Alibaba-hosted database; keeps skill vectors on Alibaba infra.
+    dsn = os.getenv("PGVECTOR_DSN", "")
+    if dsn:
+        try:
+            _store = _PgVectorStore(dsn, int(os.getenv("EMBED_DIMENSIONS", "1024")))
+            logger.info("🐘 skydb using PostgreSQL + pgvector on Alibaba Cloud")
+            return _store
+        except Exception as exc:
+            _store_err = str(exc)
+            logger.warning("pgvector unavailable (%s); trying supabase/mongo/local", exc)
+    # Supabase, but ONLY when explicitly configured (Slack backend's env);
     # the Qwen backend sets MONGODB_URI and no SUPABASE_URL, so nothing changes there.
     supa_url = os.getenv("SUPABASE_URL", "")
     supa_key = os.getenv("SUPABASE_SERVICE_KEY", "")
@@ -434,6 +558,17 @@ def find_similar_skills(query: str, k: int = 3, query_embedding: Optional[list] 
     given; otherwise embedding cosine over stored vectors; otherwise lexical cosine.
     """
     store = _get_store()
+    # PostgreSQL + pgvector on Alibaba Cloud — native cosine KNN.
+    if store.kind == "pgvector":
+        if query_embedding is None:
+            query_embedding = _embed_text(query)
+        if query_embedding:
+            try:
+                out = store.knn("skills", query_embedding, k)
+                if out:
+                    return out
+            except Exception as exc:
+                logger.debug("pgvector search failed, falling back: %s", exc)
     # Supabase pgvector path (HNSW cosine via the match_learned_skills RPC)
     if store.kind == "supabase":
         if query_embedding is None:

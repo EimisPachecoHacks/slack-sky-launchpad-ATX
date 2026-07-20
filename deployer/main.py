@@ -85,8 +85,8 @@ def _repair_failure(
         print(f"  (failure-context collection degraded: {exc})")
 
     if research:
-        _narrate("research", "Previous fix didn't hold — investigating this error on the live Internet (Qwen web search)...")
-        record_event("research", "Escalating: web research on the failure", provider=provider, run_id=run_id, error_signature=first_msg)
+        _narrate("research", "Investigating this error on the live Internet (Qwen web search) before fixing...")
+        record_event("research", "Researching the failure on the web", provider=provider, run_id=run_id, error_signature=first_msg)
     _narrate("diagnose", "Handing the logs to the Qwen repair agent to diagnose...")
     record_event("diagnose", "Qwen repair agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
     try:

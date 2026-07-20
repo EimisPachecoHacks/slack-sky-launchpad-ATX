@@ -107,7 +107,7 @@ flowchart TB
   end
   subgraph run["Targets & external systems"]
     C[Alibaba Cloud — VPC, VSwitch, SG, ECS, OSS, RDS]
-    DB[(Self-contained skill vector index — cosine over<br/>Qwen text-embedding-v4; managed backends pluggable)]
+    DB[(PostgreSQL + pgvector on Alibaba Cloud —<br/>native KNN over Qwen text-embedding-v4)]
     E[GitLab API — MR & commits]
   end
   S -->|Socket Mode| API
