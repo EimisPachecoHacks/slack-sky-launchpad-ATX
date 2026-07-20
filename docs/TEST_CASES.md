@@ -246,7 +246,33 @@ repo, and the “I understand this runs real Terraform” confirmation.
 > for the live deploy demo;** fixing the web deploy-form account picker is a
 > known follow-up.
 
-**Summary:** the website reproduces the full **design → diagram → cost tabs →
-Terraform** flow end-to-end on Qwen (W-1…W-5 verified), and reaches the deploy
-step (W-6). The actual deploy is demonstrated via Slack (TC-7/TC-8), which shares
-the same backend.
+### W-7 — AI Image Analysis (diagram image → architecture)
+The website's second entry path. On the create page choose **AI Image
+Analysis** → drop in a diagram (PNG/JPG/PDF ≤10 MB).
+
+**Steps**
+1. `/architecture` → **AI Image Analysis**.
+2. Drop/choose an architecture diagram image.
+3. Wait ~75s (`qwen3.7-plus` vision).
+
+**Expected** — *“Analyzing your architecture diagram…”*, then the detected
+architecture renders exactly like the description flow: provider + component
+count, the **diagram canvas**, and the **components table** (with per-component
+confidence), then **Generate Code**.
+
+**Result (verified)** — uploaded a 6-box “Online store” diagram → backend:
+`🖼️ Analyzing via qwen3.7-plus` → `✓ Parsed: ALIBABA, 6 components, $290/mo` →
+`✅ Image analysis completed`. The site rendered all 6 (CDN, ALB, ECS, OSS,
+ApsaraDB Redis, ApsaraDB RDS) at **99% confidence**, Total **$290/mo**.
+
+**Evidence** — upload view [`w7-image-upload.png`](testing/screenshots/web/w7-image-upload.png) ·
+analyzing [`w7-image-analyzing.png`](testing/screenshots/web/w7-image-analyzing.png) ·
+detected architecture [`w7-image-detected.png`](testing/screenshots/web/w7-image-detected.png) ✅
+
+---
+
+**Summary:** the website reproduces **both** entry paths end-to-end on Qwen —
+the **Guided Wizard** (W-1…W-5) and **AI Image Analysis** (W-7) — through
+design → diagram → cost tabs → Terraform, and reaches the deploy step (W-6). The
+actual deploy is demonstrated via Slack (TC-7/TC-8), which shares the same
+backend.
