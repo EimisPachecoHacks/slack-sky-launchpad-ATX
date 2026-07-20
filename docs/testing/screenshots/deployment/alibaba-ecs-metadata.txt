@@ -1,0 +1,27 @@
+=== ALIBABA CLOUD ECS INSTANCE METADATA (from 100.100.100.200 — only exists on Alibaba ECS) ===
+instance-id              : i-t4n89eyvczy9lajwrvzg
+region-id                : ap-southeast-1
+zone-id                  : ap-southeast-1a
+image-id                 : ubuntu_22_04_x64_20G_alibase_20260615.vhd
+instance/instance-type   : ecs.t6-c1m2.large
+instance/instance-name   : sky-launchpad-hackathon
+
+=== PUBLIC IP ===
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+         "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+ <head>
+  <title>404 - Not Found</title>
+ </head>
+ <body>
+  <h1>404 - Not Found</h1>
+ </body>
+</html>
+
+=== UPTIME ===
+ 02:00:46 up 19:26,  0 users,  load average: 0.01, 0.02, 0.00
+=== RUNNING CONTAINER ===
+sky-launchpad | Up 11 hours | sky-launchpad:latest | 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+=== APP HEALTH (Qwen on Alibaba) ===
+{"status":"healthy","version":"1.0.0","agent_ready":true,"llm_connected":true,"llm_provider":"qwen","model_id":"qwen3.7-max"}

@@ -4,6 +4,30 @@ Sky Launchpad's proof backend is reproducibly provisioned on Alibaba Cloud by
 the official `aliyun/alicloud` Terraform provider. The proof configuration is
 intentionally public and contains no AccessKey values.
 
+## Live verification (captured from the instance)
+
+![Alibaba Cloud ECS deployment verification](testing/screenshots/deployment/alibaba-ecs-verification.png)
+
+The panel above is captured straight from the running instance's **Alibaba ECS
+metadata service** (`http://100.100.100.200/latest/meta-data/…`) — an endpoint
+that only exists on genuine Alibaba Cloud ECS — plus the live health response.
+Raw capture: [`alibaba-ecs-metadata.txt`](testing/screenshots/deployment/alibaba-ecs-metadata.txt).
+
+| From Alibaba's metadata service | Value |
+|---|---|
+| Instance ID | `i-t4n89eyvczy9lajwrvzg` |
+| Instance name | `sky-launchpad-hackathon` |
+| Instance type | `ecs.t6-c1m2.large` |
+| Region / Zone | `ap-southeast-1` / `ap-southeast-1a` |
+| Image | `ubuntu_22_04_x64_20G_alibase_20260615.vhd` |
+| Public IP | `47.84.111.187` |
+
+**Anyone can verify, no credentials needed:**
+```console
+$ curl http://47.84.111.187:8080/api/status
+{"status":"healthy","llm_connected":true,"llm_provider":"qwen","model_id":"qwen3.7-max"}
+```
+
 ## Repository evidence
 
 - [`infra/alibaba/backend/main.tf`](../infra/alibaba/backend/main.tf) calls the
