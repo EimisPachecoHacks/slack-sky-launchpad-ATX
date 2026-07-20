@@ -65,7 +65,9 @@ export const learnedSkills = () => req('/api/skills/learned', { timeoutMs: 8000 
 export const learningSummary = () => req('/api/learning/summary', { timeoutMs: 8000 });
 
 export async function listCredentials() {
-  const resp = await req('/api/credentials/list', { auth: true, timeoutMs: 15000 });
+  // 30s: the single-worker backend can be briefly busy finishing a generate/code
+  // call when the deploy modal opens; a tight timeout there fails the whole modal.
+  const resp = await req('/api/credentials/list', { auth: true, timeoutMs: 30000 });
   return resp?.accounts || [];
 }
 
