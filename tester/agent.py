@@ -113,11 +113,12 @@ Decide the SINGLE next action. Return ONLY a JSON object, one of:
   {{"action":"type","idx":N,"text":"...","why":"..."}}     (types text into element N)
   {{"action":"click","idx":N,"why":"..."}}                 (clicks element N)
   {{"action":"verdict","verdict":"pass","reason":"..."}}   (expected outcome confirmed)
-  {{"action":"verdict","verdict":"fail","reason":"...evidence..."}}  (a bug: expected outcome violated)
+  {{"action":"verdict","verdict":"fail","reason":"...evidence...","fix":"..."}}  (a bug: expected outcome violated)
 Fill required fields first, then click the submit/action button, then read the VISIBLE PAGE TEXT
 to judge. Give a verdict as soon as the expected outcome is confirmed OR clearly violated — do not
 keep acting once you can decide. If invalid input was accepted or the wrong item was affected,
-that is a bug: verdict "fail" with the evidence you see in the page text."""
+that is a bug: verdict "fail" with the evidence you see in the page text, PLUS a "fix" field — one
+concrete sentence telling the developer how to fix it (e.g. which validation or handler to add)."""
 
 
 _ELEMENTS_JS = """() => {
@@ -277,6 +278,7 @@ def run_case(page, case: dict, run_dir: Path, case_idx: int, max_steps: int, url
             page.screenshot(path=str(run_dir / f"case{case_idx}_final.png"))
             shots.append(str(run_dir / f"case{case_idx}_final.png"))
             return {"status": act.get("verdict", "inconclusive"), "reason": act.get("reason", ""),
+                    "fix": act.get("fix", ""),
                     "screenshots": shots, "steps_taken": history}
         try:
             note = _act_on(page, int(act.get("idx", -1)), act.get("action"), str(act.get("text", "")))
@@ -354,6 +356,7 @@ def main() -> None:
         "inconclusive": len(results) - passed - failed,
         "cases": [{
             "title": r["case"].get("title", ""), "status": r["status"], "reason": r.get("reason", ""),
+            "fix": r.get("fix", ""),
             "screenshots": r.get("screenshots", []), "learned_skill": r.get("learned_skill"),
         } for r in results],
     }, indent=2))

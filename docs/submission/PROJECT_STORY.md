@@ -50,15 +50,45 @@ The interesting part is what happens when a deploy **fails**:
 4. Every learned skill is embedded and remembered, so the *next* deploy retrieves
    it by similarity and never repeats the mistake.
 
-Then it can **test the deployed app like a human** — a browser agent that plans
-its own test cases, clicks and types through the app, screenshots every step, and
-turns the bugs it finds into more learned skills.
+Then it can **test the deployed app like a human**. The **Testing agent**
+(`qwen3.7-max`) writes its *own* test cases from scratch — for each one it invents
+a title, the exact click-by-click **steps**, and the **expected** outcome, guided
+by the pitfalls it learned on earlier runs. It then drives a **real browser**
+through each case (reading the page's interactive elements so its clicks always
+land) and, for every case, reports a clear verdict:
 
-It's a team of five specialized agents, each powered by Qwen: an **Architecture**
-agent, a **Vision** agent that reads uploaded diagrams, a **Code** agent that
-writes Terraform, a **Repair** agent that heals its own failures, and a
-**Testing** agent that drives the live app. It runs in Slack (the primary
-experience) and as a React web app, on one shared backend.
+- **✅ pass** — the expected outcome was confirmed, or
+- **🐛 fail** — a bug. And when it fails it tells you *three* things: **why**
+  (the exact evidence it saw on the page), a **🔧 suggested fix** (one concrete
+  sentence for the developer — which validation or handler to add), and a
+  **screenshot** of the moment. Each bug is also distilled into a **reusable
+  skill**, so the next run already knows to check for that class of problem.
+
+In one real run against a demo app it authored its own cases and caught **two
+genuine bugs**: a signup form that accepted empty required fields (fix: *"collect
+and display all validation errors at once"*), and a delete button that removed the
+**wrong** item (fix: *"the handler must remove the specific todo from state"*) —
+each with the evidence, the fix, and a screenshot.
+
+## Two ways in, one brain
+
+Everything above works in **two interchangeable interfaces — Slack and a React web
+app — on one shared backend**. They are the *same product with different surfaces*:
+
+- **Slack** is where a team designs, deploys, and reviews **together in a channel**
+  — Block Kit cards for the architecture, cost/performance tabs, component swaps,
+  the deploy, and the test results.
+- The **web app** is the same flow with a **visual architecture canvas**, plus a
+  live **"How It Learned"** view of the skill memory and a **"UI Self-Test"** page.
+
+Because both talk to the **same FastAPI backend**, the behavior is identical — you
+can start a design in the web app and finish it in Slack, or run **both at the same
+time, side by side**. Same brain, different UI.
+
+It's a team of **five specialized agents**, each powered by Qwen: an
+**Architecture** agent that designs the system, a **Vision** agent that reads
+uploaded diagrams, a **Code** agent that writes Terraform, a **Repair** agent that
+heals its own failures, and a **Testing** agent that drives the live app.
 
 ## How I built it
 

@@ -44,7 +44,10 @@ export async function runTester(client, channel, { url, appName = 'webapp' }) {
   }
 
   const lines = report.cases.map(c =>
-    `${STATUS_EMOJI[c.status] || '❓'} *${clip(c.title, 70)}*${c.reason ? `\n      _${clip(c.reason, 180)}_` : ''}${c.learned_skill ? `\n      🧠 learned skill: \`${c.learned_skill}\`` : ''}`);
+    `${STATUS_EMOJI[c.status] || '❓'} *${clip(c.title, 70)}*` +
+    `${c.reason ? `\n      _${clip(c.reason, 180)}_` : ''}` +
+    `${c.fix ? `\n      🔧 suggested fix: ${clip(c.fix, 180)}` : ''}` +
+    `${c.learned_skill ? `\n      🧠 learned skill: \`${c.learned_skill}\`` : ''}`);
   const bugs = report.cases.filter(c => c.status === 'fail').length;
 
   await client.chat.update({

@@ -161,10 +161,11 @@ success + GitLab MR [`tc8-escalation-success.png`](testing/screenshots/slack/tc8
    button on a deploy card that has an app endpoint).
 3. Wait ~3–4 min.
 
-**Expected** — `qwen3.7-max` plans test cases, drives the app in a real browser,
-screenshots each step, posts a **results card** (✅ passed / 🐛 failed / ❓
-inconclusive with reasons), uploads each case’s final screenshot into the
-thread, and turns each bug into a **learned skill**.
+**Expected** — `qwen3.7-max` **writes its own test cases** (title, steps,
+expected outcome), drives the app in a real browser, screenshots each step, and
+posts a **results card**: for each case ✅ pass / 🐛 fail / ❓ inconclusive, and
+for every failure the **reason** (evidence), a **🔧 suggested fix**, the
+screenshot, and a **learned skill** it distilled from the bug.
 
 **Result from the verified run** — 4 cases: **2 passed, 2 real bugs found**:
 - 🐛 signup form accepts empty email/password (only validates `name`)
