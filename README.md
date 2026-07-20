@@ -176,10 +176,11 @@ Every model in the inference path is a **Qwen model served on Qwen Cloud** (Alib
 
 ## Documentation
 
-- [Demo script](docs/DEMO_SCRIPT.md)
+- [**Submission & judging guide**](docs/submission/SUBMISSION.md) — Devpost fields, requirement compliance, and how the project maps to each judging criterion
+- [Proof of Alibaba Cloud deployment](docs/ALIBABA_DEPLOYMENT_PROOF.md) — the live ECS backend + the `alicloud` Terraform that proves it
+- [Test cases](docs/TEST_CASES.md) — reproducible manual test plan with screenshots (Slack + web)
+- [Demo script](docs/submission/DEMO_SCRIPT.md) — 3-minute walkthrough
 - [Devpost / submission copy](DEVPOST.md)
-- [Compliance report](COMPLIANCE_REPORT.md)
-- [Test plan](TEST_PLAN.md)
 
 ## Contributing
 
