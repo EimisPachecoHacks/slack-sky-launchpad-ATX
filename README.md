@@ -82,8 +82,9 @@ To **deploy real infrastructure**, upload an Alibaba Cloud RAM AccessKey in **Se
 Qwen on Qwen Cloud powers **five capabilities** through one OpenAI-compatible
 endpoint; the FastAPI backend runs on **Alibaba Cloud ECS**; the infrastructure
 it generates is applied to **Alibaba Cloud** for real; and every deploy failure
-feeds the **self-improving loop** — *fail → learn → fail → 🔎 web research →
-update skill → succeed → GitLab MR*.
+feeds the **self-improving loop** — *fail → 🔎 web research → learn → retry →
+succeed → GitLab MR*. Web research runs on **every failure, starting from the
+first**, and the cycle repeats until the deploy succeeds.
 
 <details><summary>Same architecture as a mermaid flowchart</summary>
 
@@ -103,7 +104,7 @@ flowchart TB
     Vz["qwen3.7-plus — diagram vision"]
     V["text-embedding-v4 — skill memory"]
     ASR["qwen3-asr-flash — voice input"]
-    WS["web search — research on repeat failure"]
+    WS["web search — research the error (every failure)"]
   end
   subgraph run["Targets & external systems"]
     C[Alibaba Cloud — VPC, VSwitch, SG, ECS, OSS, RDS]
@@ -119,10 +120,9 @@ flowchart TB
   API --> DB
   API --> M
   C -->|success| E
-  T -->|"failure"| B
-  B -->|"1st fix"| T
-  T -->|"fails again"| WS
-  WS -->|"updated skill"| T
+  T -->|"failure (from the 1st)"| WS
+  WS -->|"research"| B
+  B -->|"learn + retry"| T
 ```
 </details>
 

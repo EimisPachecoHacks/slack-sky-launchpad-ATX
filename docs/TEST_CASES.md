@@ -119,22 +119,23 @@ success + GitLab MR [`tc7-deploy-self-heal-success.png`](testing/screenshots/sla
 
 ---
 
-## TC-8 — Deploy with web-research escalation (fail → learn → fail → 🔎 research → update skill → succeed)
+## TC-8 — Deploy with web research on every failure (fail → 🔎 research → learn → retry → … → succeed)
 *Backend env `SKY_DEMO_FAULT=2` (two faults: an invalid argument **and** a
-VSwitch CIDR the Alibaba API rejects at apply — so the first fix isn’t enough).*
+VSwitch CIDR the Alibaba API rejects at apply — so a single fix isn’t enough and
+the loop runs twice).*
 
-**Steps** — same as TC-7. Runs longer (~6–8 min: two repair cycles).
+**Steps** — same as TC-7. Runs longer (~6–8 min: two research+repair cycles).
 
-**Expected arc**
-- Attempt 1 fails (invalid argument) → learns `alicloud-unsupported-argument`.
-- Attempt 2 fails at apply (Alibaba rejects the CIDR) → **escalates**:
-  🔎 investigates the error on the **live Internet** (Qwen web search) → authors
-  an **updated** skill `alicloud-vswitch-cidr-subnet-validation`.
-- Attempt 3 **succeeds**; both skills saved to `skills/learned/`; **GitLab MR**
-  opened; resources destroyed.
+**Expected arc — research runs on the *first* failure, and every one after:**
+- Attempt 1 fails (invalid argument) → 🔎 **researches the error on the live
+  Internet** (Qwen web search) → learns a skill (e.g. `terraform-unsupported-argument`) → retries.
+- Attempt 2 fails at apply (Alibaba rejects the CIDR) → 🔎 **researches again** →
+  learns a skill (e.g. `alicloud-vswitch-cidr-in-vpc`) → retries.
+- Attempt 3 **succeeds**; both skills saved to `skills/learned/` **and pgvector**;
+  **GitLab MR** opened; resources destroyed.
 - Success card shows: **“🧠 Self-healing loop: succeeded on attempt 3 · 🔎
-  researched the failure on the web · learned skills: alicloud-unsupported-argument,
-  alicloud-vswitch-cidr-subnet-validation”**.
+  researched the failure on the web · learned skills: …”**.
+  *(Exact skill slugs are named by the model and vary per run.)*
 
 **What each of your requirements maps to in the deploy log**
 | Requirement | Log line |
