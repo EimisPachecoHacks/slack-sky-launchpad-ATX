@@ -16,7 +16,7 @@ against the requirements and judging criteria.
 | **Track** | Autopilot Agent (Track 4) |
 | **Repository URL** | the public GitHub repo (MIT licensed) |
 | **Proof of Alibaba Cloud deployment** | Link **`deployer/iac_generator.py`** (generates `alicloud` Terraform — 14 `alicloud_*` resources) and **`infra/alibaba/backend/main.tf`** (provisions the ECS/VPC that hosts the backend). Live proof: `http://47.84.111.187:8080/api/status` → `llm_provider: qwen`, `model_id: qwen3.7-max`. See `docs/ALIBABA_DEPLOYMENT_PROOF.md`. |
-| **Architecture diagram** | The mermaid diagram in `README.md` (§ How it works). |
+| **Architecture diagram** | `docs/assets/architecture.png` (also embedded in `README.md` § Architecture, with a mermaid version). |
 | **Demo video** | 1–3 min, public on YouTube/Vimeo. Script: `docs/submission/DEMO_SCRIPT.md`. |
 | **Text description** | `DEVPOST.md` (copy in). |
 
