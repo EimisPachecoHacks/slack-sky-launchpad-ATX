@@ -1218,6 +1218,12 @@ async def deploy_architecture(
             )
             from deployer.deployment_validator import DeploymentResult, analyze_and_fix
             from deployer.config import MAX_DEPLOY_RETRIES
+            # The self-improving repair step: on a failed terraform run it asks the
+            # Qwen repair agent to diagnose + fix the HCL AND author a reusable
+            # SKILL.md, persists it, and returns the corrected files — falling back
+            # to analyze_and_fix if the agent is unavailable. This is what makes the
+            # deploy loop learn (fail → learn → retry → succeed), not just patch.
+            from deployer.main import _repair_failure
 
             if not credential_exists(provider):
                 raise HTTPException(
@@ -1251,6 +1257,8 @@ async def deploy_architecture(
             run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
             workspace = prepare_workspace(provider, run_id)
             final_files = files
+            agent_env_id = None          # correlates repair attempts across retries
+            learned_skills: list[str] = []  # skills the repair agent authored this deploy
 
             for attempt in range(1, MAX_DEPLOY_RETRIES + 1):
                 write_terraform_files(workspace, final_files)
@@ -1286,8 +1294,18 @@ async def deploy_architecture(
                 ok, output = terraform_init(workspace)
                 if not ok:
                     logs.append(f"[WARN] Init failed, auto-fixing...")
-                    result = DeploymentResult(False, output)
-                    final_files, changes = analyze_and_fix(final_files, result.errors)
+                    final_files, changes, agent_env_id = _repair_failure(
+                        provider, config, workspace, final_files, output, agent_env_id
+                    )
+                    for _c in changes:
+                        if _c.lower().startswith("learned skill"):
+                            _slug = _c.split(":", 1)[-1].strip()
+                            learned_skills.append(_slug)
+                            # Phrasing kept parseable by the Slack UI's parseDeployLog
+                            # ("learned skill: <slug>") so the self-healing panel lights up.
+                            logs.append(f"[LEARN] Learned skill: {_slug}")
+                        else:
+                            logs.append(f"[REPAIR] {_c}")
                     if changes and attempt < MAX_DEPLOY_RETRIES:
                         continue
                     raise ValueError(f"terraform init failed: {output[:300]}")
@@ -1296,8 +1314,18 @@ async def deploy_architecture(
                 ok, output = terraform_plan(workspace, var_args)
                 if not ok:
                     logs.append(f"[WARN] Plan failed, auto-fixing...")
-                    result = DeploymentResult(False, output)
-                    final_files, changes = analyze_and_fix(final_files, result.errors)
+                    final_files, changes, agent_env_id = _repair_failure(
+                        provider, config, workspace, final_files, output, agent_env_id
+                    )
+                    for _c in changes:
+                        if _c.lower().startswith("learned skill"):
+                            _slug = _c.split(":", 1)[-1].strip()
+                            learned_skills.append(_slug)
+                            # Phrasing kept parseable by the Slack UI's parseDeployLog
+                            # ("learned skill: <slug>") so the self-healing panel lights up.
+                            logs.append(f"[LEARN] Learned skill: {_slug}")
+                        else:
+                            logs.append(f"[REPAIR] {_c}")
                     if changes and attempt < MAX_DEPLOY_RETRIES:
                         continue
                     raise ValueError(f"terraform plan failed: {output[:300]}")
@@ -1307,8 +1335,18 @@ async def deploy_architecture(
                 if not ok:
                     logger.error(f"[Deploy] terraform apply FAILED:\n{output}")
                     logs.append(f"[WARN] Apply failed: {output[-300:]}")
-                    result = DeploymentResult(False, output)
-                    final_files, changes = analyze_and_fix(final_files, result.errors)
+                    final_files, changes, agent_env_id = _repair_failure(
+                        provider, config, workspace, final_files, output, agent_env_id
+                    )
+                    for _c in changes:
+                        if _c.lower().startswith("learned skill"):
+                            _slug = _c.split(":", 1)[-1].strip()
+                            learned_skills.append(_slug)
+                            # Phrasing kept parseable by the Slack UI's parseDeployLog
+                            # ("learned skill: <slug>") so the self-healing panel lights up.
+                            logs.append(f"[LEARN] Learned skill: {_slug}")
+                        else:
+                            logs.append(f"[REPAIR] {_c}")
                     if changes and attempt < MAX_DEPLOY_RETRIES:
                         logs.append(f"[INFO] Auto-fix applied, retrying...")
                         continue
@@ -1425,6 +1463,7 @@ async def deploy_architecture(
         logger.info(f"   Autopilot Stages: Requirements Analyzer → Qwen IaC Generator → GitLab Code Committer")
         logger.info(f"{'='*60}\n")
 
+        learned = locals().get("learned_skills", []) or []
         return AgentResponse(
             success=True,
             message="Deployment completed successfully",
@@ -1436,8 +1475,14 @@ async def deploy_architecture(
                 "provider": provider,
                 "region": region,
                 "gitlab_mr_url": final_mr_url,
+                # Skills the repair agent authored while healing this deploy — the
+                # self-improving loop. Empty when the deploy succeeded first try.
+                "learned_skills": learned,
             },
-            reasoning=f"Deployed {len(architecture.get('components', []))} components to {provider.upper()} in {region}"
+            reasoning=(
+                f"Deployed {len(architecture.get('components', []))} components to {provider.upper()} in {region}"
+                + (f"; learned {len(learned)} new skill(s) from failures along the way" if learned else "")
+            )
         )
 
     except HTTPException:
