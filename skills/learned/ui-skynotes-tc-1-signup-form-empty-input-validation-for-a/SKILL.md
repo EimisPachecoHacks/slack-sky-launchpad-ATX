@@ -25,4 +25,4 @@ Objective: Verify that the signup form prevents submission when required fields 
 
 ### Fix Pattern
 
-Regression-check this scenario first on similar apps. Expected: The form rejects the submission and displays specific validation error messages for all three empty required fields (e.g., 'Name is required', 'Email is required', and 'Password is required'), rather than only showing the error for the first empty field.
+Regression-check this scenario first on similar apps. Expected: The form rejects the submission and displays specific validation error messages for all three empty required fields (e.g., 'Name is required', 'Email is required', and 'Password is required') simultaneously, rather than only showing the error for the first empty field.

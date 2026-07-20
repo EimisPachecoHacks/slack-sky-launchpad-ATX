@@ -35,7 +35,7 @@ See [`backend/config.py`](config.py) for all options.
 ### 3. Bring up the GPU stack
 
 `bash ../../scripts/pod_up.sh` (hackathon pod) or
-`docker build -f Dockerfile.backend` then run on Alibaba Cloud.
+`docker build -f Dockerfile .` (from the repo root) then run on Alibaba Cloud.
 
 ### 4. Run the Server
 

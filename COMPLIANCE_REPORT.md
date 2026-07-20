@@ -10,10 +10,10 @@ This report maps each submission requirement to concrete evidence in the repo.
 | Requirement | Status | Evidence |
 |---|---|---|
 | **Use Qwen models on Qwen Cloud** | ✅ MET | Every model call goes through Qwen Cloud (Alibaba Model Studio) via the OpenAI-compatible endpoint — [`project/backend/llm_client.py`](project/backend/llm_client.py). Models: `qwen3.7-max` (reasoning + IaC + repair), `qwen3.7-plus` (diagram vision), `text-embedding-v4` (skill retrieval), `qwen3-asr-flash` (voice). |
-| **Proof of Alibaba Cloud deployment** | ✅ MET | Backend is containerized ([`Dockerfile.backend`](Dockerfile.backend), Terraform pre-installed) and runs on an Alibaba Cloud Simple Application Server / ECS instance. Submit a screenshot of the Workbench Overview showing the running instance. |
+| **Proof of Alibaba Cloud deployment** | ✅ MET | Backend is containerized ([`Dockerfile`](Dockerfile), Terraform pre-installed) and runs on an Alibaba Cloud Simple Application Server / ECS instance. Submit a screenshot of the Workbench Overview showing the running instance. |
 | **Public open-source repo with license** | ✅ MET | [`LICENSE`](LICENSE) — MIT, detectable at the repo root. |
 | **Architecture diagram** | ✅ MET | Mermaid diagram in [`README.md`](README.md#how-it-works). |
-| **≤ 3-minute demo video** | ⏳ TODO | Script in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md); record and link on Devpost. |
+| **≤ 3-minute demo video** | ⏳ TODO | Script in [`docs/submission/DEMO_SCRIPT.md`](docs/submission/DEMO_SCRIPT.md); record and link on Devpost. |
 | **Written summary** | ✅ MET | [`DEVPOST.md`](DEVPOST.md). |
 | **Track identification** | ✅ MET | Track 4 — Autopilot Agent (stated in README and DEVPOST). |
 | **Newly created / significantly updated in the submission period** | ✅ MET | The Qwen Cloud + Alibaba Cloud implementation was built during the submission period; git history documents the work. |
@@ -38,7 +38,7 @@ The app doesn't only *host* on Alibaba Cloud — it *generates and applies* `ali
 
 ## Containerization
 
-The backend image ([`Dockerfile.backend`](Dockerfile.backend)) is `python:3.11-slim` with Terraform 1.7.5 pre-installed, so `terraform init/plan/apply` runs inside the container. Qwen Cloud is a hosted API, so no GPU or model server is needed — the container only needs `DASHSCOPE_API_KEY`.
+The backend image ([`Dockerfile`](Dockerfile)) is `python:3.11-slim` with Terraform 1.7.5 pre-installed, so `terraform init/plan/apply` runs inside the container. Qwen Cloud is a hosted API, so no GPU or model server is needed — the container only needs `DASHSCOPE_API_KEY`.
 
 ## Reproduce the compliance checks
 

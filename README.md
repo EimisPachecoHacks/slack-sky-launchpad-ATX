@@ -140,7 +140,7 @@ flowchart TB
 | [`skydb/`](skydb/) | PostgreSQL + pgvector store on Alibaba Cloud + native KNN (pluggable backends) |
 | [`skills/`](skills/) | Reusable SKILL.md modules (Terraform, security, cost, patterns) + `learned/` |
 | [`examples/terraform/`](examples/terraform/) | Reference Terraform implementations |
-| [`Dockerfile.backend`](Dockerfile.backend) | Backend image (Terraform pre-installed) for Alibaba Cloud hosting |
+| [`Dockerfile`](Dockerfile) | Full app image (frontend + FastAPI + nginx + Terraform) built for the Alibaba Cloud ECS backend |
 
 ## Deploying the app to Alibaba Cloud (proof of deployment)
 
