@@ -81,7 +81,7 @@ def _record(model: str, kind: str, duration_ms: float, ok: bool, error: str) -> 
         pass
 
 
-def _post_chat(model: str, messages: list[dict], temperature: float, max_tokens: int, kind: str) -> str:
+def _post_chat(model: str, messages: list[dict], temperature: float, max_tokens: int, kind: str, web_search: bool = False) -> str:
     import httpx
     import time as _time
 
@@ -92,6 +92,12 @@ def _post_chat(model: str, messages: list[dict], temperature: float, max_tokens:
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    if web_search:
+        # Qwen Cloud's built-in web search plugin (DashScope compatible-mode):
+        # the model searches the live Internet server-side before answering.
+        # Used by the repair agent when its own fix failed and it must research
+        # the exact provider error online.
+        payload["enable_search"] = True
     headers = {
         "Authorization": f"Bearer {_api_key()}",
         "Content-Type": "application/json",
@@ -121,16 +127,19 @@ def chat(
     temperature: float = 0.2,
     max_tokens: int = 4096,
     kind: str = "architecture",
+    web_search: bool = False,
 ) -> str:
     """Send a chat completion and return the assistant text.
 
+    ``web_search=True`` turns on Qwen Cloud's server-side Internet search for
+    this call (used when a repair needs live research on an error).
     Raises RuntimeError if no API key is configured, or on a transport/HTTP error.
     """
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
-    return _post_chat(_resolve("LLM_MODEL"), messages, temperature, max_tokens, kind)
+    return _post_chat(_resolve("LLM_MODEL"), messages, temperature, max_tokens, kind, web_search=web_search)
 
 
 def vision_chat(

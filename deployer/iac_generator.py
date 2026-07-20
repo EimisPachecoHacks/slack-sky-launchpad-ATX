@@ -474,10 +474,20 @@ resource "alicloud_security_group" "main" {
     # healing loop then diagnoses it, authors a learned skill, removes the
     # argument, and retries to success — fail -> learn -> retry -> succeed, end
     # to end. No effect unless the env var is set.
-    if os.getenv("SKY_DEMO_FAULT") == "1":
+    if os.getenv("SKY_DEMO_FAULT") in ("1", "2"):
         main_tf = main_tf.replace(
             '  tags                = local.tags\n}',
             '  tags                = local.tags\n  not_a_real_argument = "demo-fault"\n}',
+        )
+    # SKY_DEMO_FAULT=2: ALSO break the vswitch CIDR (outside the VPC's block).
+    # Terraform plan passes; the Alibaba API rejects it at APPLY time, so the
+    # first skill alone doesn't finish the deploy. The loop must then ESCALATE:
+    # research the provider error on the web, author an updated skill, and
+    # retry again — fail -> learn -> fail -> research -> update -> succeed.
+    if os.getenv("SKY_DEMO_FAULT") == "2":
+        main_tf = main_tf.replace(
+            '  cidr_block   = "172.16.0.0/24"',
+            '  cidr_block   = "10.99.0.0/24"',
         )
 
     outputs_tf = """\

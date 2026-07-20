@@ -38,6 +38,7 @@ def diagnose_and_author(
     tf_files: dict[str, str],
     existing_skills: dict[str, str] | None = None,
     env_id: str | None = None,
+    research: bool = False,
 ) -> dict:
     """Diagnose a failed Terraform deployment and author a reusable skill.
 
@@ -60,7 +61,18 @@ def diagnose_and_author(
     tf_files = tf_files or {}
 
     prompt = _build_prompt(failure_context, tf_files, existing_skills)
-    text = _run_llm(prompt)
+    if research:
+        # Escalation: a previous fix on this deployment did not hold. Turn on
+        # live web search and demand an UPDATED skill informed by real docs.
+        prompt = (
+            "ESCALATION — YOUR PREVIOUS FIX DID NOT RESOLVE THE DEPLOYMENT.\n"
+            "The deploy failed again. Use your web search capability to research\n"
+            "the EXACT error message and the cloud provider's current documentation\n"
+            "before answering. Base the fix on what you find, and author an UPDATED,\n"
+            "more general skill (reuse the same skill name if you are improving one\n"
+            "you authored earlier for this deployment).\n\n"
+        ) + prompt
+    text = _run_llm(prompt, web_search=research)
     parsed = _extract_json(text) or {}
 
     return _assemble_result(
@@ -77,11 +89,12 @@ def diagnose_and_author(
 # ---------------------------------------------------------------------------
 
 
-def _run_llm(prompt: str) -> str:
+def _run_llm(prompt: str, web_search: bool = False) -> str:
     """Send the repair prompt to Qwen (qwen3.7-max) and return the raw reply text.
 
-    Imported lazily so the deployer stays usable as a standalone CLI (matching
-    how ``deployer/main.py`` reaches into ``backend``).
+    ``web_search=True`` enables Qwen Cloud's live Internet search for the call
+    (the research escalation). Imported lazily so the deployer stays usable as a
+    standalone CLI (matching how ``deployer/main.py`` reaches into ``backend``).
     """
     try:
         from backend.llm_client import chat
@@ -96,6 +109,7 @@ def _run_llm(prompt: str) -> str:
         temperature=0.1,
         max_tokens=8192,
         kind=REPAIR_KIND,
+        web_search=web_search,
     )
 
 

@@ -59,6 +59,7 @@ def _repair_failure(
     files: dict[str, str],
     output: str,
     agent_env_id: str | None,
+    research: bool = False,
 ) -> tuple[dict[str, str], list[str], str | None]:
     """Self-improving repair step.
 
@@ -83,12 +84,15 @@ def _repair_failure(
         ctx = {"provider": provider, "terraform_errors": result.errors, "summary": output[:1000]}
         print(f"  (failure-context collection degraded: {exc})")
 
+    if research:
+        _narrate("research", "Previous fix didn't hold — investigating this error on the live Internet (Qwen web search)...")
+        record_event("research", "Escalating: web research on the failure", provider=provider, run_id=run_id, error_signature=first_msg)
     _narrate("diagnose", "Handing the logs to the Qwen repair agent to diagnose...")
     record_event("diagnose", "Qwen repair agent diagnosing the failure", provider=provider, run_id=run_id, error_signature=first_msg)
     try:
         from .repair_agent import diagnose_and_author
 
-        out = diagnose_and_author(ctx, files, existing_skills=None, env_id=agent_env_id)
+        out = diagnose_and_author(ctx, files, existing_skills=None, env_id=agent_env_id, research=research)
         agent_env_id = out.get("env_id", agent_env_id)
         fixed = out.get("fixed_files") or {}
         new_skill = out.get("new_skill")

@@ -1294,16 +1294,24 @@ async def deploy_architecture(
                 ok, output = terraform_init(workspace)
                 if not ok:
                     logs.append(f"[WARN] Init failed, auto-fixing...")
+                    # Attempt 1: diagnose from the logs alone. Attempt 2+: the
+                    # previous fix didn't hold, so escalate — research the exact
+                    # error on the live Internet (Qwen web search) and author an
+                    # UPDATED skill before retrying.
+                    if attempt >= 2:
+                        logs.append(f"[RESEARCH] Attempt {attempt} failed too — investigating the error on the web (Qwen search) before updating the skill...")
                     final_files, changes, agent_env_id = _repair_failure(
-                        provider, config, workspace, final_files, output, agent_env_id
+                        provider, config, workspace, final_files, output, agent_env_id,
+                        research=(attempt >= 2),
                     )
                     for _c in changes:
                         if _c.lower().startswith("learned skill"):
                             _slug = _c.split(":", 1)[-1].strip()
                             learned_skills.append(_slug)
                             # Phrasing kept parseable by the Slack UI's parseDeployLog
-                            # ("learned skill: <slug>") so the self-healing panel lights up.
-                            logs.append(f"[LEARN] Learned skill: {_slug}")
+                            # ("learned/updated skill: <slug>") so the panel lights up.
+                            _verb = "Updated" if attempt >= 2 else "Learned"
+                            logs.append(f"[LEARN] {_verb} skill: {_slug}")
                         else:
                             logs.append(f"[REPAIR] {_c}")
                     if changes and attempt < MAX_DEPLOY_RETRIES:
@@ -1314,16 +1322,24 @@ async def deploy_architecture(
                 ok, output = terraform_plan(workspace, var_args)
                 if not ok:
                     logs.append(f"[WARN] Plan failed, auto-fixing...")
+                    # Attempt 1: diagnose from the logs alone. Attempt 2+: the
+                    # previous fix didn't hold, so escalate — research the exact
+                    # error on the live Internet (Qwen web search) and author an
+                    # UPDATED skill before retrying.
+                    if attempt >= 2:
+                        logs.append(f"[RESEARCH] Attempt {attempt} failed too — investigating the error on the web (Qwen search) before updating the skill...")
                     final_files, changes, agent_env_id = _repair_failure(
-                        provider, config, workspace, final_files, output, agent_env_id
+                        provider, config, workspace, final_files, output, agent_env_id,
+                        research=(attempt >= 2),
                     )
                     for _c in changes:
                         if _c.lower().startswith("learned skill"):
                             _slug = _c.split(":", 1)[-1].strip()
                             learned_skills.append(_slug)
                             # Phrasing kept parseable by the Slack UI's parseDeployLog
-                            # ("learned skill: <slug>") so the self-healing panel lights up.
-                            logs.append(f"[LEARN] Learned skill: {_slug}")
+                            # ("learned/updated skill: <slug>") so the panel lights up.
+                            _verb = "Updated" if attempt >= 2 else "Learned"
+                            logs.append(f"[LEARN] {_verb} skill: {_slug}")
                         else:
                             logs.append(f"[REPAIR] {_c}")
                     if changes and attempt < MAX_DEPLOY_RETRIES:
@@ -1335,16 +1351,24 @@ async def deploy_architecture(
                 if not ok:
                     logger.error(f"[Deploy] terraform apply FAILED:\n{output}")
                     logs.append(f"[WARN] Apply failed: {output[-300:]}")
+                    # Attempt 1: diagnose from the logs alone. Attempt 2+: the
+                    # previous fix didn't hold, so escalate — research the exact
+                    # error on the live Internet (Qwen web search) and author an
+                    # UPDATED skill before retrying.
+                    if attempt >= 2:
+                        logs.append(f"[RESEARCH] Attempt {attempt} failed too — investigating the error on the web (Qwen search) before updating the skill...")
                     final_files, changes, agent_env_id = _repair_failure(
-                        provider, config, workspace, final_files, output, agent_env_id
+                        provider, config, workspace, final_files, output, agent_env_id,
+                        research=(attempt >= 2),
                     )
                     for _c in changes:
                         if _c.lower().startswith("learned skill"):
                             _slug = _c.split(":", 1)[-1].strip()
                             learned_skills.append(_slug)
                             # Phrasing kept parseable by the Slack UI's parseDeployLog
-                            # ("learned skill: <slug>") so the self-healing panel lights up.
-                            logs.append(f"[LEARN] Learned skill: {_slug}")
+                            # ("learned/updated skill: <slug>") so the panel lights up.
+                            _verb = "Updated" if attempt >= 2 else "Learned"
+                            logs.append(f"[LEARN] {_verb} skill: {_slug}")
                         else:
                             logs.append(f"[REPAIR] {_c}")
                     if changes and attempt < MAX_DEPLOY_RETRIES:

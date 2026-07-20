@@ -146,7 +146,7 @@ export function successMessage(session, data) {
   if (heal.attempts > 1 || heal.learnedSkills.length) {
     blocksTail.push({
       type: 'context',
-      elements: [mrkdwn(`🧠 Self-healing loop: ${heal.attempts > 1 ? `succeeded on attempt ${heal.attempts}` : 'succeeded first try'}${heal.learnedSkills.length ? ` · learned skill${heal.learnedSkills.length > 1 ? 's' : ''}: ${clip(heal.learnedSkills.join(', '), 200)}` : ''}`)],
+      elements: [mrkdwn(`🧠 Self-healing loop: ${heal.attempts > 1 ? `succeeded on attempt ${heal.attempts}` : 'succeeded first try'}${heal.researched ? ' · 🔎 researched the failure on the web' : ''}${heal.learnedSkills.length ? ` · learned skill${heal.learnedSkills.length > 1 ? 's' : ''}: ${clip(heal.learnedSkills.join(', '), 200)}` : ''}`)],
     });
   }
   const outputs = Object.entries(data.outputs || {}).slice(0, 6);
@@ -227,15 +227,17 @@ export function failureMessage(session, errMessage, logs) {
 export function parseDeployLog(logs) {
   const arr = (logs || []).map(String);
   let attempts = 0;
+  let researched = false;
   const learned = new Set();
   for (const l of arr) {
     const a = l.match(/Attempt (\d+)\s*\/\s*\d+/i);
     if (a) attempts = Math.max(attempts, Number(a[1]));
-    const s = l.match(/learned (?:a new )?skill[:\s]+["'`]?([\w .()-]{3,60})/i)
+    if (/\[RESEARCH\]|investigating the error on the web/i.test(l)) researched = true;
+    const s = l.match(/(?:learned|updated) (?:a new )?skill[:\s]+["'`]?([\w .()-]{3,60})/i)
       || l.match(/(?:authored|created) skill[:\s]+["'`]?([\w .()-]{3,60})/i);
     if (s) learned.add(s[1].trim().replace(/["'`]$/, ''));
   }
-  return { attempts, learnedSkills: [...learned] };
+  return { attempts, researched, learnedSkills: [...learned] };
 }
 
 /** Last ~20 log lines as a fenced context section; full log goes to a snippet. */
