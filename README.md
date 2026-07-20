@@ -107,7 +107,7 @@ flowchart TB
   end
   subgraph run["Targets & external systems"]
     C[Alibaba Cloud — VPC, VSwitch, SG, ECS, OSS, RDS]
-    DB[(MongoDB Atlas Vector Search / local JSON)]
+    DB[(Self-contained skill vector index — cosine over<br/>Qwen text-embedding-v4; managed backends pluggable)]
     E[GitLab API — MR & commits]
   end
   S -->|Socket Mode| API
