@@ -164,7 +164,7 @@ CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 | `LLM_BASE_URL` | OpenAI-compatible inference URL | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` (Qwen Cloud) |
 | `LLM_MODEL` | Text/vision model | `qwen3.7-max` |
 | `EMBED_MODEL` | Skill-retrieval embedder | `text-embedding-v4` |
-| `MONGODB_URI` | Atlas connection (blank = local JSON) | — |
+| `PGVECTOR_DSN` | PostgreSQL + pgvector on Alibaba (blank = local JSON) | — |
 | `PORT` | API port | 8080 |
 
 ## Troubleshooting

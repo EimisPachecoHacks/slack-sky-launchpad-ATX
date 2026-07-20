@@ -15,7 +15,7 @@ Legend: ✅ verified · ⏳ ready to run · 🔑 needs live cloud creds · 🗝�
 | Frontend | Vite dev server, `http://localhost:3001` (proxies `/api` → backend) |
 | Inference | **Qwen Cloud** — `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` (`qwen3.7-max`, `qwen3.7-plus`, `text-embedding-v4`, `qwen3-asr-flash`) |
 | CLI / loop | `deployer/` package (run from repo root) |
-| Keys needed | `DASHSCOPE_API_KEY` for inference; `MONGODB_URI` for Atlas; `GITLAB_TOKEN` for MRs; Alibaba Cloud RAM AccessKey for real deploys |
+| Keys needed | `DASHSCOPE_API_KEY` for inference; `PGVECTOR_DSN` for the pgvector store; `GITLAB_TOKEN` for MRs; Alibaba Cloud RAM AccessKey for real deploys |
 
 **Setup**
 ```bash
@@ -99,6 +99,6 @@ uvicorn backend.api.main:app --host 0.0.0.0 --port 8080
 |---|---|---|---|
 | R-1 | No `DASHSCOPE_API_KEY` | Backend starts; generation raises a clear error, not a crash | ✅ |
 | R-2 | `LLM_PROVIDER=openai` | `ValidationError` at startup (only `qwen` allowed) | ✅ |
-| R-3 | No `MONGODB_URI` | `skydb` falls back to `~/.skyrchitect/db/` local JSON | ✅ |
+| R-3 | No `PGVECTOR_DSN` | `skydb` falls back to local JSON (`~/.skyrchitect/db/`) | ✅ |
 | R-4 | Deleted modules stay deleted | Nothing imports `duo_client`, `whisper_server`, or the old AMD/Gemini/Fireworks modules | ✅ |
 | R-5 | Changing `EMBED_MODEL` invalidates the index | Recreate the Atlas index and re-run `scripts/migrate_vector_index.py` | ⚠️ documented |

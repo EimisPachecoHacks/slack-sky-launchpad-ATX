@@ -8,7 +8,7 @@ The through-line is the money demo: **fail once, learn, never fail again** — o
 
 1. Backend running (locally or on the Alibaba Cloud instance) with `DASHSCOPE_API_KEY` set.
 2. Alibaba Cloud RAM AccessKey uploaded in **Settings → Alibaba Cloud**.
-3. A MongoDB Atlas vector index on `skills` (1024-d, cosine) — or the local fallback.
+3. A PostgreSQL + pgvector index on `skills` (1024-d cosine KNN) on Alibaba Cloud — or the local fallback.
 4. The **Alibaba Cloud Workbench Overview** open in a tab (proof of deployment).
 5. Clean browser profile, 1920×1080, zoom ~125%.
 

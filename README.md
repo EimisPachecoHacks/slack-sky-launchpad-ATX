@@ -67,11 +67,11 @@ curl https://dashscope-intl.aliyuncs.com/compatible-mode/v1/embeddings \
   | jq '.data[0].embedding | length'      # -> 1024
 ```
 
-**One-time**, after creating the Atlas vector index with `numDimensions: 1024`:
-
-```bash
-python3 scripts/migrate_vector_index.py
-```
+**Skill vector store.** Set `PGVECTOR_DSN` to a PostgreSQL + pgvector database
+(it runs on the Alibaba Cloud backend; the store auto-creates its schema and does
+native cosine KNN over the 1024-d Qwen vectors). With no DSN, `skydb` falls back
+to a local JSON index — managed backends (Tair, AnalyticDB, MongoDB, Supabase)
+are pluggable via the same interface.
 
 To **deploy real infrastructure**, upload an Alibaba Cloud RAM AccessKey in **Settings → Alibaba Cloud** (or `POST /api/credentials/upload?provider=alicloud`), then run a deployment.
 
@@ -137,7 +137,7 @@ flowchart TB
 |------|---------|
 | [`project/`](project/) | **React + Vite** frontend and **FastAPI** backend (`project/backend/`) |
 | [`deployer/`](deployer/) | Credential handling, Terraform workspace, deploy / retry / repair / GitLab save |
-| [`skydb/`](skydb/) | MongoDB Atlas store + Vector Search retrieval (local JSON fallback) |
+| [`skydb/`](skydb/) | PostgreSQL + pgvector store on Alibaba Cloud + native KNN (pluggable backends) |
 | [`skills/`](skills/) | Reusable SKILL.md modules (Terraform, security, cost, patterns) + `learned/` |
 | [`examples/terraform/`](examples/terraform/) | Reference Terraform implementations |
 | [`Dockerfile.backend`](Dockerfile.backend) | Backend image (Terraform pre-installed) for Alibaba Cloud hosting |
@@ -170,7 +170,7 @@ the pay-as-you-go resources after judging with
 | Frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind** |
 | Deploy target | **Alibaba Cloud** (`alicloud` Terraform: OSS, VPC, VSwitch) — plus AWS/GCP/Azure |
 | App hosting | **Alibaba Cloud** Simple Application Server / ECS |
-| Skill retrieval | **MongoDB Atlas Vector Search** (1024-d, cosine) |
+| Skill retrieval | **PostgreSQL + pgvector on Alibaba Cloud** (1024-d cosine KNN) |
 | Voice | **`qwen3-asr-flash`** (input) + browser SpeechSynthesis (output; CosyVoice available as a server-side upgrade) |
 
 ## Models & licensing

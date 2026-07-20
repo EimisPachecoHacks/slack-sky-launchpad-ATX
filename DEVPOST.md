@@ -27,7 +27,7 @@ The interesting part is what happens when it **fails**:
 1. **Collect** — `deployer/log_collector.py` gathers the Terraform error and the exact HCL lines around it.
 2. **Diagnose** — `deployer/repair_agent.py` hands that context to **`qwen3.7-max`**, which finds the root cause and rewrites the broken HCL.
 3. **Author** — the same Qwen call writes a **new, generalized `SKILL.md`** — not "fix line 42", but "query available zones and pick a supported ecs instance type before creating the instance."
-4. **Remember** — the skill is embedded by **`text-embedding-v4`** and indexed in MongoDB Atlas Vector Search.
+4. **Remember** — the skill is embedded by **`text-embedding-v4`** and indexed in PostgreSQL + pgvector on Alibaba Cloud.
 5. **Transfer** — the *next* deployment retrieves matching skills by vector similarity and injects them into generation.
 
 The same failure never happens twice. No human ever edits a skill.
@@ -57,7 +57,7 @@ Everything the app touches speaks the **OpenAI wire format**, which collapses ch
 - **`project/backend/llm_client.py`** — `chat`, `vision_chat`, `transcribe`, `embed`, all against the Qwen Cloud compatible endpoint.
 - **`deployer/iac_generator.py`** — generates `alicloud` Terraform (OSS bucket + VPC + VSwitch + security group), plus AWS/GCP/Azure. The globally-unique OSS bucket name is deliberately the failure the learned-skill library pre-empts.
 - **`deployer/repair_agent.py`** — the failure → repair → author-skill engine, on `qwen3.7-max`.
-- **`skydb/`** — MongoDB Atlas Vector Search (1024-d, cosine) with a graceful local-JSON fallback.
+- **`skydb/`** — PostgreSQL + pgvector on Alibaba Cloud (1024-d cosine KNN), with pluggable managed backends.
 - **Alibaba Cloud proof deployment** — the backend/UI is packaged as one Docker image and the reproducible ECS/VPC deployment is defined in `infra/alibaba/backend/main.tf`; generated customer infrastructure lands on Alibaba Cloud too.
 
 The app is containerized (`Dockerfile`, with Terraform pre-installed) for its Alibaba Cloud ECS proof host.
@@ -99,7 +99,7 @@ Sky Launchpad turns each failure into a durable, machine-readable asset that mak
 
 - **Qwen Cloud** (Alibaba Cloud Model Studio) — `qwen3.7-max`, `qwen3.7-plus`, `text-embedding-v4`, `qwen3-asr-flash`
 - **Alibaba Cloud** — deploy target (`alicloud` Terraform: OSS, VPC, VSwitch) and app hosting (Simple Application Server / ECS)
-- **MongoDB Atlas Vector Search** — skill retrieval (1024-d, cosine)
+- **PostgreSQL + pgvector on Alibaba Cloud** — skill retrieval (1024-d cosine KNN)
 - **Terraform** CLI (BUSL-1.1 — invoked, not redistributed; [OpenTofu](https://opentofu.org) drops in), **GitLab REST API** — real deploys, real merge requests
 - **FastAPI** + **Python**, **React 18** + **TypeScript** + **Vite**
 - **Docker** — containerized backend for Alibaba Cloud

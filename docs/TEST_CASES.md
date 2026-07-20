@@ -181,6 +181,27 @@ thread, and turns each bug into a **learned skill**.
 
 ---
 
+## TC-10 — Skill memory: PostgreSQL + pgvector on Alibaba Cloud
+The self-improving loop stores learned-skill vectors in a **PostgreSQL + pgvector**
+database running on the **Alibaba Cloud ECS** backend (`skydb-pg` container), with
+native cosine KNN over Qwen `text-embedding-v4` vectors.
+
+**Verify (from the backend container):**
+```bash
+docker exec sky-launchpad python -c "import skydb; print(skydb._get_store().kind)"   # -> pgvector
+docker exec sky-launchpad python -c "import skydb; print(skydb.find_similar_skills('vswitch outside vpc cidr', k=2))"
+docker exec skydb-pg psql -U postgres -d skydb -c \
+  "SELECT count(*), count(embedding) FROM skydb_docs WHERE coll='skills';"           # -> 12, 12
+```
+
+**Result (verified):** `store = pgvector`; 12 skills loaded, all with vectors;
+semantic queries return the right skill via native KNN —
+*"vswitch outside vpc cidr"* → `alicloud-vswitch-cidr-subnet-validation` (0.66),
+*"signup form validation bug"* → `ui-skynotes-tc-1-empty-input-validation` (0.71).
+A real deploy failure's authored skill lands in the same store. ✅
+
+---
+
 # Part 2 — Website (same flow)
 
 The web app under [`project/`](../project/) shares the same backend, so it runs

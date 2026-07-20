@@ -70,6 +70,16 @@ $ curl http://47.84.111.187:8080/api/status
  "llm_connected":true,"llm_provider":"qwen","model_id":"qwen3.7-max"}
 ```
 
+### Skill vector store — also on Alibaba Cloud
+
+The self-improving skill memory is a **PostgreSQL + pgvector** database (pgvector
+0.8.5) running on the **same Alibaba Cloud ECS instance** (container `skydb-pg`).
+Skill vectors — Qwen `text-embedding-v4`, 1024-d — are retrieved by **native
+cosine KNN** (`ORDER BY embedding <=> query`). 12 learned skills are loaded and
+verified: e.g. a query for *"vswitch outside vpc cidr"* returns
+`alicloud-vswitch-cidr-subnet-validation` (score 0.66). The store is pluggable
+(`skydb`); managed Alibaba backends (Tair, AnalyticDB) drop in via `PGVECTOR_DSN`.
+
 ### Notes from this deployment
 
 - An earlier apply had stopped with `Forbidden.RAM` on `vpc:CreateVpc` and

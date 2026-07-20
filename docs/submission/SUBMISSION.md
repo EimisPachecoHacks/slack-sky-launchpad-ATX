@@ -44,7 +44,7 @@ Qwen is load-bearing across **five** capabilities, not one call bolted on:
 |---|---|---|
 | Architecture design + Terraform generation + failure repair | `qwen3.7-max` | `deployer/`, `project/backend/agents/architecture_agent.py` |
 | Diagram → structured architecture (vision) | `qwen3.7-plus` | `project/backend/agents/image_analysis_agent.py` |
-| Skill retrieval memory (embeddings) | `text-embedding-v4` (1024-d) | `deployer/skill_library.py`, `skydb/` |
+| Skill retrieval memory (embeddings) | `text-embedding-v4` (1024-d) | `deployer/skill_library.py`, `skydb/` — vectors stored in **PostgreSQL + pgvector on Alibaba Cloud** (native cosine KNN) |
 | Voice input | `qwen3-asr-flash` | `project/backend/llm_client.py` |
 | **Live web research on repeat failure** | Qwen Cloud `enable_search` | `deployer/repair_agent.py` (research escalation) |
 
