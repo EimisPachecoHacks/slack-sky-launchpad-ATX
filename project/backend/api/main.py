@@ -1294,15 +1294,14 @@ async def deploy_architecture(
                 ok, output = terraform_init(workspace)
                 if not ok:
                     logs.append(f"[WARN] Init failed, auto-fixing...")
-                    # Attempt 1: diagnose from the logs alone. Attempt 2+: the
-                    # previous fix didn't hold, so escalate — research the exact
-                    # error on the live Internet (Qwen web search) and author an
-                    # UPDATED skill before retrying.
-                    if attempt >= 2:
-                        logs.append(f"[RESEARCH] Attempt {attempt} failed too — investigating the error on the web (Qwen search) before updating the skill...")
+                    # Research on EVERY failure, from the very first: diagnose the
+                    # exact error against the live Internet (Qwen web search) and
+                    # the provider's current docs before authoring/updating the
+                    # skill — so the first fix is already grounded in real sources.
+                    logs.append(f"[RESEARCH] Attempt {attempt} failed — researching the error on the web (Qwen search) before fixing...")
                     final_files, changes, agent_env_id = _repair_failure(
                         provider, config, workspace, final_files, output, agent_env_id,
-                        research=(attempt >= 2),
+                        research=True,
                     )
                     for _c in changes:
                         if _c.lower().startswith("learned skill"):
@@ -1322,15 +1321,14 @@ async def deploy_architecture(
                 ok, output = terraform_plan(workspace, var_args)
                 if not ok:
                     logs.append(f"[WARN] Plan failed, auto-fixing...")
-                    # Attempt 1: diagnose from the logs alone. Attempt 2+: the
-                    # previous fix didn't hold, so escalate — research the exact
-                    # error on the live Internet (Qwen web search) and author an
-                    # UPDATED skill before retrying.
-                    if attempt >= 2:
-                        logs.append(f"[RESEARCH] Attempt {attempt} failed too — investigating the error on the web (Qwen search) before updating the skill...")
+                    # Research on EVERY failure, from the very first: diagnose the
+                    # exact error against the live Internet (Qwen web search) and
+                    # the provider's current docs before authoring/updating the
+                    # skill — so the first fix is already grounded in real sources.
+                    logs.append(f"[RESEARCH] Attempt {attempt} failed — researching the error on the web (Qwen search) before fixing...")
                     final_files, changes, agent_env_id = _repair_failure(
                         provider, config, workspace, final_files, output, agent_env_id,
-                        research=(attempt >= 2),
+                        research=True,
                     )
                     for _c in changes:
                         if _c.lower().startswith("learned skill"):
@@ -1351,15 +1349,14 @@ async def deploy_architecture(
                 if not ok:
                     logger.error(f"[Deploy] terraform apply FAILED:\n{output}")
                     logs.append(f"[WARN] Apply failed: {output[-300:]}")
-                    # Attempt 1: diagnose from the logs alone. Attempt 2+: the
-                    # previous fix didn't hold, so escalate — research the exact
-                    # error on the live Internet (Qwen web search) and author an
-                    # UPDATED skill before retrying.
-                    if attempt >= 2:
-                        logs.append(f"[RESEARCH] Attempt {attempt} failed too — investigating the error on the web (Qwen search) before updating the skill...")
+                    # Research on EVERY failure, from the very first: diagnose the
+                    # exact error against the live Internet (Qwen web search) and
+                    # the provider's current docs before authoring/updating the
+                    # skill — so the first fix is already grounded in real sources.
+                    logs.append(f"[RESEARCH] Attempt {attempt} failed — researching the error on the web (Qwen search) before fixing...")
                     final_files, changes, agent_env_id = _repair_failure(
                         provider, config, workspace, final_files, output, agent_env_id,
-                        research=(attempt >= 2),
+                        research=True,
                     )
                     for _c in changes:
                         if _c.lower().startswith("learned skill"):

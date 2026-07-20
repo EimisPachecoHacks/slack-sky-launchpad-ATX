@@ -62,15 +62,16 @@ def diagnose_and_author(
 
     prompt = _build_prompt(failure_context, tf_files, existing_skills)
     if research:
-        # Escalation: a previous fix on this deployment did not hold. Turn on
-        # live web search and demand an UPDATED skill informed by real docs.
+        # Research mode: turn on live web search and base the fix on real sources.
+        # Runs on the first failure and on every retry, so the prompt must not
+        # assume a prior fix exists.
         prompt = (
-            "ESCALATION — YOUR PREVIOUS FIX DID NOT RESOLVE THE DEPLOYMENT.\n"
-            "The deploy failed again. Use your web search capability to research\n"
-            "the EXACT error message and the cloud provider's current documentation\n"
-            "before answering. Base the fix on what you find, and author an UPDATED,\n"
-            "more general skill (reuse the same skill name if you are improving one\n"
-            "you authored earlier for this deployment).\n\n"
+            "RESEARCH THE ERROR ONLINE BEFORE FIXING.\n"
+            "Use your web search capability to look up the EXACT error message and\n"
+            "the cloud provider's CURRENT documentation, then base your fix on what\n"
+            "you find — not on assumptions. Author a reusable skill that captures\n"
+            "the lesson. If you are improving a skill you authored earlier for this\n"
+            "same deployment, reuse its name and make it more general.\n\n"
         ) + prompt
     text = _run_llm(prompt, web_search=research)
     parsed = _extract_json(text) or {}
